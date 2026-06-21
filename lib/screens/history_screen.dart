@@ -49,7 +49,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundLight,
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text('HISTORIQUE'),
         actions: [
@@ -196,7 +196,7 @@ class _SessionCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        decoration: AppTheme.subtleCard(),
+        decoration: AppTheme.glassmorphism(),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(

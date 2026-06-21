@@ -21,7 +21,7 @@ class SessionDetailScreen extends StatelessWidget {
     final stores = session.items.map((i) => i.storeName).toSet();
     
     return Scaffold(
-      backgroundColor: AppTheme.backgroundLight,
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: Text(
           'Détails',
@@ -162,7 +162,7 @@ class _StatItem extends StatelessWidget {
     
     return Expanded(
       child: Container(
-        decoration: AppTheme.subtleCard(),
+        decoration: AppTheme.glassmorphism(),
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

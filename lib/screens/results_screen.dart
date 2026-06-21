@@ -65,7 +65,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final theme = Theme.of(context);
     
     return Scaffold(
-      backgroundColor: AppTheme.backgroundLight,
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: Text(
           _isSelectionMode ? 'Sélection ($_selectedCount)' : 'RÉSULTATS',
@@ -205,7 +205,7 @@ class _StatItem extends StatelessWidget {
     
     return Expanded(
       child: Container(
-        decoration: AppTheme.subtleCard(),
+        decoration: AppTheme.glassmorphism(),
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

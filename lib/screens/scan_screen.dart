@@ -292,7 +292,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundLight,
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text('SCANNER'),
         actions: [

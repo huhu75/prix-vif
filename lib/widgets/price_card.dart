@@ -24,7 +24,7 @@ class PriceCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: AppTheme.subtleCard(),
+        decoration: AppTheme.glassmorphism(),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -208,7 +208,7 @@ class PriceCardCompact extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: AppTheme.subtleCard(),
+        decoration: AppTheme.glassmorphism(),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
