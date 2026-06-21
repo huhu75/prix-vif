@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
 
-// 💳 Carte d'article scanné avec style moderne 2026
+// 💳 Carte d'article scanné - Design épuré français
 class PriceCard extends StatelessWidget {
   final ScannedItem item;
   final VoidCallback? onTap;
@@ -24,100 +24,28 @@ class PriceCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        decoration: AppTheme.glassmorphism(blur: 15, opacity: 0.08),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: AppTheme.cardGradient,
-            ),
-            child: Row(
-              children: [
-                // Image / Icône
-                Container(
-                  width: 80,
-                  height: 80,
-                  margin: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: item.imageUrl != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            item.imageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.shopping_bag_outlined,
-                              color: Colors.white,
-                              size: 32,
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.shopping_bag_outlined,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                ),
-                
-                // Infos principales
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Nom + Marque
-                        Text(
-                          item.name,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        if (item.brand != null)
-                          Text(
-                            item.brand!,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        const SizedBox(height: 4),
-                        if (showQuantity && item.formattedQuantity.isNotEmpty)
-                          Text(
-                            item.formattedQuantity,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textMuted,
-                              fontSize: 12,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Prix
+        decoration: AppTheme.subtleCard(),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // En-tête : magasin + date
+              if (item.storeName != null || showDate)
                 Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        item.formattedPrice,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: AppTheme.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
+                      if (item.storeName != null)
+                        Text(
+                          item.storeName!,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
                         ),
-                      ),
                       if (showDate)
                         Text(
                           _formatDate(item.scanDate),
@@ -129,8 +57,114 @@ class PriceCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
-            ),
+              
+              // Contenu principal
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceDark,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.black.withOpacity(0.05),
+                        width: 1,
+                      ),
+                    ),
+                    child: item.imageUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              item.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.shopping_bag_outlined,
+                                color: AppTheme.textSecondary,
+                                size: 28,
+                              ),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.shopping_bag_outlined,
+                            color: AppTheme.textSecondary,
+                            size: 28,
+                          ),
+                  ),
+                  const SizedBox(width: 14),
+                  
+                  // Infos principales
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nom du produit
+                        Text(
+                          item.name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        
+                        // Marque
+                        if (item.brand != null)
+                          Text(
+                            item.brand!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        
+                        // Quantité
+                        if (showQuantity && item.formattedQuantity.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(
+                              item.formattedQuantity,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Prix - en grand
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        item.price.toStringAsFixed(2),
+                        style: theme.textTheme.displaySmall?.copyWith(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          height: 1,
+                        ),
+                      ),
+                      Text(
+                        item.currency ?? '€',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -174,65 +208,61 @@ class PriceCardCompact extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: AppTheme.cardGradient,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.05),
-            width: 1,
+        decoration: AppTheme.subtleCard(),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Icône
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceDark,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: AppTheme.textSecondary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // Infos
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${item.formattedPrice}${item.storeName != null ? ' • ${item.storeName}' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Flèche
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textMuted,
+                size: 20,
+              ),
+            ],
           ),
-        ),
-        child: Row(
-          children: [
-            // Icône
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.shopping_bag_outlined,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            // Infos
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${item.formattedPrice} • ${_formatDate(item.scanDate)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Flèche
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppTheme.textMuted,
-              size: 20,
-            ),
-          ],
         ),
       ),
     );

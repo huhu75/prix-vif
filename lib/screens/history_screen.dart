@@ -3,7 +3,6 @@ import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
 
-// 🕒 Écran d'historique des sessions de scan
 class HistoryScreen extends StatefulWidget {
   final List<ScanSession> sessions;
   final Function(ScanSession) onSessionSelected;
@@ -23,10 +22,34 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
+  String? _selectedStoreFilter;
+
+  List<ScanSession> get _filteredSessions {
+    if (_selectedStoreFilter == null) {
+      return widget.sessions;
+    }
+    return widget.sessions
+        .where((session) => 
+            session.items.any((item) => item.storeName == _selectedStoreFilter))
+        .toList();
+  }
+
+  Set<String> get _availableStores {
+    final stores = <String>{};
+    for (final session in widget.sessions) {
+      for (final item in session.items) {
+        if (item.storeName != null) {
+          stores.add(item.storeName!);
+        }
+      }
+    }
+    return stores;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
+      backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
         title: const Text('HISTORIQUE'),
         actions: [
@@ -50,52 +73,100 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ? _EmptyHistoryState()
           : Column(
               children: [
-                // Tri et filtres
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _FilterChip(
-                          label: 'Récents',
-                          isSelected: true,
-                          onSelected: (selected) {},
-                        ),
+                // Filtres par magasin
+                if (_availableStores.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: SizedBox(
+                      height: 40,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: const Text('Tous'),
+                              selected: _selectedStoreFilter == null,
+                              onSelected: (_) {
+                                setState(() {
+                                  _selectedStoreFilter = null;
+                                });
+                              },
+                              backgroundColor: AppTheme.surfaceDark,
+                              selectedColor: AppTheme.primary.withOpacity(0.15),
+                              labelStyle: TextStyle(
+                                color: _selectedStoreFilter == null 
+                                    ? AppTheme.primary 
+                                    : AppTheme.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              side: BorderSide(
+                                color: _selectedStoreFilter == null
+                                    ? AppTheme.primary
+                                    : Colors.black.withOpacity(0.1),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          ..._availableStores.map((store) {
+                            final isSelected = _selectedStoreFilter == store;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(store),
+                                selected: isSelected,
+                                onSelected: (_) {
+                                  setState(() {
+                                    _selectedStoreFilter = isSelected ? null : store;
+                                  });
+                                },
+                                backgroundColor: AppTheme.surfaceDark,
+                                selectedColor: AppTheme.primary.withOpacity(0.15),
+                                labelStyle: TextStyle(
+                                  color: isSelected 
+                                      ? AppTheme.primary 
+                                      : AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? AppTheme.primary
+                                      : Colors.black.withOpacity(0.1),
+                                  width: 1,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _FilterChip(
-                          label: 'Montant ⬆️',
-                          isSelected: false,
-                          onSelected: (selected) {},
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _FilterChip(
-                          label: 'Articles ⬆️',
-                          isSelected: false,
-                          onSelected: (selected) {},
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
                 
                 // Liste des sessions
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: widget.sessions.length,
-                    itemBuilder: (context, index) {
-                      final session = widget.sessions[index];
-                      return _SessionCard(
-                        session: session,
-                        onTap: () => widget.onSessionSelected(session),
-                        onDelete: () => widget.onSessionDeleted(session),
-                      );
-                    },
-                  ),
+                  child: _filteredSessions.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Aucune session pour ce magasin',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          itemCount: _filteredSessions.length,
+                          itemBuilder: (context, index) {
+                            final session = _filteredSessions[index];
+                            return _SessionCard(
+                              session: session,
+                              onTap: () => widget.onSessionSelected(session),
+                              onDelete: () => widget.onSessionDeleted(session),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -103,50 +174,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-// 🎫 Puce de filtre
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final Function(bool) onSelected;
-
-  const _FilterChip({
-    required this.label,
-    required this.isSelected,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onSelected(!isSelected),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? AppTheme.primary.withOpacity(0.2)
-              : AppTheme.surfaceLight,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppTheme.primary : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-}
-
-// 📦 Carte de session
+// Carte de session
 class _SessionCard extends StatelessWidget {
   final ScanSession session;
   final VoidCallback onTap;
@@ -161,132 +189,106 @@ class _SessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final stores = session.items.map((i) => i.storeName).toSet();
+    final storeLabel = stores.isEmpty ? '-' : stores.join(', ');
     
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: AppTheme.glassmorphism(blur: 15, opacity: 0.08),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // En-tête
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Session #${session.id.substring(0, 6)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(session.date),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Menu
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
-                  color: AppTheme.surfaceDark,
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'view',
-                      child: Text(
-                        'Voir les détails',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text(
-                        'Supprimer',
-                        style: TextStyle(color: AppTheme.error),
-                      ),
-                    ),
-                  ],
-                  onSelected: (value) {
-                    if (value == 'view') {
-                      onTap();
-                    } else if (value == 'delete') {
-                      onDelete();
-                    }
-                  },
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Statistiques
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _SessionStat(
-                  icon: Icons.shopping_bag,
-                  label: 'Articles',
-                  value: session.items.length.toString(),
-                  color: AppTheme.primary,
-                ),
-                _SessionStat(
-                  icon: Icons.euro,
-                  label: 'Total',
-                  value: session.totalAmount.toStringAsFixed(2),
-                  color: AppTheme.accent,
-                  suffix: '€',
-                ),
-                _SessionStat(
-                  icon: Icons.access_time,
-                  label: 'Durée',
-                  value: _formatDuration(session),
-                  color: AppTheme.secondary,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Aperçu des articles
-            if (session.items.length <= 3)
-              ...session.items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: PriceCardCompact(item: item),
-              )).toList()
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: AppTheme.subtleCard(),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // En-tête
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  ...session.items.take(2).map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: PriceCardCompact(item: item),
-                  )).toList(),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_formatDate(session.date)}',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          storeLabel,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppTheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppTheme.textMuted, size: 18),
+                    onPressed: onDelete,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Statistiques
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _SessionStat(
+                    icon: Icons.shopping_bag,
+                    label: 'Articles',
+                    value: session.items.length.toString(),
+                  ),
+                  _SessionStat(
+                    icon: Icons.euro,
+                    label: 'Total',
+                    value: session.totalAmount.toStringAsFixed(2),
+                    suffix: '€',
+                  ),
+                  _SessionStat(
+                    icon: Icons.access_time,
+                    label: 'Durée',
+                    value: _formatDuration(session),
+                  ),
+                ],
+              ),
+              
+              // Aperçu des articles
+              if (session.items.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                const SizedBox(height: 10),
+                ...session.items.take(2).map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: PriceCardCompact(item: item),
+                )).toList(),
+                if (session.items.length > 2)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8, left: 8),
+                    padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      '+ ${session.items.length - 2} autres',
-                      style: TextStyle(
+                      '+ ${session.items.length - 2} autre${session.items.length - 2 > 1 ? 's' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: AppTheme.textMuted,
-                        fontSize: 13,
+                        fontSize: 11,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
-                ],
-              ),
-          ],
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -297,14 +299,11 @@ class _SessionCard extends StatelessWidget {
     final difference = now.difference(date);
     
     if (difference.inDays == 0) {
-      if (difference.inHours < 1) {
-        return 'À l\'instant';
-      }
-      return 'Il y a ${difference.inHours}h';
+      return 'Aujourd\'hui';
     } else if (difference.inDays == 1) {
       return 'Hier';
     } else if (difference.inDays < 7) {
-      return 'Il y a ${difference.inDays}j';
+      return 'Il y a ${difference.inDays} j';
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
@@ -318,28 +317,26 @@ class _SessionCard extends StatelessWidget {
     final duration = session.endDate!.difference(session.date);
     
     if (duration.inMinutes < 1) {
-      return ' quelques sec';
+      return '< 1m';
     } else if (duration.inHours < 1) {
       return '${duration.inMinutes}m';
     } else {
-      return '${duration.inHours}h${duration.inMinutes % 60}m';
+      return '${duration.inHours}h${(duration.inMinutes % 60).toString().padLeft(2, '0')}m';
     }
   }
 }
 
-// 📈 Statistique de session
+// Statistique de session
 class _SessionStat extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final Color color;
   final String? suffix;
 
   const _SessionStat({
     required this.icon,
     required this.label,
     required this.value,
-    required this.color,
     this.suffix,
   });
 
@@ -347,21 +344,30 @@ class _SessionStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 20),
+        Icon(icon, color: AppTheme.primary, size: 18),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppTheme.primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
           ),
         ),
+        if (suffix != null)
+          Text(
+            suffix!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppTheme.textMuted,
+              fontSize: 10,
+            ),
+          ),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: AppTheme.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -369,7 +375,7 @@ class _SessionStat extends StatelessWidget {
   }
 }
 
-// 📭 État vide
+// État vide
 class _EmptyHistoryState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -380,46 +386,34 @@ class _EmptyHistoryState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 120,
-            height: 120,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.secondary.withOpacity(0.8), AppTheme.primary.withOpacity(0.8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(60),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withOpacity(0.3),
-                  blurRadius: 40,
-                  spreadRadius: 8,
-                ),
-              ],
+              color: AppTheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.history,
-              color: Colors.white,
-              size: 50,
+              color: AppTheme.primary,
+              size: 40,
             ),
           ),
           const SizedBox(height: 24),
           Text(
             'Aucun historique',
             style: theme.textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Vos sessions de scan apparaissent ici. Sauvegardez une session pour la consulter ultérieurement.',
+              'Vos sessions de scan apparaîtront ici',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondary,
-                height: 1.6,
               ),
             ),
           ),
@@ -429,7 +423,7 @@ class _EmptyHistoryState extends StatelessWidget {
   }
 }
 
-// ❓ Dialogue de confirmation
+// Dialogue de confirmation
 class _ConfirmClearDialog extends StatelessWidget {
   final VoidCallback onConfirm;
 
@@ -438,19 +432,19 @@ class _ConfirmClearDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppTheme.surfaceDark,
+      backgroundColor: AppTheme.surfaceLight,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
       ),
       title: const Text(
         'Tout supprimer ?',
         style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w600,
         ),
       ),
       content: const Text(
-        'Cette action supprimera tout l\'historique. Vous ne pourrez pas annuler.',
+        'L\'historique sera perdu. Vous ne pourrez pas annuler.',
         style: TextStyle(
           color: AppTheme.textSecondary,
           height: 1.5,
@@ -472,15 +466,14 @@ class _ConfirmClearDialog extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.error,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: const Text('Supprimer tout'),
+          child: const Text('Supprimer'),
         ),
       ],
     );
   }
 }
-

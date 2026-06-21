@@ -99,11 +99,16 @@ class _MainScreenState extends State<MainScreen> {
   void _saveSession() {
     if (_currentScannedItems.isEmpty) return;
 
+    final storeName = _currentScannedItems.isNotEmpty
+        ? _currentScannedItems.first.storeName
+        : null;
+
     final session = ScanSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       items: List<ScannedItem>.from(_currentScannedItems),
       date: DateTime.now(),
       endDate: DateTime.now(),
+      storeName: storeName,
     );
 
     setState(() {
@@ -158,70 +163,23 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildBottomNavigationBar() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.black.withOpacity(0.8),
-            Colors.black.withOpacity(0.9),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) => setState(() => _currentIndex = index),
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.qr_code_scanner),
+          label: 'Scanner',
         ),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.05),
-          width: 1,
+        BottomNavigationBarItem(
+          icon: Icon(Icons.receipt_long),
+          label: 'Résultats',
         ),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.history),
+          label: 'Historique',
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 30,
-            spreadRadius: 0,
-            offset: const Offset(0, -10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          selectedItemColor: const Color(0xFF00F5FF),
-          unselectedItemColor: const Color(0xFFB0B0B0),
-          selectedLabelStyle: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w400,
-          ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.qr_code_scanner, size: 22),
-              label: 'Scanner',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long, size: 22),
-              label: 'Resultats',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history, size: 22),
-              label: 'Historique',
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
