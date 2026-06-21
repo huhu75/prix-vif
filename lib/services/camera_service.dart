@@ -9,6 +9,7 @@ class CameraService {
   bool _isInitialized = false;
   bool _hasError = false;
   String? _errorMessage;
+  Future<void>? _initializationFuture;
 
   MobileScannerController get controller => _controller!;
   bool get isTorchEnabled => _isTorchEnabled;
@@ -17,9 +18,7 @@ class CameraService {
   bool get hasError => _hasError;
   String? get errorMessage => _errorMessage;
 
-  CameraService() {
-    _initializeController();
-  }
+  CameraService();
 
   Future<void> _initializeController() async {
     try {
@@ -38,6 +37,10 @@ class CameraService {
       _hasError = true;
       _errorMessage = 'Erreur initialisation: ${e.toString()}';
       _isInitialized = false;
+      
+      // Clean up the failed controller
+      _controller?.dispose();
+      
       // Essayer avec la caméra avant
       try {
         _controller = MobileScannerController(
@@ -55,23 +58,39 @@ class CameraService {
         _hasError = true;
         _errorMessage = 'Aucune caméra disponible: ${e2.toString()}';
         _isInitialized = false;
+        _controller?.dispose();
+        _controller = null;
       }
     }
   }
 
   Future<void> start() async {
-    if (_controller == null || !_isInitialized) {
-      await _initializeController();
-    } else if (!_controller!.value.isInitialized) {
-      await _controller!.start();
+    // Si déjà initialisé, on s'assure qu'il tourne
+    if (_isInitialized && _controller != null) {
+      if (!_controller!.value.isRunning) {
+        await _controller!.start();
+      }
       _isScanning = true;
+      return;
     }
+
+    // Si une initialisation est déjà en cours, on attend sa fin
+    if (_initializationFuture != null) {
+      await _initializationFuture;
+      return;
+    }
+
+    // Sinon, on lance l'initialisation
+    _initializationFuture = _initializeController();
+    await _initializationFuture;
+    _initializationFuture = null;
   }
 
   Future<void> stop() async {
     if (_controller != null) {
       await _controller!.stop();
       _isScanning = false;
+      _isTorchEnabled = false;
     }
   }
 
@@ -191,6 +210,9 @@ class CameraService {
   void dispose() {
     if (_controller != null) {
       _controller!.dispose();
+      _controller = null;
+      _isInitialized = false;
+      _isScanning = false;
     }
   }
 }

@@ -100,6 +100,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   Future<void> _stopScanner() async {
     try {
       await _cameraService.stop();
+      setState(() {});
     } catch (e) {
       // Ignorer les erreurs lors de l'arrêt
     }
@@ -407,11 +408,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           Padding(
             padding: const EdgeInsets.all(20),
             child: MagicButton(
-              text: _cameraService.isInitialized ? 'ARRÊTER' : 'SCANNER',
-              icon: _cameraService.isInitialized ? Icons.stop : Icons.qr_code_scanner,
+              text: _cameraService.isScanning ? 'ARRÊTER' : 'SCANNER',
+              icon: _cameraService.isScanning ? Icons.stop : Icons.qr_code_scanner,
               onPressed: () async {
                 _buttonController.forward().then((_) => _buttonController.reverse());
-                if (_cameraService.isInitialized) {
+                if (_cameraService.isScanning) {
                   await _stopScanner();
                 } else {
                   await _startScanner();

@@ -71,13 +71,9 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
     
     return Stack(
       children: [
-        // Preview de la caméra ou fond noir
+        // Preview de la caméra
         if (widget.cameraPreview != null)
-          widget.cameraPreview!
-        else
-          Container(
-            color: Colors.black,
-          ),
+          widget.cameraPreview!,
         
         // Overlay avec fond semi-transparent autour de la zone de scan
         Container(
