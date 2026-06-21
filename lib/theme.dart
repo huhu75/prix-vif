@@ -1,35 +1,35 @@
 import 'package:flutter/material.dart';
 
-// Thème Bleu Tech - Professionnel 2026
+// Thème Bleu Électrique #00AAFF - Moderne 2026
 class AppTheme {
-  // Couleurs principales - Palette Bleu Tech
-  static const Color backgroundDark = Color(0xFF1E293B); // Fond sombre bleu nuit
-  static const Color surfaceDark = Color(0xFF0F172A); // Surface sombre
-  static const Color surfaceLight = Color(0xFF1E293B); // Surface légèrement plus claire
-  static const Color primary = Color(0xFF3B82F6); // Bleu vif principal
-  static const Color secondary = Color(0xFF8B5CF6); // Violet secondaire
-  static const Color accent = Color(0xFF10B981); // Vert accent
+  // Couleurs principales - Palette autour du bleu #00AAFF
+  static const Color backgroundDark = Color(0xFF0F172A); // Fond bleu nuit très sombre
+  static const Color surfaceDark = Color(0xFF1E293B); // Surface sombre
+  static const Color surfaceLight = Color(0xFF334155); // Surface légèrement plus claire
+  static const Color primary = Color(0xFF00AAFF); // Bleu électrique pour les boutons
+  static const Color secondary = Color(0xFF7C3AED); // Violet profond pour contraste
+  static const Color accent = Color(0xFF00F5FF); // Cyan/bleu clair pour accents
   static const Color error = Color(0xFFEF4444); // Rouge erreur
   static const Color warning = Color(0xFFF59E0B); // Orange avertissement
   static const Color textPrimary = Color(0xFFFFFFFF); // Blanc
-  static const Color textSecondary = Color(0xFF94A3B8); // Gris clair
+  static const Color textSecondary = Color(0xFF94A3B8); // Gris-bleu clair
   static const Color textMuted = Color(0xFF64748B); // Gris moyen
 
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+    colors: [Color(0xFF00AAFF), Color(0xFF0088FF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient surfaceGradient = LinearGradient(
-    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF1E293B), Color(0xFF334155)],
+    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -99,7 +99,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
+          backgroundColor: primary, // #00AAFF pour les boutons
           foregroundColor: backgroundDark,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
@@ -111,12 +111,12 @@ class AppTheme {
             letterSpacing: 0.5,
           ),
           elevation: 0,
-          shadowColor: primary.withOpacity(0.3),
+          shadowColor: primary.withOpacity(0.4),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: textPrimary,
+          foregroundColor: primary, // #00AAFF pour les boutons outlined
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(50),
@@ -129,14 +129,14 @@ class AppTheme {
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: primary,
+        backgroundColor: primary, // #00AAFF pour le FAB
         foregroundColor: backgroundDark,
         elevation: 8,
         shape: CircleBorder(),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surfaceDark.withOpacity(0.8),
-        selectedItemColor: primary,
+        selectedItemColor: primary, // #00AAFF pour l'item sélectionné
         unselectedItemColor: textSecondary,
         selectedLabelStyle: const TextStyle(
           fontSize: 11,
@@ -162,7 +162,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: primary, width: 2),
+          borderSide: const BorderSide(color: primary, width: 2), // #00AAFF
         ),
         hintStyle: const TextStyle(color: textSecondary),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -235,7 +235,7 @@ class AppTheme {
         labelLarge: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: primary,
+          color: primary, // #00AAFF
           letterSpacing: 0.5,
         ),
       ),
