@@ -52,7 +52,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const Text('HISTORIQUE'),
+        title: const NeonTitle(text: 'HISTORIQUE', fontSize: 22),
         actions: [
           if (widget.sessions.isNotEmpty)
             IconButton(

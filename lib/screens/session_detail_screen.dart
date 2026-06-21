@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
+import '../widgets/magic_title.dart';
 
 class SessionDetailScreen extends StatelessWidget {
   final ScanSession session;
@@ -23,10 +24,7 @@ class SessionDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: Text(
-          'Détails',
-          style: theme.appBarTheme.titleTextStyle,
-        ),
+        title: const NeonTitle(text: 'DÉTAILS', fontSize: 22),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: onBack,

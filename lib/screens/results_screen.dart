@@ -68,11 +68,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: Text(
-          _isSelectionMode ? 'Sélection ($_selectedCount)' : 'RÉSULTATS',
-          style: theme.appBarTheme.titleTextStyle?.copyWith(
-            color: _isSelectionMode ? AppTheme.primary : AppTheme.textPrimary,
-          ),
+        title: NeonTitle(
+          text: _isSelectionMode ? 'Sélection ($_selectedCount)' : 'RÉSULTATS',
+          fontSize: 22,
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),

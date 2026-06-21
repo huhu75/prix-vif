@@ -4,6 +4,7 @@ import '../models.dart';
 import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
+import '../widgets/magic_title.dart';
 
 class ScanScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
@@ -298,7 +299,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const Text('SCANNER'),
+        title: const NeonTitle(text: 'SCANNER', fontSize: 22),
         actions: [
           IconButton(
             icon: Badge(
