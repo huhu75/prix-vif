@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'models.dart';
+import 'widgets/logo.dart';
 import 'screens/scan_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/history_screen.dart';
