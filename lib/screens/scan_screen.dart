@@ -61,13 +61,19 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeInOut),
     );
+    
+    // Démarrer la caméra automatiquement
+    _startScanner();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Gérer le cycle de vie pour libérer la caméra quand l'app est en arrière-plan
+    // Gérer le cycle de vie pour libérer/relancer la caméra
     if (state == AppLifecycleState.paused) {
       _stopScanner();
+    } else if (state == AppLifecycleState.resumed) {
+      // Redémarrer la caméra quand l'app revient au premier plan
+      _startScanner();
     }
   }
 
@@ -79,9 +85,17 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         _errorMessage = null;
       });
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur: ${e.toString()}';
-      });
+      // Vérifier si c'est une erreur de permission
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('permission') || errorString.contains('denied')) {
+        setState(() {
+          _errorMessage = 'Permission caméra refusée. Allez dans les paramètres pour autoriser.';
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Erreur caméra: ${e.toString()}';
+        });
+      }
     }
   }
 
