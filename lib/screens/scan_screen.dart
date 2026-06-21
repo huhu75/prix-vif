@@ -26,15 +26,25 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   bool _isFlashOn = false;
   String? _scannedBarcode;
   String? _errorMessage;
-  String _selectedStore = 'Carrefour';
-  
+  final List<String> _stores = [
+    'Carrefour',
+    'Auchan',
+    'Leclerc',
+    'Monoprix',
+    'Franprix',
+    'Biocoop',
+  ];
+  late String _selectedStore;
+
   final TextEditingController _storeController = TextEditingController();
+  final TextEditingController _newStoreController = TextEditingController();
   late AnimationController _buttonController;
   late Animation<double> _buttonScale;
 
   @override
   void initState() {
     super.initState();
+    _selectedStore = _stores.first;
     _storeController.text = _selectedStore;
     _buttonController = AnimationController(
       vsync: this,
@@ -49,7 +59,79 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   void dispose() {
     _buttonController.dispose();
     _storeController.dispose();
+    _newStoreController.dispose();
     super.dispose();
+  }
+
+  Future<void> _addStore() async {
+    _newStoreController.clear();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Ajouter un magasin'),
+        content: TextField(
+          controller: _newStoreController,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            hintText: 'Nom du magasin',
+            filled: true,
+            fillColor: AppTheme.surfaceLight,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = _newStoreController.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.of(dialogContext).pop(name);
+              }
+            },
+            child: const Text('Ajouter'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
+    final trimmed = result.trim();
+    final exists = _stores.any((s) => s.toLowerCase() == trimmed.toLowerCase());
+    if (exists) {
+      setState(() => _selectedStore = _stores.firstWhere(
+        (s) => s.toLowerCase() == trimmed.toLowerCase(),
+      ));
+      return;
+    }
+
+    setState(() {
+      final insertIndex = _stores.indexWhere((s) => s.toLowerCase().compareTo(trimmed.toLowerCase()) > 0);
+      if (insertIndex == -1) {
+        _stores.add(trimmed);
+      } else {
+        _stores.insert(insertIndex, trimmed);
+      }
+      _selectedStore = trimmed;
+      _storeController.text = trimmed;
+    });
   }
 
   Future<void> _simulateScan() async {
@@ -253,52 +335,56 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 const SizedBox(height: 8),
-                DropdownMenu<String>(
-                  initialSelection: _selectedStore,
-                  onSelected: (String? value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedStore = value;
-                        _storeController.text = value;
-                      });
-                    }
-                  },
-                  dropdownMenuEntries: [
-                    'Carrefour',
-                    'Auchan',
-                    'Leclerc',
-                    'Monoprix',
-                    'Franprix',
-                    'Biocoop',
-                  ].map<DropdownMenuEntry<String>>((String value) {
-                    return DropdownMenuEntry<String>(
-                      value: value,
-                      label: value,
-                    );
-                  }).toList(),
-                  width: double.infinity,
-                  inputDecorationTheme: InputDecorationTheme(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    constraints: const BoxConstraints(minHeight: 48),
-                    isDense: true,
-                    filled: true,
-                    fillColor: AppTheme.surfaceLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownMenu<String>(
+                        initialSelection: _selectedStore,
+                        onSelected: (String? value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedStore = value;
+                              _storeController.text = value;
+                            });
+                          }
+                        },
+                        dropdownMenuEntries: _stores
+                            .map<DropdownMenuEntry<String>>((String value) {
+                          return DropdownMenuEntry<String>(
+                            value: value,
+                            label: value,
+                          );
+                        }).toList(),
+                        width: double.infinity,
+                        inputDecorationTheme: InputDecorationTheme(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          constraints: const BoxConstraints(minHeight: 48),
+                          isDense: true,
+                          filled: true,
+                          fillColor: AppTheme.surfaceLight,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                          ),
+                        ),
+                        textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+                    const SizedBox(width: 12),
+                    _AddStoreButton(
+                      onAdd: _addStore,
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-                    ),
-                  ),
-                  textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textPrimary,
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -376,6 +462,53 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AddStoreButton extends StatefulWidget {
+  final VoidCallback onAdd;
+  const _AddStoreButton({required this.onAdd});
+
+  @override
+  State<_AddStoreButton> createState() => _AddStoreButtonState();
+}
+
+class _AddStoreButtonState extends State<_AddStoreButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onAdd();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          decoration: BoxDecoration(
+            color: AppTheme.primary,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withOpacity(0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Icon(Icons.add, color: Colors.white, size: 24),
+          ),
+        ),
       ),
     );
   }
