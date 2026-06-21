@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
+import '../widgets/magic_title.dart';
 
 class HistoryScreen extends StatefulWidget {
   final List<ScanSession> sessions;
@@ -52,7 +53,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const NeonTitle(text: 'HISTORIQUE', fontSize: 22),
+        title: NeonTitle(text: 'HISTORIQUE', fontSize: 22),
         actions: [
           if (widget.sessions.isNotEmpty)
             IconButton(

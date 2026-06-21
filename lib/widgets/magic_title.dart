@@ -188,7 +188,7 @@ class _AITitleState extends State<AITitle> with SingleTickerProviderStateMixin {
         SlideTransition(
           position: _offsetAnimation,
           child: Opacity(
-            opacity: _opacityAnimation,
+            opacity: _opacityAnimation.value,
             child: Text(
               widget.text,
               style: TextStyle(

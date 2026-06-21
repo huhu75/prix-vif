@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
+import '../widgets/magic_title.dart';
 
 class ResultsScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
