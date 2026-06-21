@@ -134,7 +134,6 @@ class AppTheme {
         ),
         type: BottomNavigationBarType.fixed,
         elevation: 1,
-        borderRadius: 0,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

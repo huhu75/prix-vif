@@ -131,13 +131,15 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
                           right: scannerWidth * 0.1,
                           child: Container(
                             height: 2,
-                            color: AppTheme.primary,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withOpacity(0.3),
-                                blurRadius: 6,
-                              ),
-                            ],
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.primary.withOpacity(0.3),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
