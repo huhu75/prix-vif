@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../widgets/scanner_overlay.dart';
+import '../widgets/magic_button.dart';
+import '../widgets/ai_scan_effect.dart';
 
 class ScanScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
@@ -390,75 +392,55 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             ),
           ),
           
-          // Zone de scan
+          // Zone de scan avec effet IA
           Expanded(
-            child: ScannerOverlay(
-              isScanning: _isScanning,
-              scannedBarcode: _scannedBarcode,
-              errorMessage: _errorMessage,
-              isFlashOn: _isFlashOn,
-              onGalleryTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppTheme.primary,
-                    content: Text(
-                      'Sélection depuis la galerie',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                    ),
-                    duration: Duration(seconds: 1),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Effet de scan IA
+                if (_isScanning)
+                  AIScanEffect(
+                    isActive: true,
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    height: MediaQuery.of(context).size.width * 0.8 * 0.6,
                   ),
-                );
-              },
-              onFlashToggle: () {
-                setState(() {
-                  _isFlashOn = !_isFlashOn;
-                });
-              },
+                // Overlay du scanner
+                ScannerOverlay(
+                  isScanning: _isScanning,
+                  scannedBarcode: _scannedBarcode,
+                  errorMessage: _errorMessage,
+                  isFlashOn: _isFlashOn,
+                  onGalleryTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        backgroundColor: AppTheme.primary,
+                        content: Text(
+                          'Sélection depuis la galerie',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                        ),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  onFlashToggle: () {
+                    setState(() {
+                      _isFlashOn = !_isFlashOn;
+                    });
+                  },
+                ),
+              ],
             ),
           ),
           
-          // Bouton scanner
+          // Bouton scanner magique
           Padding(
             padding: const EdgeInsets.all(20),
-            child: AnimatedBuilder(
-              animation: _buttonScale,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _buttonScale.value,
-                  child: ElevatedButton.icon(
-                    onPressed: _simulateScan,
-                    icon: _isScanning
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.qr_code_scanner, size: 22),
-                    label: Text(
-                      _isScanning ? 'SCANNING...' : 'SCANNER',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                );
-              },
+            child: MagicButton(
+              text: _isScanning ? 'SCANNING...' : 'SCANNER UN CODE',
+              icon: Icons.qr_code_scanner,
+              onPressed: _simulateScan,
+              isLoading: _isScanning,
+              isPrimary: true,
             ),
           ),
         ],
