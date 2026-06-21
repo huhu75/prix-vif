@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
+import '../widgets/magic_button.dart';
 
 class HistoryScreen extends StatefulWidget {
   final List<ScanSession> sessions;
@@ -458,20 +459,15 @@ class _ConfirmClearDialog extends StatelessWidget {
             style: TextStyle(color: AppTheme.textSecondary),
           ),
         ),
-        ElevatedButton(
+        MagicButton(
+          text: 'Supprimer',
           onPressed: () {
             onConfirm();
             Navigator.of(context).pop();
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.error,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: const Text('Supprimer'),
+          color: AppTheme.error,
+          width: 120,
+          height: 44,
         ),
       ],
     );

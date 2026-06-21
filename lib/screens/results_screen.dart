@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
+import '../widgets/magic_button.dart';
 
 class ResultsScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
@@ -378,13 +379,11 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 32),
-          ElevatedButton.icon(
+          MagicButton(
+            text: 'SCANNER MAINTENANT',
+            icon: Icons.qr_code_scanner,
             onPressed: onScan,
-            icon: const Icon(Icons.qr_code_scanner, size: 18),
-            label: const Text('SCANNER'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-            ),
+            width: 200,
           ),
         ],
       ),
@@ -427,20 +426,15 @@ class _ConfirmClearDialog extends StatelessWidget {
             style: TextStyle(color: AppTheme.textSecondary),
           ),
         ),
-        ElevatedButton(
+        MagicButton(
+          text: 'Supprimer',
           onPressed: () {
             onConfirm();
             Navigator.of(context).pop();
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.error,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: const Text('Supprimer'),
+          color: AppTheme.error,
+          width: 120,
+          height: 44,
         ),
       ],
     );

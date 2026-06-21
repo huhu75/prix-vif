@@ -100,14 +100,16 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Annuler'),
           ),
-          FilledButton(
+          MagicButton(
+            text: 'Ajouter',
             onPressed: () {
               final name = _newStoreController.text.trim();
               if (name.isNotEmpty) {
                 Navigator.of(dialogContext).pop(name);
               }
             },
-            child: const Text('Ajouter'),
+            width: 120,
+            height: 44,
           ),
         ],
       ),

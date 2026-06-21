@@ -8,6 +8,7 @@ class MagicButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isPrimary;
+  final Color? color;
   final double width;
   final double height;
 
@@ -18,6 +19,7 @@ class MagicButton extends StatefulWidget {
     this.onPressed,
     this.isLoading = false,
     this.isPrimary = true,
+    this.color,
     this.width = double.infinity,
     this.height = 60,
   });
@@ -57,7 +59,7 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = widget.isPrimary ? AppTheme.primary : AppTheme.secondary;
+    final buttonColor = widget.color ?? (widget.isPrimary ? AppTheme.primary : AppTheme.secondary);
     
     return AnimatedBuilder(
       animation: _glowAnimation,
