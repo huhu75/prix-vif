@@ -15,10 +15,11 @@
 ## ✨ Fonctionnalités
 
 ### 🎯 Scanner
-- Interface de scanner intuitive avec animation de ligne de détection
-- Simulation de scan avec génération de produits aléatoires
-- Contrôles de la caméra : flash, sélection depuis la galerie
+- **Caméra réelle** : Accès à la caméra du téléphone/tablette
+- Scan de codes-barres en temps réel
+- Contrôles de la caméra : flash
 - Aperçu des derniers articles scannés
+- Interface intuitive avec animation de ligne de détection
 
 ### 📊 Résultats
 - Liste des articles scannés avec cartes modernes
@@ -62,6 +63,7 @@
 - [Dart SDK](https://dart.dev/get-dart) **3.0+**
 - IDE recommandé : Android Studio, VS Code ou IntelliJ IDEA
 - Un émulateur ou un appareil physique connecté
+- **Android 6.0+** ou **iOS 12+** (pour la caméra)
 
 ---
 
@@ -92,9 +94,14 @@ flutter run -d iPhone
 # Sur Android
 flutter run -d emulator-5554
 
-# Sur le web
-flutter run -d chrome
+# Build APK pour Android
+flutter build apk --release
+
+# Build App Bundle pour Android
+flutter build appbundle --release
 ```
+
+> ⚠️ **Note** : Le web n'est pas supporté avec la caméra réelle. Utilisez `flutter run -d chrome` uniquement pour le design, mais pas pour tester la fonctionnalité caméra.
 
 ---
 
@@ -106,6 +113,9 @@ prix_vif/
 │   ├── main.dart                 # Point d'entrée + navigation
 │   ├── models.dart              # Modèles de données
 │   ├── theme.dart               # Thème moderne 2026
+│   │
+│   ├── services/
+│   │   └── camera_service.dart   # Service de gestion de la caméra
 │   │
 │   ├── screens/
 │   │   ├── scan_screen.dart      # Écran scanner
@@ -160,15 +170,35 @@ prix_vif/
 
 ---
 
+## 🎯 Utilisation
+
+### Scanner un produit
+1. Lancez l'application sur votre appareil Android/iOS
+2. Autorisez l'accès à la caméra
+3. Appuyez sur "SCANNER"
+4. Pointez la caméra vers un code-barres
+5. Le code est scanné automatiquement
+
+### Consulter les résultats
+- Icône de reçu → affiche la liste
+- Sélection multiple → suppression
+- Bouton "Enregistrer" → sauvegarde la session
+
+### Consulter l'historique
+- Icône historique → listes des sessions
+- Appuyez sur une session → détails
+- Menu → supprimer
+
+---
+
 ## 🔧 Développement Futur
 
-Pour rendre l'app fonctionnelle :
-- [ ] SDK de scan (flutter_barcode_scanner)
-- [ ] API produits (OpenFoodFacts)
-- [ ] Base de données (Hive, SQLite)
+Pour améliorer l'app :
+- [ ] API produits (OpenFoodFacts) pour récupérer les infos réelles
+- [ ] Base de données (Hive, SQLite) pour persister les données
 - [ ] Synchronisation cloud
 - [ ] Export CSV/PDF
-- [ ] Comparaison de prix
+- [ ] Comparaison de prix entre magasins
 
 ---
 
