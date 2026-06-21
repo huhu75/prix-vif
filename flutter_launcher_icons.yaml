@@ -1,20 +1,21 @@
 # Configuration for flutter_launcher_icons package
 # Run: flutter pub run flutter_launcher_icons:main
+#
+# NOTE: Convert app_icon.svg to PNG first using:
+#   rsvg-convert -w 1024 -h 1024 assets/images/app_icon.svg > assets/images/app_icon.png
+# OR use an online SVG to PNG converter
 
 flutter_launcher_icons:
   # Android configuration
   android: true
   ios: true
-  image_path: "assets/images/app_icon.svg"
-  image_path_android: "assets/images/app_icon.svg"
-  image_path_ios: "assets/images/app_icon.svg"
+  image_path: "assets/images/app_icon.png"
+  image_path_android: "assets/images/app_icon.png"
+  image_path_ios: "assets/images/app_icon.png"
   
   # Adaptive icon for Android 8.0+
   adaptive_icon_background: "#0F172A"
-  adaptive_icon_foreground: "assets/images/app_icon.svg"
-  
-  # App icon size (default: 1024x1024)
-  # For best results, use a square image at least 1024x1024
+  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"
   
   # Min SDK version (default: 21)
   min_sdk_android: 21
@@ -25,17 +26,17 @@ flutter_launcher_icons:
   # Web configuration
   web:
     generate: true
-    image_path: "assets/images/app_icon.svg"
+    image_path: "assets/images/app_icon.png"
     background_color: "#0F172A"
     theme_color: "#00AAFF"
   
   # Windows configuration
   windows:
     generate: true
-    image_path: "assets/images/app_icon.svg"
-    icon_size: 48 # min:48, max:256, default:48
+    image_path: "assets/images/app_icon.png"
+    icon_size: 48
   
   # macOS configuration
   macos:
     generate: true
-    image_path: "assets/images/app_icon.svg"
+    image_path: "assets/images/app_icon.png"

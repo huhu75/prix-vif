@@ -1,11 +1,11 @@
 {
-    "name": "prix_vif",
-    "short_name": "prix_vif",
+    "name": "Prix Vif",
+    "short_name": "PrixVif",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F172A",
+    "theme_color": "#00AAFF",
+    "description": "Prix Vif - Scanner de prix moderne 2026",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
