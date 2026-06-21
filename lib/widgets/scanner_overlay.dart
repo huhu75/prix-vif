@@ -79,18 +79,6 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Message principal
-              Padding(
-                padding: const EdgeInsets.only(bottom: 32),
-                child: Text(
-                  'Scannez',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              
               // Cadre du scanner avec animation
               Stack(
                 alignment: Alignment.center,
@@ -173,7 +161,7 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
               Padding(
                 padding: const EdgeInsets.only(top: 24, bottom: 16),
                 child: Text(
-                  'Alignez le code-barres ou le QR code \n dans le cadre pour scanner',
+                  'Scannez codes-barres, tickets de caisse\n ou étiquettes de prix',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,

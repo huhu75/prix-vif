@@ -439,7 +439,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           Padding(
             padding: const EdgeInsets.all(20),
             child: MagicButton(
-              text: _isScanning ? 'SCANNING...' : 'SCANNER UN CODE',
+              text: _isScanning ? 'SCANNING...' : 'SCANNER',
               icon: Icons.qr_code_scanner,
               onPressed: _simulateScan,
               isLoading: _isScanning,
