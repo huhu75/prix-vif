@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
 import '../widgets/magic_title.dart';
+import '../services/barcode_scanner.dart';
 
 class ScanScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
@@ -24,7 +26,7 @@ class ScanScreen extends StatefulWidget {
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin {
+class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isScanning = false;
   bool _isFlashOn = false;
   String? _scannedBarcode;
@@ -38,6 +40,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     'Biocoop',
   ];
   late String _selectedStore;
+  
+  // Service de scan de codes-barres
+  final BarcodeScannerService _scannerService = createBarcodeScannerService();
 
   final TextEditingController _storeController = TextEditingController();
   final TextEditingController _newStoreController = TextEditingController();
@@ -47,6 +52,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedStore = _stores.first;
     _storeController.text = _selectedStore;
     _buttonController = AnimationController(
@@ -56,10 +62,75 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeInOut),
     );
+    
+    // Initialiser le scanner
+    _initializeScanner();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Gérer le cycle de vie pour libérer la caméra quand l'app est en arrière-plan
+    if (state == AppLifecycleState.paused) {
+      _stopScanner();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_isScanning) {
+        _startScanner();
+      }
+    }
+  }
+
+  Future<void> _initializeScanner() async {
+    try {
+      await _scannerService.start();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Impossible d\'initialiser la caméra';
+      });
+    }
+  }
+
+  Future<void> _startScanner() async {
+    try {
+      await _scannerService.start();
+      setState(() {
+        _isScanning = true;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _stopScanner() async {
+    try {
+      await _scannerService.stop();
+      setState(() {
+        _isScanning = false;
+      });
+    } catch (e) {
+      // Ignorer les erreurs lors de l'arrêt
+    }
+  }
+
+  Future<void> _toggleFlash() async {
+    try {
+      await _scannerService.toggleTorch();
+      _isFlashOn = _scannerService.isTorchEnabled;
+      setState(() {});
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Impossible d\'activer le flash';
+        _isFlashOn = false;
+      });
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopScanner();
     _buttonController.dispose();
     _storeController.dispose();
     _newStoreController.dispose();
@@ -139,160 +210,67 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     });
   }
 
-  Future<void> _simulateScan() async {
-    if (_isScanning) return;
-    
-    setState(() {
-      _isScanning = true;
-      _errorMessage = null;
-    });
-    
-    _buttonController.forward().then((_) => _buttonController.reverse());
-    
-    await Future.delayed(const Duration(seconds: 2));
-    
-    final fakeBarcode = _generateFakeBarcode();
-    
-    setState(() {
-      _scannedBarcode = fakeBarcode;
+  void _onBarcodeScanned(BarcodeCapture barcodes) {
+    if (_isScanning && barcodes.barcodes.isNotEmpty) {
+      final barcode = barcodes.barcodes.first;
+      final barcodeValue = barcode.rawValue ?? '';
+      
+      // Arrêter le scan temporairement
       _isScanning = false;
-    });
-    
-    await Future.delayed(const Duration(milliseconds: 1000));
-    
-    final fakeItem = _generateFakeItem(fakeBarcode);
-    widget.onItemScanned(fakeItem);
-    
-    setState(() {
-      _scannedBarcode = null;
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.primary,
-        content: Text(
-          'Produit scanné : ${fakeItem.name}',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+      setState(() {
+        _scannedBarcode = barcodeValue;
+      });
+      
+      // Vibrer pour confirmer le scan (simulé)
+      // Sur mobile réel, on pourrait utiliser Vibrate.vibrate
+      
+      // Traiter le code scanné
+      final scannedItem = ScannedItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: 'Produit scanné',
+        brand: 'Marque inconnue',
+        price: 0.0,
+        quantity: 1,
+        unit: 'unité',
+        scanDate: DateTime.now(),
+        barcode: barcodeValue,
+        imageUrl: 'https://via.placeholder.com/150x150/CCCCCC/000000?text=📦',
+        storeName: _selectedStore,
+      );
+      
+      widget.onItemScanned(scannedItem);
+      
+      // Afficher notification
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.primary,
+          content: Text(
+            'Code scanné : $barcodeValue',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-    );
+      );
+      
+      // Réinitialiser après un court délai
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() {
+            _scannedBarcode = null;
+            _isScanning = true;
+          });
+        }
+      });
+    }
   }
 
-  String _generateFakeBarcode() {
-    final prefixes = ['300', '301', '302', '303', '304', '305', '306', '307', '308', '309'];
-    final random = DateTime.now().millisecondsSinceEpoch;
-    final prefix = prefixes[random % prefixes.length];
-    final suffix = (100000000 + random % 900000000).toString();
-    return '$prefix$suffix';
-  }
 
-  ScannedItem _generateFakeItem(String barcode) {
-    final products = [
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Lait Demi-Écrémé UHT',
-        brand: 'Candia',
-        price: 1.49 + (DateTime.now().second % 50) / 100.0,
-        quantity: 1,
-        unit: 'L',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/E6F3FF/000000?text=🥛',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Pain de Mie Brioché',
-        brand: 'Brioché Doré',
-        price: 2.99 + (DateTime.now().second % 50) / 100.0,
-        quantity: 500,
-        unit: 'g',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/FFF8E1/000000?text=🍞',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Eau Minérale Naturelle',
-        brand: 'Evian',
-        price: 0.89 + (DateTime.now().second % 30) / 100.0,
-        quantity: 1.5,
-        unit: 'L',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/E0F7FA/000000?text=💧',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Café Moulu Arabica',
-        brand: 'Nescafé',
-        price: 4.50 + (DateTime.now().second % 80) / 100.0,
-        quantity: 250,
-        unit: 'g',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/FFF3E0/000000?text=☕',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Pâtes Spaghetti',
-        brand: 'Barilla',
-        price: 1.89 + (DateTime.now().second % 40) / 100.0,
-        quantity: 500,
-        unit: 'g',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/FFF8E1/000000?text=🍝',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Chocolat Noir 70%',
-        brand: 'Lindt',
-        price: 2.49 + (DateTime.now().second % 60) / 100.0,
-        quantity: 100,
-        unit: 'g',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/D2B48C/000000?text=🍫',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Jus d\'Orange Pressé',
-        brand: 'Tropicana',
-        price: 2.29 + (DateTime.now().second % 45) / 100.0,
-        quantity: 1,
-        unit: 'L',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/FFE0B2/000000?text=🍊',
-        storeName: _selectedStore,
-      ),
-      ScannedItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'Yaourt Nature',
-        brand: 'Danone',
-        price: 0.59 + (DateTime.now().second % 20) / 100.0,
-        quantity: 4,
-        unit: 'x 125g',
-        scanDate: DateTime.now(),
-        barcode: barcode,
-        imageUrl: 'https://via.placeholder.com/150x150/FFFFFF/000000?text=🥛',
-        storeName: _selectedStore,
-      ),
-    ];
-    
-    return products[DateTime.now().second % products.length];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -400,6 +378,12 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Scanner de codes-barres
+                _scannerService.buildScanner(
+                  onDetect: (BarcodeCapture capture) => _onBarcodeScanned(capture),
+                  context: context,
+                ),
+                
                 // Effet de scan IA
                 if (_isScanning)
                   AIScanEffect(
@@ -407,7 +391,8 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     width: MediaQuery.of(context).size.width * 0.8,
                     height: MediaQuery.of(context).size.width * 0.8 * 0.6,
                   ),
-                // Overlay du scanner
+                
+                // Overlay du scanner avec cadre
                 ScannerOverlay(
                   isScanning: _isScanning,
                   scannedBarcode: _scannedBarcode,
@@ -425,11 +410,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       ),
                     );
                   },
-                  onFlashToggle: () {
-                    setState(() {
-                      _isFlashOn = !_isFlashOn;
-                    });
-                  },
+                  onFlashToggle: _toggleFlash,
                 ),
               ],
             ),
@@ -439,10 +420,17 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           Padding(
             padding: const EdgeInsets.all(20),
             child: MagicButton(
-              text: _isScanning ? 'SCANNING...' : 'SCANNER',
-              icon: Icons.qr_code_scanner,
-              onPressed: _simulateScan,
-              isLoading: _isScanning,
+              text: _isScanning ? 'ARRÊTER' : 'SCANNER',
+              icon: _isScanning ? Icons.stop : Icons.qr_code_scanner,
+              onPressed: () async {
+                _buttonController.forward().then((_) => _buttonController.reverse());
+                if (_isScanning) {
+                  await _stopScanner();
+                } else {
+                  await _startScanner();
+                }
+              },
+              isLoading: false,
               isPrimary: true,
             ),
           ),

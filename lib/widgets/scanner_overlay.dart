@@ -6,8 +6,9 @@ class ScannerOverlay extends StatefulWidget {
   final String? scannedBarcode;
   final String? errorMessage;
   final VoidCallback onGalleryTap;
-  final VoidCallback onFlashToggle;
+  final VoidCallback? onFlashToggle;
   final bool isFlashOn;
+  final Widget? cameraPreview;
 
   const ScannerOverlay({
     super.key,
@@ -15,8 +16,9 @@ class ScannerOverlay extends StatefulWidget {
     this.scannedBarcode,
     this.errorMessage,
     required this.onGalleryTap,
-    required this.onFlashToggle,
+    this.onFlashToggle,
     this.isFlashOn = false,
+    this.cameraPreview,
   });
 
   @override
@@ -69,9 +71,20 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
     
     return Stack(
       children: [
-        // Fond semi-transparent
+        // Preview de la caméra ou fond noir
+        if (widget.cameraPreview != null)
+          widget.cameraPreview!
+        else
+          Container(
+            color: Colors.black,
+          ),
+        
+        // Overlay avec fond semi-transparent autour de la zone de scan
         Container(
-          color: Colors.black.withOpacity(0.5),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            backgroundBlendMode: BlendMode.darken,
+          ),
         ),
         
         // Zone de scan
@@ -83,7 +96,7 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
               Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Cadre
+                  // Cadre transparent avec bordure
                   Container(
                     width: scannerWidth,
                     height: scannerHeight,
@@ -99,7 +112,7 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(15),
                       child: Container(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.transparent,
                       ),
                     ),
                   ),
@@ -252,13 +265,24 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
                 onTap: widget.onGalleryTap,
               ),
               
-              // Bouton Flash
-              _ControlButton(
-                icon: widget.isFlashOn ? Icons.flash_on : Icons.flash_off,
-                label: widget.isFlashOn ? 'Éteindre' : 'Allumer',
-                onTap: widget.onFlashToggle,
-                isActive: widget.isFlashOn,
-              ),
+              // Bouton Flash (désactivé si callback null)
+              if (widget.onFlashToggle != null)
+                _ControlButton(
+                  icon: widget.isFlashOn ? Icons.flash_on : Icons.flash_off,
+                  label: widget.isFlashOn ? 'Éteindre' : 'Allumer',
+                  onTap: widget.onFlashToggle!,
+                  isActive: widget.isFlashOn,
+                )
+              else
+                Opacity(
+                  opacity: 0.5,
+                  child: _ControlButton(
+                    icon: Icons.flash_off,
+                    label: 'Non dispo.',
+                    onTap: () {},
+                    isActive: false,
+                  ),
+                ),
             ],
           ),
         ),
