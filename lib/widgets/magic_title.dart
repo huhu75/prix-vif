@@ -60,60 +60,69 @@ class _MagicTitleState extends State<MagicTitle> with SingleTickerProviderStateM
           fontSize: widget.fontSize,
           fontWeight: FontWeight.bold,
           color: Colors.white,
-          letterSpacing: 1.5,
+          letterSpacing: 1.0,
         ),
+        overflow: TextOverflow.fade,
+        maxLines: 1,
       );
     }
 
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            // Glow effect
-            Text(
-              widget.text,
-              style: TextStyle(
-                fontSize: widget.fontSize,
-                fontWeight: FontWeight.bold,
-                foreground: Paint()
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = 2.0
-                  ..color = _colorAnimation.value!.withOpacity(0.5 * _glowAnimation.value),
-                letterSpacing: 1.5,
-                shadows: [
-                  Shadow(
-                    color: _colorAnimation.value!.withOpacity(0.3),
-                    blurRadius: _glowAnimation.value * 10,
-                    offset: Offset.zero,
-                  ),
-                  Shadow(
-                    color: _colorAnimation.value!.withOpacity(0.2),
-                    blurRadius: _glowAnimation.value * 15,
-                    offset: Offset.zero,
-                  ),
-                ],
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: double.infinity),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Glow effect
+              Text(
+                widget.text,
+                style: TextStyle(
+                  fontSize: widget.fontSize,
+                  fontWeight: FontWeight.bold,
+                  foreground: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 2.0
+                    ..color = _colorAnimation.value!.withOpacity(0.5 * _glowAnimation.value),
+                  letterSpacing: 1.0,
+                  shadows: [
+                    Shadow(
+                      color: _colorAnimation.value!.withOpacity(0.3),
+                      blurRadius: _glowAnimation.value * 10,
+                      offset: Offset.zero,
+                    ),
+                    Shadow(
+                      color: _colorAnimation.value!.withOpacity(0.2),
+                      blurRadius: _glowAnimation.value * 15,
+                      offset: Offset.zero,
+                    ),
+                  ],
+                ),
+                overflow: TextOverflow.fade,
+                maxLines: 1,
               ),
-            ),
-            // Main text
-            Text(
-              widget.text,
-              style: widget.style ?? TextStyle(
-                fontSize: widget.fontSize,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 1.5,
-                shadows: [
-                  Shadow(
-                    color: _colorAnimation.value!.withOpacity(0.2),
-                    blurRadius: 5,
-                    offset: Offset.zero,
-                  ),
-                ],
+              // Main text
+              Text(
+                widget.text,
+                style: widget.style ?? TextStyle(
+                  fontSize: widget.fontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1.0,
+                  shadows: [
+                    Shadow(
+                      color: _colorAnimation.value!.withOpacity(0.2),
+                      blurRadius: 5,
+                      offset: Offset.zero,
+                    ),
+                  ],
+                ),
+                overflow: TextOverflow.fade,
+                maxLines: 1,
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -170,44 +179,51 @@ class _AITitleState extends State<AITitle> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (widget.icon != null) ...[
-          SlideTransition(
-            position: _offsetAnimation,
-            child: Icon(
-              widget.icon!,
-              size: widget.fontSize * 0.8,
-              color: AppTheme.primary,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (widget.icon != null) ...[
+            SlideTransition(
+              position: _offsetAnimation,
+              child: Icon(
+                widget.icon!,
+                size: widget.fontSize * 0.8,
+                color: AppTheme.primary,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        SlideTransition(
-          position: _offsetAnimation,
-          child: Opacity(
-            opacity: _opacityAnimation.value,
-            child: Text(
-              widget.text,
-              style: TextStyle(
-                fontSize: widget.fontSize,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 1.5,
-                shadows: [
-                  Shadow(
-                    color: AppTheme.primary.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: Offset.zero,
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: SlideTransition(
+              position: _offsetAnimation,
+              child: Opacity(
+                opacity: _opacityAnimation.value,
+                child: Text(
+                  widget.text,
+                  style: TextStyle(
+                    fontSize: widget.fontSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.0,
+                    shadows: [
+                      Shadow(
+                        color: AppTheme.primary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset.zero,
+                      ),
+                    ],
                   ),
-                ],
+                  overflow: TextOverflow.fade,
+                  maxLines: 1,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -220,57 +236,64 @@ class ScannerTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Background glow
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 3.0
-              ..color = AppTheme.primary.withOpacity(0.3),
-            letterSpacing: 2.0,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Background glow
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 3.0
+                ..color = AppTheme.primary.withOpacity(0.3),
+              letterSpacing: 1.0,
+            ),
+            overflow: TextOverflow.fade,
+            maxLines: 1,
           ),
-        ),
-        // Main text
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 2.0,
+          // Main text
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 1.0,
+            ),
+            overflow: TextOverflow.fade,
+            maxLines: 1,
           ),
-        ),
-        // Scan line effect (top)
-        Positioned(
-          top: -8,
-          child: Container(
-            width: 40,
-            height: 2,
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(1),
+          // Scan line effect (top)
+          Positioned(
+            top: -8,
+            child: Container(
+              width: 40,
+              height: 2,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(1),
+              ),
             ),
           ),
-        ),
-        // Scan line effect (bottom)
-        Positioned(
-          bottom: -8,
-          child: Container(
-            width: 40,
-            height: 2,
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(1),
+          // Scan line effect (bottom)
+          Positioned(
+            bottom: -8,
+            child: Container(
+              width: 40,
+              height: 2,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(1),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -317,45 +340,52 @@ class NeonTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Neon glow (multiple layers)
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 3.0
-              ..color = AppTheme.primary.withOpacity(0.4),
-            letterSpacing: 1.5,
-            shadows: [
-              Shadow(
-                color: AppTheme.primary,
-                blurRadius: 15,
-                offset: Offset.zero,
-              ),
-              Shadow(
-                color: AppTheme.primary,
-                blurRadius: 25,
-                offset: Offset.zero,
-              ),
-            ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Neon glow (multiple layers)
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 3.0
+                ..color = AppTheme.primary.withOpacity(0.4),
+              letterSpacing: 1.0,
+              shadows: [
+                Shadow(
+                  color: AppTheme.primary,
+                  blurRadius: 15,
+                  offset: Offset.zero,
+                ),
+                Shadow(
+                  color: AppTheme.primary,
+                  blurRadius: 25,
+                  offset: Offset.zero,
+                ),
+              ],
+            ),
+            overflow: TextOverflow.fade,
+            maxLines: 1,
           ),
-        ),
-        // Main text
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 1.5,
+          // Main text
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 1.0,
+            ),
+            overflow: TextOverflow.fade,
+            maxLines: 1,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
