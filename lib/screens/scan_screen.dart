@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
 import '../widgets/magic_title.dart';
-import '../services/barcode_scanner.dart';
+import '../services/camera_service.dart';
 
 class ScanScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
@@ -27,8 +27,6 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  bool _isScanning = false;
-  bool _isFlashOn = false;
   String? _scannedBarcode;
   String? _errorMessage;
   final List<String> _stores = [
@@ -41,8 +39,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   ];
   late String _selectedStore;
   
-  // Service de scan de codes-barres
-  final BarcodeScannerService _scannerService = createBarcodeScannerService();
+  // Service de caméra
+  final CameraService _cameraService = CameraService();
+  bool _isScanning = false;
 
   final TextEditingController _storeController = TextEditingController();
   final TextEditingController _newStoreController = TextEditingController();
@@ -62,9 +61,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeInOut),
     );
-    
-    // Initialiser le scanner
-    _initializeScanner();
   }
 
   @override
@@ -72,26 +68,12 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     // Gérer le cycle de vie pour libérer la caméra quand l'app est en arrière-plan
     if (state == AppLifecycleState.paused) {
       _stopScanner();
-    } else if (state == AppLifecycleState.resumed) {
-      if (_isScanning) {
-        _startScanner();
-      }
-    }
-  }
-
-  Future<void> _initializeScanner() async {
-    try {
-      await _scannerService.start();
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Impossible d\'initialiser la caméra';
-      });
     }
   }
 
   Future<void> _startScanner() async {
     try {
-      await _scannerService.start();
+      await _cameraService.start();
       setState(() {
         _isScanning = true;
         _errorMessage = null;
@@ -105,7 +87,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
   Future<void> _stopScanner() async {
     try {
-      await _scannerService.stop();
+      await _cameraService.stop();
       setState(() {
         _isScanning = false;
       });
@@ -116,13 +98,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
   Future<void> _toggleFlash() async {
     try {
-      await _scannerService.toggleTorch();
-      _isFlashOn = _scannerService.isTorchEnabled;
+      await _cameraService.toggleTorch();
       setState(() {});
     } catch (e) {
       setState(() {
         _errorMessage = 'Impossible d\'activer le flash';
-        _isFlashOn = false;
       });
     }
   }
@@ -130,6 +110,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cameraService.dispose();
     _stopScanner();
     _buttonController.dispose();
     _storeController.dispose();
@@ -210,9 +191,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     });
   }
 
-  void _onBarcodeScanned(BarcodeCapture barcodes) {
-    if (_isScanning && barcodes.barcodes.isNotEmpty) {
-      final barcode = barcodes.barcodes.first;
+  void _onBarcodeScanned(List<Barcode> barcodes) {
+    if (_isScanning && barcodes.isNotEmpty) {
+      final barcode = barcodes.first;
       final barcodeValue = barcode.rawValue ?? '';
       
       // Arrêter le scan temporairement
@@ -378,9 +359,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Scanner de codes-barres
-                _scannerService.buildScanner(
-                  onDetect: (BarcodeCapture capture) => _onBarcodeScanned(capture),
+                // Camera preview avec scanner
+                _cameraService.buildCameraPreview(
+                  onDetect: (List<Barcode> barcodes) => _onBarcodeScanned(barcodes),
                   context: context,
                 ),
                 
@@ -397,7 +378,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   isScanning: _isScanning,
                   scannedBarcode: _scannedBarcode,
                   errorMessage: _errorMessage,
-                  isFlashOn: _isFlashOn,
+                  isFlashOn: _cameraService.isTorchEnabled,
                   onGalleryTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(

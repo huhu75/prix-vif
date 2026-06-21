@@ -38,10 +38,7 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   
   # Scanner de codes-barres pour mobile
-  # Note: mobile_scanner n'est pas compatible avec le web.
-  # Pour compiler sur le web, utiliser: flutter build web
-  # Pour mobile, décommentez la ligne suivante:
-  # mobile_scanner: ^5.0.0
+  mobile_scanner: ^5.0.0
 
 dev_dependencies:
   flutter_test:
