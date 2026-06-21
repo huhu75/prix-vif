@@ -3,7 +3,6 @@ import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
 
-// 📊 Écran des résultats de scan
 class ResultsScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
   final VoidCallback onBack;
@@ -25,11 +24,9 @@ class ResultsScreen extends StatefulWidget {
 }
 
 class _ResultsScreenState extends State<ResultsScreen> {
-  // État pour la sélection multiple
   final Set<String> _selectedItems = {};
   
   bool get _isSelectionMode => _selectedItems.isNotEmpty;
-  
   int get _selectedCount => _selectedItems.length;
   
   double get _totalAmount => widget.scannedItems
@@ -68,16 +65,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final theme = Theme.of(context);
     
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
+      backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
         title: Text(
           _isSelectionMode ? 'Sélection ($_selectedCount)' : 'RÉSULTATS',
           style: theme.appBarTheme.titleTextStyle?.copyWith(
-            color: _isSelectionMode ? AppTheme.primary : Colors.white,
+            color: _isSelectionMode ? AppTheme.primary : AppTheme.textPrimary,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: () {
             _clearSelection();
             widget.onBack();
@@ -88,11 +85,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
             IconButton(
               icon: const Icon(Icons.delete_outline, color: AppTheme.error),
               onPressed: _removeSelected,
-              tooltip: 'Supprimer la sélection',
+              tooltip: 'Supprimer',
             )
           else
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.white),
+              icon: const Icon(Icons.delete_outline, color: AppTheme.textSecondary),
               onPressed: () {
                 if (widget.scannedItems.isNotEmpty) {
                   showDialog(
@@ -105,17 +102,17 @@ class _ResultsScreenState extends State<ResultsScreen> {
               },
               tooltip: 'Tout supprimer',
             ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.save, color: Colors.white),
+            icon: const Icon(Icons.save, color: AppTheme.primary),
             onPressed: () {
               widget.onSaveSession();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  backgroundColor: AppTheme.accent,
+                  backgroundColor: AppTheme.primary,
                   content: Text(
-                    'Session enregistrée dans l\'historique',
-                    style: TextStyle(color: Colors.white),
+                    'Session enregistrée',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                   ),
                   duration: Duration(seconds: 2),
                 ),
@@ -130,33 +127,28 @@ class _ResultsScreenState extends State<ResultsScreen> {
         children: [
           // Statistiques
           if (widget.scannedItems.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: AppTheme.glassmorphism(blur: 15, opacity: 0.1),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _StatCard(
+                  _StatItem(
                     label: 'Articles',
                     value: widget.scannedItems.length.toString(),
                     icon: Icons.shopping_bag,
-                    color: AppTheme.primary,
                   ),
-                  _StatCard(
+                  const SizedBox(width: 12),
+                  _StatItem(
                     label: 'Total',
                     value: _totalAmount.toStringAsFixed(2),
+                    suffix: '€',
                     icon: Icons.euro,
-                    color: AppTheme.accent,
-                    suffix: '€',
                   ),
-                  _StatCard(
+                  const SizedBox(width: 12),
+                  _StatItem(
                     label: 'Moyenne',
-                    value: (_totalAmount / widget.scannedItems.length)
-                        .toStringAsFixed(2),
-                    icon: Icons.trending_up,
-                    color: AppTheme.secondary,
+                    value: (_totalAmount / widget.scannedItems.length).toStringAsFixed(2),
                     suffix: '€',
+                    icon: Icons.trending_up,
                   ),
                 ],
               ),
@@ -172,7 +164,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     },
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: widget.scannedItems.length,
                     itemBuilder: (context, index) {
                       final item = widget.scannedItems[index];
@@ -187,112 +179,84 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     },
                   ),
           ),
-          
-          // Barre de total en bas
-          if (widget.scannedItems.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: AppTheme.cardGradient,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppTheme.primary,
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'TOTAL :',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    _totalAmount.toStringAsFixed(2),
-                    style: theme.textTheme.displaySmall?.copyWith(
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 28,
-                    ),
-                  ),
-                  const Text(
-                    '€',
-                    style: TextStyle(
-                      color: AppTheme.primary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-// 📋 Carte de statistiques
-class _StatCard extends StatelessWidget {
+// Élément de stat
+class _StatItem extends StatelessWidget {
   final String label;
   final String value;
-  final IconData icon;
-  final Color color;
   final String? suffix;
+  final IconData icon;
 
-  const _StatCard({
+  const _StatItem({
     required this.label,
     required this.value,
     required this.icon,
-    required this.color,
     this.suffix,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    final theme = Theme.of(context);
+    
+    return Expanded(
+      child: Container(
+        decoration: AppTheme.subtleCard(),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: AppTheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3), width: 1),
-          ),
-          child: Icon(icon, color: color, size: 24),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                ),
+                if (suffix != null) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    suffix!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: AppTheme.textMuted,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-// 📄 Carte sélectionnable
+// Carte de produit sélectionnable
 class _SelectablePriceCard extends StatelessWidget {
   final ScannedItem item;
   final bool isSelected;
@@ -312,57 +276,51 @@ class _SelectablePriceCard extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [
-                    AppTheme.primary.withOpacity(0.2),
-                    AppTheme.primary.withOpacity(0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : AppTheme.cardGradient,
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppTheme.primary.withOpacity(0.08) : AppTheme.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppTheme.primary : Colors.white.withOpacity(0.1),
-            width: isSelected ? 2 : 1,
+            color: isSelected 
+              ? AppTheme.primary.withOpacity(0.4)
+              : Colors.black.withOpacity(0.05),
+            width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.3),
-                    blurRadius: 15,
-                    spreadRadius: 2,
+                    color: AppTheme.primary.withOpacity(0.1),
+                    blurRadius: 8,
+                    spreadRadius: 0,
                   ),
                 ]
-              : null,
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 4,
+                    spreadRadius: 0,
+                  ),
+                ],
         ),
         child: Stack(
           children: [
-            PriceCard(
-              item: item,
-              showQuantity: true,
-              showDate: false,
-            ),
-            // Indicateur de sélection
+            PriceCard(item: item, showQuantity: true, showDate: false),
             if (isSelected)
               Positioned(
-                top: 12,
-                right: 12,
+                top: 14,
+                right: 14,
                 child: Container(
-                  width: 36,
-                  height: 36,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     color: AppTheme.primary,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Icon(
                     Icons.check,
-                    color: AppTheme.backgroundDark,
-                    size: 20,
+                    color: Colors.white,
+                    size: 16,
                   ),
                 ),
               ),
@@ -373,7 +331,7 @@ class _SelectablePriceCard extends StatelessWidget {
   }
 }
 
-// 📭 État vide
+// État vide
 class _EmptyState extends StatelessWidget {
   final VoidCallback onScan;
 
@@ -388,66 +346,44 @@ class _EmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 120,
-            height: 120,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(60),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withOpacity(0.4),
-                  blurRadius: 40,
-                  spreadRadius: 8,
-                ),
-              ],
+              color: AppTheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(
-              Icons.qr_code_scanner,
-              color: Colors.white,
-              size: 50,
+            child: Icon(
+              Icons.shopping_bag,
+              size: 40,
+              color: AppTheme.primary,
             ),
           ),
           const SizedBox(height: 24),
           Text(
-            'Aucun article scanné',
+            'Aucun article',
             style: theme.textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Commencez par scanner un code-barres ou un QR code pour voir les résultats',
+              'Scannez vos premiers produits',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondary,
-                height: 1.6,
               ),
             ),
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: onScan,
-            icon: const Icon(Icons.qr_code_scanner, size: 24),
-            label: const Text(
-              'SCANNER MAINTENANT',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
+            icon: const Icon(Icons.qr_code_scanner, size: 18),
+            label: const Text('SCANNER'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: AppTheme.backgroundDark,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(50),
-              ),
-              elevation: 8,
-              shadowColor: AppTheme.primary.withOpacity(0.4),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
             ),
           ),
         ],
@@ -456,7 +392,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ❓ Dialogue de confirmation
+// Dialogue de confirmation
 class _ConfirmClearDialog extends StatelessWidget {
   final VoidCallback onConfirm;
 
@@ -465,19 +401,19 @@ class _ConfirmClearDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppTheme.surfaceDark,
+      backgroundColor: AppTheme.surfaceLight,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
       ),
       title: const Text(
         'Tout supprimer ?',
         style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w600,
         ),
       ),
       content: const Text(
-        'Cette action supprimera tous les articles scannés. Vous ne pourrez pas annuler.',
+        'Cette action supprimera tous les articles. Vous ne pourrez pas annuler.',
         style: TextStyle(
           color: AppTheme.textSecondary,
           height: 1.5,
@@ -499,12 +435,12 @@ class _ConfirmClearDialog extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.error,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: const Text('Supprimer tout'),
+          child: const Text('Supprimer'),
         ),
       ],
     );

@@ -3,7 +3,6 @@ import '../theme.dart';
 import '../models.dart';
 import '../widgets/price_card.dart';
 
-// 📋 Écran de détail d'une session
 class SessionDetailScreen extends StatelessWidget {
   final ScanSession session;
   final VoidCallback onBack;
@@ -19,80 +18,75 @@ class SessionDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final stores = session.items.map((i) => i.storeName).toSet();
     
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
+      backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
         title: Text(
-          'Session #${session.id.substring(0, 6)}',
+          'Détails',
           style: theme.appBarTheme.titleTextStyle,
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
           onPressed: onBack,
         ),
       ),
       body: Column(
         children: [
-          // En-tête avec infos
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(20),
-            decoration: AppTheme.glassmorphism(blur: 15, opacity: 0.1),
+          // En-tête
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _DetailStat(
-                      icon: Icons.calendar_today,
-                      label: 'Date',
-                      value: _formatDate(session.date),
-                      color: AppTheme.primary,
-                    ),
-                    _DetailStat(
-                      icon: Icons.shopping_bag,
-                      label: 'Articles',
-                      value: session.items.length.toString(),
-                      color: AppTheme.accent,
-                    ),
-                    _DetailStat(
-                      icon: Icons.euro,
-                      label: 'Total',
-                      value: session.totalAmount.toStringAsFixed(2),
-                      color: AppTheme.secondary,
-                      suffix: '€',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(
-                  color: Color(0xFF2D2D2D),
-                  height: 1,
-                ),
-                const SizedBox(height: 16),
-                if (session.endDate != null)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.access_time,
-                        color: AppTheme.textMuted,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Durée: ${_formatDuration(session)}',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                Text(
+                  _formatDate(session.date),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  stores.join(' • '),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
+          
+          // Statistiques
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _StatItem(
+                  icon: Icons.shopping_bag,
+                  label: 'Articles',
+                  value: session.items.length.toString(),
+                ),
+                const SizedBox(width: 12),
+                _StatItem(
+                  icon: Icons.euro,
+                  label: 'Total',
+                  value: session.totalAmount.toStringAsFixed(2),
+                  suffix: '€',
+                ),
+                const SizedBox(width: 12),
+                _StatItem(
+                  icon: Icons.access_time,
+                  label: 'Durée',
+                  value: _formatDuration(session),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 16),
           
           // Liste des articles
           Expanded(
@@ -101,70 +95,16 @@ class SessionDetailScreen extends StatelessWidget {
               itemCount: session.items.length,
               itemBuilder: (context, index) {
                 final item = session.items[index];
-                return PriceCard(
-                  item: item,
-                  onTap: onItemTap,
-                  showQuantity: true,
-                  showDate: true,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: PriceCard(
+                    item: item,
+                    onTap: onItemTap,
+                    showQuantity: true,
+                    showDate: true,
+                  ),
                 );
               },
-            ),
-          ),
-          
-          // Total en bas
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: AppTheme.cardGradient,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppTheme.primary,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'TOTAL',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      '${session.items.length} articles',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Text(
-                      session.totalAmount.toStringAsFixed(2),
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      '€',
-                      style: TextStyle(
-                        color: AppTheme.primary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ),
           ),
         ],
@@ -173,79 +113,102 @@ class SessionDetailScreen extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'Aujourd\'hui';
+    } else if (difference.inDays == 1) {
+      return 'Hier';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 
   String _formatDuration(ScanSession session) {
     if (session.endDate == null) {
-      return 'Non terminée';
+      return '-';
     }
     
     final duration = session.endDate!.difference(session.date);
     
     if (duration.inMinutes < 1) {
-      return 'quelques secondes';
+      return '< 1m';
     } else if (duration.inHours < 1) {
-      return '${duration.inMinutes} min';
+      return '${duration.inMinutes}m';
     } else {
-      final hours = duration.inHours;
-      final minutes = duration.inMinutes % 60;
-      return minutes > 0 ? '$hours h $minutes min' : '$hours h';
+      return '${duration.inHours}h${(duration.inMinutes % 60).toString().padLeft(2, '0')}m';
     }
   }
 }
 
-// 📊 Statistique détaillée
-class _DetailStat extends StatelessWidget {
+// Élément de stat
+class _StatItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final Color color;
   final String? suffix;
 
-  const _DetailStat({
+  const _StatItem({
     required this.icon,
     required this.label,
     required this.value,
-    required this.color,
     this.suffix,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    final theme = Theme.of(context);
+    
+    return Expanded(
+      child: Container(
+        decoration: AppTheme.subtleCard(),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: AppTheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3), width: 1),
-          ),
-          child: Icon(icon, color: color, size: 24),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                ),
+                if (suffix != null) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    suffix!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppTheme.textMuted,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

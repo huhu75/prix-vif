@@ -10,6 +10,7 @@ class ScannedItem {
   final DateTime scanDate;
   final String? imageUrl;
   final String? barcode;
+  final String? storeName;
 
   ScannedItem({
     required this.id,
@@ -22,6 +23,7 @@ class ScannedItem {
     required this.scanDate,
     this.imageUrl,
     this.barcode,
+    this.storeName,
   });
 
   // Donnees fake pour la demo
@@ -36,6 +38,7 @@ class ScannedItem {
       scanDate: DateTime.now(),
       barcode: '3008360001234',
       imageUrl: 'https://via.placeholder.com/150x150/E6F3FF/000000?text=Lait',
+      storeName: 'Carrefour',
     ),
     ScannedItem(
       id: '2',
@@ -47,6 +50,7 @@ class ScannedItem {
       scanDate: DateTime.now().subtract(const Duration(hours: 1)),
       barcode: '3017620422003',
       imageUrl: 'https://via.placeholder.com/150x150/FFF8E1/000000?text=Pain',
+      storeName: 'Leclerc',
     ),
     ScannedItem(
       id: '3',
@@ -58,6 +62,7 @@ class ScannedItem {
       scanDate: DateTime.now().subtract(const Duration(days: 1)),
       barcode: '3029330014567',
       imageUrl: 'https://via.placeholder.com/150x150/E0F7FA/000000?text=Eau',
+      storeName: 'Monoprix',
     ),
     ScannedItem(
       id: '4',
@@ -69,6 +74,7 @@ class ScannedItem {
       scanDate: DateTime.now().subtract(const Duration(days: 2)),
       barcode: '7613033597471',
       imageUrl: 'https://via.placeholder.com/150x150/8B4513/FFFFFF?text=Cafe',
+      storeName: 'Carrefour',
     ),
   ];
 
@@ -82,6 +88,7 @@ class ScanSession {
   final List<ScannedItem> items;
   final DateTime date;
   final DateTime? endDate;
+  final String? storeName;
 
   String get name => 'Session du ${date.day}/${date.month}/${date.year}';
 
@@ -92,6 +99,7 @@ class ScanSession {
     required this.items,
     required this.date,
     this.endDate,
+    this.storeName,
   });
 
   // Donnees fake pour la demo
@@ -109,6 +117,7 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 2, hours: 10)),
           barcode: '3008360001234',
           imageUrl: 'https://via.placeholder.com/150x150/E6F3FF/000000?text=🥛',
+          storeName: 'Carrefour',
         ),
         ScannedItem(
           id: '2',
@@ -120,6 +129,7 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 2, hours: 10, minutes: 5)),
           barcode: '3017620422003',
           imageUrl: 'https://via.placeholder.com/150x150/FFF8E1/000000?text=🍞',
+          storeName: 'Carrefour',
         ),
         ScannedItem(
           id: '3',
@@ -131,10 +141,12 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 2, hours: 10, minutes: 10)),
           barcode: '3046920024657',
           imageUrl: 'https://via.placeholder.com/150x150/FFFBEB/000000?text=🧈',
+          storeName: 'Carrefour',
         ),
       ],
       date: DateTime.now().subtract(const Duration(days: 2, hours: 10)),
       endDate: DateTime.now().subtract(const Duration(days: 2, hours: 9, minutes: 30)),
+      storeName: 'Carrefour',
     ),
     ScanSession(
       id: '20260618_002',
@@ -149,6 +161,7 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 4, hours: 14)),
           barcode: '3029330014567',
           imageUrl: 'https://via.placeholder.com/150x150/E0F7FA/000000?text=💧',
+          storeName: 'Leclerc',
         ),
         ScannedItem(
           id: '5',
@@ -160,10 +173,12 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 4, hours: 14, minutes: 5)),
           barcode: '3599990000000',
           imageUrl: 'https://via.placeholder.com/150x150/FF0000/FFFFFF?text=🥤',
+          storeName: 'Leclerc',
         ),
       ],
       date: DateTime.now().subtract(const Duration(days: 4, hours: 14)),
       endDate: DateTime.now().subtract(const Duration(days: 4, hours: 13, minutes: 45)),
+      storeName: 'Leclerc',
     ),
     ScanSession(
       id: '20260615_003',
@@ -178,6 +193,7 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 7, hours: 18)),
           barcode: '8008688003586',
           imageUrl: 'https://via.placeholder.com/150x150/FFF8E1/000000?text=🍝',
+          storeName: 'Monoprix',
         ),
         ScannedItem(
           id: '7',
@@ -189,6 +205,7 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 7, hours: 18, minutes: 3)),
           barcode: '3560070460303',
           imageUrl: 'https://via.placeholder.com/150x150/FF6B35/FFFFFF?text=🍅',
+          storeName: 'Monoprix',
         ),
         ScannedItem(
           id: '8',
@@ -200,6 +217,7 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 7, hours: 18, minutes: 6)),
           barcode: '3228857000000',
           imageUrl: 'https://via.placeholder.com/150x150/FFFF00/000000?text=🧀',
+          storeName: 'Monoprix',
         ),
         ScannedItem(
           id: '9',
@@ -211,10 +229,12 @@ class ScanSession {
           scanDate: DateTime.now().subtract(const Duration(days: 7, hours: 18, minutes: 9)),
           barcode: '3256220000000',
           imageUrl: 'https://via.placeholder.com/150x150/FFC0CB/000000?text=🍖',
+          storeName: 'Monoprix',
         ),
       ],
       date: DateTime.now().subtract(const Duration(days: 7, hours: 18)),
       endDate: DateTime.now().subtract(const Duration(days: 7, hours: 17, minutes: 40)),
+      storeName: 'Monoprix',
     ),
   ];
 }
