@@ -41,7 +41,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   
   // Service de caméra
   final CameraService _cameraService = CameraService();
-  bool _isScanning = false;
 
   final TextEditingController _storeController = TextEditingController();
   final TextEditingController _newStoreController = TextEditingController();
@@ -81,7 +80,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     try {
       await _cameraService.start();
       setState(() {
-        _isScanning = true;
         _errorMessage = null;
       });
     } catch (e) {
@@ -102,9 +100,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   Future<void> _stopScanner() async {
     try {
       await _cameraService.stop();
-      setState(() {
-        _isScanning = false;
-      });
     } catch (e) {
       // Ignorer les erreurs lors de l'arrêt
     }
@@ -206,12 +201,10 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   }
 
   void _onBarcodeScanned(List<Barcode> barcodes) {
-    if (_isScanning && barcodes.isNotEmpty) {
+    if (_cameraService.isScanning && barcodes.isNotEmpty) {
       final barcode = barcodes.first;
       final barcodeValue = barcode.rawValue ?? '';
       
-      // Arrêter le scan temporairement
-      _isScanning = false;
       setState(() {
         _scannedBarcode = barcodeValue;
       });
@@ -258,7 +251,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         if (mounted) {
           setState(() {
             _scannedBarcode = null;
-            _isScanning = true;
           });
         }
       });
@@ -380,7 +372,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                 ),
                 
                 // Effet de scan IA
-                if (_isScanning)
+                if (_cameraService.isScanning)
                   AIScanEffect(
                     isActive: true,
                     width: MediaQuery.of(context).size.width * 0.8,
@@ -389,9 +381,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                 
                 // Overlay du scanner avec cadre
                 ScannerOverlay(
-                  isScanning: _isScanning,
+                  isScanning: _cameraService.isScanning,
                   scannedBarcode: _scannedBarcode,
-                  errorMessage: _errorMessage,
+                  errorMessage: _errorMessage ?? _cameraService.errorMessage,
                   isFlashOn: _cameraService.isTorchEnabled,
                   onGalleryTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -405,7 +397,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       ),
                     );
                   },
-                  onFlashToggle: _toggleFlash,
+                  onFlashToggle: _cameraService.isInitialized ? _toggleFlash : null,
                 ),
               ],
             ),
@@ -415,11 +407,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           Padding(
             padding: const EdgeInsets.all(20),
             child: MagicButton(
-              text: _isScanning ? 'ARRÊTER' : 'SCANNER',
-              icon: _isScanning ? Icons.stop : Icons.qr_code_scanner,
+              text: _cameraService.isInitialized ? 'ARRÊTER' : 'SCANNER',
+              icon: _cameraService.isInitialized ? Icons.stop : Icons.qr_code_scanner,
               onPressed: () async {
                 _buttonController.forward().then((_) => _buttonController.reverse());
-                if (_isScanning) {
+                if (_cameraService.isInitialized) {
                   await _stopScanner();
                 } else {
                   await _startScanner();

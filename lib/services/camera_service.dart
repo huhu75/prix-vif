@@ -3,44 +3,131 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 /// Service pour gérer la caméra et le scan de codes-barres
 class CameraService {
-  final MobileScannerController _controller = MobileScannerController(
-    autoStart: true,
-    detectionSpeed: DetectionSpeed.normal,
-    facing: CameraFacing.back,
-    torchEnabled: false,
-  );
-
+  MobileScannerController? _controller;
   bool _isTorchEnabled = false;
   bool _isScanning = false;
+  bool _isInitialized = false;
+  bool _hasError = false;
+  String? _errorMessage;
 
-  MobileScannerController get controller => _controller;
+  MobileScannerController get controller => _controller!;
   bool get isTorchEnabled => _isTorchEnabled;
   bool get isScanning => _isScanning;
+  bool get isInitialized => _isInitialized;
+  bool get hasError => _hasError;
+  String? get errorMessage => _errorMessage;
+
+  CameraService() {
+    _initializeController();
+  }
+
+  Future<void> _initializeController() async {
+    try {
+      _controller = MobileScannerController(
+        autoStart: false,
+        detectionSpeed: DetectionSpeed.normal,
+        facing: CameraFacing.back,
+        torchEnabled: false,
+      );
+      await _controller!.start();
+      _isInitialized = true;
+      _isScanning = true;
+      _hasError = false;
+      _errorMessage = null;
+    } catch (e) {
+      _hasError = true;
+      _errorMessage = 'Erreur initialisation: ${e.toString()}';
+      _isInitialized = false;
+      // Essayer avec la caméra avant
+      try {
+        _controller = MobileScannerController(
+          autoStart: false,
+          detectionSpeed: DetectionSpeed.normal,
+          facing: CameraFacing.front,
+          torchEnabled: false,
+        );
+        await _controller!.start();
+        _isInitialized = true;
+        _isScanning = true;
+        _hasError = false;
+        _errorMessage = null;
+      } catch (e2) {
+        _hasError = true;
+        _errorMessage = 'Aucune caméra disponible: ${e2.toString()}';
+        _isInitialized = false;
+      }
+    }
+  }
 
   Future<void> start() async {
-    // Le contrôleur est déjà en autoStart, donc on vérifie juste qu'il est prêt
-    if (!_controller.value.isInitialized) {
-      await _controller.start();
+    if (_controller == null || !_isInitialized) {
+      await _initializeController();
+    } else if (!_controller!.value.isInitialized) {
+      await _controller!.start();
+      _isScanning = true;
     }
-    _isScanning = true;
   }
 
   Future<void> stop() async {
-    await _controller.stop();
-    _isScanning = false;
+    if (_controller != null) {
+      await _controller!.stop();
+      _isScanning = false;
+    }
   }
 
   Future<void> toggleTorch() async {
-    _isTorchEnabled = !_isTorchEnabled;
-    await _controller.toggleTorch();
+    if (_controller != null) {
+      _isTorchEnabled = !_isTorchEnabled;
+      await _controller!.toggleTorch();
+    }
   }
 
   Widget buildCameraPreview({
     required Function(List<Barcode>) onDetect,
     required BuildContext context,
   }) {
+    // Si le contrôleur n'est pas initialisé, afficher un message d'erreur
+    if (_controller == null || !_isInitialized || _hasError) {
+      return Container(
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.videocam_off, size: 48, color: Colors.white54),
+              const SizedBox(height: 16),
+              const Text(
+                'Caméra non disponible',
+                style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              if (_errorMessage != null)
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              const SizedBox(height: 16),
+              const Text(
+                'Vérifiez que l\'application a accès à la caméra',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Paramètres → Applications → Prix Vif → Permissions',
+                style: TextStyle(color: Colors.white38, fontSize: 10),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return MobileScanner(
-      controller: _controller,
+      controller: _controller!,
       onDetect: (capture) => onDetect(capture.barcodes),
       fit: BoxFit.cover,
       placeholderBuilder: (context, constraints) {
@@ -77,7 +164,7 @@ class CameraService {
                 const Icon(Icons.error, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
                 const Text(
-                  'Caméra non disponible',
+                  'Erreur caméra',
                   style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
@@ -102,6 +189,8 @@ class CameraService {
   }
 
   void dispose() {
-    _controller.dispose();
+    if (_controller != null) {
+      _controller!.dispose();
+    }
   }
 }
