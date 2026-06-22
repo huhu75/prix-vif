@@ -8,7 +8,7 @@
 
 ## 📱 Apercu
 
-**Prix Vif** est une application Flutter moderne (design 2026) conçue pour scanner des codes-barres et des QR codes afin de récupérer et organiser les informations de prix des produits. Cette version utilise des **données simulées** (fake) pour démontrer l'interface utilisateur sans implémenter la logique réelle de scan.
+**Prix Vif** est une application Flutter moderne (design 2026) conçue pour scanner des codes-barres et des tickets de caisse afin de récupérer et organiser les informations de prix des produits. L'application fonctionne désormais avec un **scanner réel** et une **capture photo de tickets** avec compression d'image.
 
 ---
 
@@ -20,6 +20,10 @@
 - Contrôles de la caméra : flash
 - Aperçu des derniers articles scannés
 - Interface intuitive avec animation de ligne de détection
+- **Mode bi-mode** : Bascule entre scan de code-barres et capture de ticket
+- **Saisie de prix** : Après scan d'un code-barres, dialogue modal pour entrer le prix réel
+- **Capture photo** : Photographier un ticket de caisse via la galerie ou la caméra
+- **Compression d'image** : Réduction automatique des images à 1024px max, JPEG 80% avec affichage des gains de taille
 
 ### 📊 Résultats
 - Liste des articles scannés avec cartes modernes
@@ -111,14 +115,14 @@ flutter build appbundle --release
 prix_vif/
 ├── lib/
 │   ├── main.dart                 # Point d'entrée + navigation
-│   ├── models.dart              # Modèles de données
+│   ├── models.dart              # Modèles de données (ScannedItem, ScanSession)
 │   ├── theme.dart               # Thème moderne 2026
 │   │
 │   ├── services/
 │   │   └── camera_service.dart   # Service de gestion de la caméra
 │   │
 │   ├── screens/
-│   │   ├── scan_screen.dart      # Écran scanner
+│   │   ├── scan_screen.dart      # Écran scanner (bi-mode: code-barres/ticket)
 │   │   ├── results_screen.dart   # Écran résultats
 │   │   ├── history_screen.dart   # Écran historique
 │   │   └── session_detail_screen.dart # Détails session
@@ -127,7 +131,7 @@ prix_vif/
 │       ├── price_card.dart       # Cartes produits
 │       └── scanner_overlay.dart  # Overlay scanner
 │
-├── pubspec.yaml                # Dépendances
+├── pubspec.yaml                # Dépendances (mobile_scanner, image_picker, image)
 ├── README.md                   # Documentation
 └── ...                         # Fichiers Flutter natifs
 ```
@@ -153,52 +157,46 @@ prix_vif/
 
 ## 🎯 Utilisation
 
-### Scanner un produit
-1. Ouvrez l'application
-2. Appuyez sur "SCANNER UN CODE"
-3. Un produit aléatoire est généré
-
-### Consulter les résultats
-- Icône de reçu → affiche la liste
-- Sélection multiple → suppression
-- Bouton "Enregistrer" → sauvegarde la session
-
-### Consulter l'historique
-- Icône historique → listes des sessions
-- Appuyez sur une session → détails
-- Menu → supprimer
-
----
-
-## 🎯 Utilisation
-
-### Scanner un produit
+### Scanner un code-barres
 1. Lancez l'application sur votre appareil Android/iOS
 2. Autorisez l'accès à la caméra
-3. Appuyez sur "SCANNER"
+3. Sélectionnez le mode **CODE-BARRES** (bascule en haut de l'écran)
 4. Pointez la caméra vers un code-barres
 5. Le code est scanné automatiquement
+6. Un dialogue s'ouvre : entrez le **prix réel** du produit
+7. L'article est ajouté à votre liste avec le prix saisi
+
+### Capturer un ticket de caisse
+1. Sélectionnez le mode **TICKET** (bascule en haut de l'écran)
+2. Appuyez sur le bouton "Photographier un ticket"
+3. Prenez une photo du ticket avec la caméra ou choisissez depuis la galerie
+4. L'image s'affiche avec sa taille originale
+5. Appuyez sur "Compresser" pour réduire la taille (max 1024px, JPEG 80%)
+6. Les gains de compression s'affichent (ex: 5 Mo → 500 Ko)
+7. Les articles du ticket sont simulés et ajoutés à votre liste
 
 ### Consulter les résultats
-- Icône de reçu → affiche la liste
-- Sélection multiple → suppression
-- Bouton "Enregistrer" → sauvegarde la session
+- Icône de reçu → affiche la liste des articles scannés
+- Sélection multiple → suppression groupée
+- Bouton "Enregistrer" → sauvegarde la session dans l'historique
+- Affichage du total en grand avec statistiques (moyenne, nombre d'articles)
 
 ### Consulter l'historique
-- Icône historique → listes des sessions
-- Appuyez sur une session → détails
-- Menu → supprimer
+- Icône historique → liste des sessions de scan précédentes
+- Appuyez sur une session → affiche les détails complets
+- Menu → supprimer une session ou tout l'historique
 
 ---
 
 ## 🔧 Développement Futur
 
 Pour améliorer l'app :
-- [ ] API produits (OpenFoodFacts) pour récupérer les infos réelles
-- [ ] Base de données (Hive, SQLite) pour persister les données
-- [ ] Synchronisation cloud
-- [ ] Export CSV/PDF
+- [ ] API produits (OpenFoodFacts) pour récupérer les infos réelles à partir des codes-barres
+- [ ] Base de données (Hive, SQLite) pour persister les données localement
+- [ ] Synchronisation cloud pour sauvegarder l'historique
+- [ ] Export CSV/PDF des sessions de scan
 - [ ] Comparaison de prix entre magasins
+- [ ] Reconnaissance OCR des tickets de caisse (remplace la simulation actuelle)
 
 ---
 
