@@ -62,12 +62,19 @@ Appareil photo Flutter
 
 **Objectif :** valider la plomberie réseau avec l'API la plus simple (gratuite, matching exact).
 
-- Endpoint : `GET https://world.openfoodfacts.org/api/v2/product/{ean}`
-- Pas de clé API requise
-- Champs utiles : `product_name`, `nutriscore_grade`, `categories`, `image_url`, `brands`
-- Stocker localement : nom, Nutri-Score, catégories, prix saisi, date du scan
+- [x] **Étape 2a — Service Client API Open Food Facts** :
+  - [x] Créer `OpenFoodFactsService` pour appeler le endpoint de lookup EAN (`GET https://world.openfoodfacts.org/api/v2/product/{ean}`)
+  - [x] Extraire les champs utiles : `product_name`, `brands`, `nutriscore_grade`, `categories`, `image_url`
+  - [x] Gérer le parsing du JSON et les erreurs réseau (retourner un objet ou `null`)
+- [x] **Étape 2b — Intégration du lookup EAN dans le flux de scan** :
+  - [x] Lors du scan, afficher un loader de chargement API ("Recherche du produit...")
+  - [x] Appeler le service `OpenFoodFactsService` avec l'EAN scanné
+  - [x] En cas de succès, afficher la boîte de dialogue de saisie du prix enrichie avec les données réelles du produit (nom, marque, image)
+  - [x] En cas d'échec (produit non trouvé ou pas de réseau), utiliser un fallback propre (nom générique, marque inconnue) tout en conservant l'EAN
+- [x] **Étape 2c — Interface de Résultats enrichie** :
+  - [x] S'assurer que le modèle `ScannedItem` et l'affichage des listes de résultats (ex: sur la fiche produit) prennent bien en compte et affichent les images réelles d'Open Food Facts et les grades Nutri-Score correspondants.
 
-**Critère de validation :** scan EAN → fiche produit → sauvegarde locale.
+**Critère de validation :** scan EAN → affichage loader → fiche produit OFF résolue → saisie du prix → sauvegarde locale avec métadonnées réelles.
 
 ---
 
@@ -77,15 +84,15 @@ Appareil photo Flutter
 
 #### 3a. Préparation de l'image (côté Flutter, avant envoi)
 
-- Redimensionner à **1024px de large maximum** (package `image`)
-- Compresser en **JPEG à 80%**
-- Encoder en base64 pour l'envoi à l'API
-- Objectif : réduire la taille de 60 à 80% pour limiter les tokens vision
+- [x] Redimensionner à **1024px de large maximum** (package `image`)
+- [x] Compresser en **JPEG à 80%**
+- [x] Encoder en base64 pour l'envoi à l'API
+- [x] Objectif : réduire la taille de 60 à 80% pour limiter les tokens vision
 
 #### 3b. Appel Mistral AI
 
-- Modèle recommandé : `mistral-small-latest` (vision) — ne pas utiliser `large` en dev
-- Prompt à forcer en sortie JSON structurée :
+- [x] Modèle recommandé : `mistral-small-latest` (vision) ou `pixtral-12b-2409`
+- [x] Prompt à forcer en sortie JSON structurée :
 
 ```
 Extrais les articles de ce ticket de caisse.
@@ -94,15 +101,15 @@ Format attendu :
 {"articles": [{"nom": "...", "prix": 0.00, "quantite": 1}]}
 ```
 
-- Parser la réponse JSON directement — évite tout parsing de texte libre
+- [x] Parser la réponse JSON directement — évite tout parsing de texte libre
 
 #### 3c. Matching Open Food Facts par nom
 
-- Endpoint : `GET https://world.openfoodfacts.org/cgi/search.pl?search_terms={nom}&json=1`
-- Stratégie en deux passes :
+- [x] Endpoint : `GET https://world.openfoodfacts.org/cgi/search.pl?search_terms={nom}&json=1`
+- [x] Stratégie en deux passes :
   1. Recherche avec le nom complet → prendre le premier résultat si pertinent
   2. Si échec : retirer les mots génériques (kg, g, %, bio, x2…) et réessayer
-- Toujours afficher les candidats dans une UI de confirmation — le matching par nom n'est pas parfait
+- [x] Toujours afficher les candidats dans une UI de confirmation — le matching par nom n'est pas parfait
 
 **Critère de validation :** photo ticket → liste JSON Mistral → produits OFF avec confirmation utilisateur.
 

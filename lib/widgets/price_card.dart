@@ -135,6 +135,13 @@ class PriceCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                        
+                        // Nutri-Score
+                        if (item.nutriscore != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: NutriScoreBadge(score: item.nutriscore!),
+                          ),
                       ],
                     ),
                   ),
@@ -282,5 +289,79 @@ class PriceCardCompact extends StatelessWidget {
     } else {
       return '${date.day}/${date.month}';
     }
+  }
+}
+
+// Badge Nutri-Score premium
+class NutriScoreBadge extends StatelessWidget {
+  final String score;
+  const NutriScoreBadge({super.key, required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    final cleanScore = score.trim().toLowerCase();
+    Color badgeColor;
+    String letter;
+    switch (cleanScore) {
+      case 'a':
+        badgeColor = const Color(0xFF038141);
+        letter = 'A';
+        break;
+      case 'b':
+        badgeColor = const Color(0xFF85BB2F);
+        letter = 'B';
+        break;
+      case 'c':
+        badgeColor = const Color(0xFFFECB02);
+        letter = 'C';
+        break;
+      case 'd':
+        badgeColor = const Color(0xFFEE8100);
+        letter = 'D';
+        break;
+      case 'e':
+        badgeColor = const Color(0xFFE63E11);
+        letter = 'E';
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: badgeColor,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: badgeColor.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'NUTRI-SCORE ',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+          Text(
+            letter,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -11,6 +11,8 @@ class ScannedItem {
   final String? imageUrl;
   final String? barcode;
   final String? storeName;
+  final String? nutriscore;
+  final List<String>? categories;
 
   ScannedItem({
     required this.id,
@@ -24,6 +26,8 @@ class ScannedItem {
     this.imageUrl,
     this.barcode,
     this.storeName,
+    this.nutriscore,
+    this.categories,
   });
 
   // Donnees fake pour la demo

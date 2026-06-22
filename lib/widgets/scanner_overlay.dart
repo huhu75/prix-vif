@@ -66,7 +66,9 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final scannerWidth = size.width * 0.8;
+    final isLandscape = size.width > size.height;
+    final baseSize = isLandscape ? size.height * 0.4 : size.width;
+    final scannerWidth = baseSize * 0.8;
     final scannerHeight = scannerWidth * 0.6;
     
     return Stack(
