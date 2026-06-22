@@ -38,16 +38,23 @@ Appareil photo Flutter
 
 **Objectif :** faire tourner le squelette complet avant de brancher quoi que ce soit.
 
-- [ ] Intégration caméra :
-  - `camera` ou `image_picker` pour la photo de ticket (haute résolution)
-  - `mobile_scanner` pour la détection de code barre en temps réel dans le viewfinder
-- [ ] Deux modes bien séparés dans l'UI :
-  - bouton "Scanner un code barre"
-  - bouton "Photographier un ticket"
-- [ ] Saisie du prix pour le flux code barre (`TextField` clavier numérique)
-- [ ] Navigation entre les écrans (résultat, historique)
+- [x] **Étape 1a — Dépendances & Configuration** :
+  - [x] Ajouter `image_picker` (capture du ticket) et `image` (compression d'image) dans `pubspec.yaml`
+  - [x] Configurer les permissions caméra et galerie sur iOS (`Info.plist`) et Android (`AndroidManifest.xml`)
+- [x] **Étape 1b — Flux Saisie de Prix (Code-barres)** :
+  - [x] Mettre le scanner en pause lors du scan d'un EAN
+  - [x] Afficher un dialogue / bottom sheet demandant la saisie du prix (clavier numérique)
+  - [x] Ajouter l'article à la liste avec le prix réel saisi, puis relancer le scanner
+- [x] **Étape 1c — Interface bi-mode & Capture du Ticket** :
+  - [x] Créer une bascule dans `scan_screen.dart` entre le mode "Code-barres" et le mode "Ticket"
+  - [x] En mode Ticket, ajouter un bouton de capture avec `image_picker`
+  - [x] Afficher l'aperçu du ticket pris en photo dans l'UI
+- [x] **Étape 1d — Compression locale de l'image** :
+  - [x] Intégrer une fonction utilitaire pour compresser l'image du ticket (max 1024px, JPEG 80%)
+  - [x] Afficher à l'écran les gains de taille (Ko originaux vs Ko compressés)
 
-**Critère de validation :** photo prise, EAN scanné, prix saisi — tout en local, zéro appel réseau.
+**Critère de validation :** photo prise et compressée, EAN scanné avec demande de saisie du prix, le tout en local (sans appel réseau).
+
 
 ---
 
