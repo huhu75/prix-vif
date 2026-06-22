@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../models/hive_models.dart';
+import 'scan_repository.dart';
 
 /// Modèle interne pour un produit récupéré d'Open Food Facts
 class OFFProduct {
@@ -93,14 +95,40 @@ class OFFProduct {
 }
 
 /// Service d'interaction avec l'API Open Food Facts
+/// Supporte le cache via ScanRepository (étape 3c)
 class OpenFoodFactsService {
   static const String _baseUrl = 'https://world.openfoodfacts.org/api/v2/product';
 
+  /// Repository optionnel pour le cache produits
+  ScanRepository? _repository;
+
+  /// Injecte le repository pour activer le cache OFF
+  void setRepository(ScanRepository repository) {
+    _repository = repository;
+  }
+
   /// Recherche un produit par son code-barres (EAN)
+  /// Vérifie le cache d'abord si un repository est disponible
   /// Retourne un objet [OFFProduct] si trouvé, sinon `null`
   Future<OFFProduct?> lookupBarcode(String barcode) async {
     final cleanBarcode = barcode.trim();
     if (cleanBarcode.isEmpty) return null;
+
+    // Étape 3c — Vérifier le cache avant l'appel réseau
+    if (_repository != null) {
+      final cached = _repository!.getCachedProduct(cleanBarcode);
+      if (cached != null) {
+        print('Cache HIT pour EAN: $cleanBarcode');
+        return OFFProduct(
+          barcode: cached.ean,
+          name: cached.productName,
+          brand: cached.brands ?? 'Marque inconnue',
+          nutriscore: cached.nutriscoreGrade,
+          categories: cached.categories ?? [],
+          imageUrl: cached.imageUrl,
+        );
+      }
+    }
 
     try {
       final url = Uri.parse('$_baseUrl/$cleanBarcode');
@@ -117,7 +145,23 @@ class OpenFoodFactsService {
         
         // status = 1 signifie produit trouvé dans l'API OFF
         if (status == 1) {
-          return OFFProduct.fromJson(cleanBarcode, data);
+          final product = OFFProduct.fromJson(cleanBarcode, data);
+
+          // Mettre en cache le produit trouvé
+          if (_repository != null) {
+            await _repository!.cacheProduct(CachedProduct(
+              ean: product.barcode,
+              productName: product.name,
+              brands: product.brand,
+              nutriscoreGrade: product.nutriscore,
+              imageUrl: product.imageUrl,
+              categories: product.categories,
+              cachedAt: DateTime.now(),
+            ));
+            print('Cache STORE pour EAN: $cleanBarcode');
+          }
+
+          return product;
         }
       }
       return null;

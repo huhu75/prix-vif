@@ -93,6 +93,7 @@ class ScanSession {
   final DateTime date;
   final DateTime? endDate;
   final String? storeName;
+  final String type; // 'ticket' ou 'barcode'
 
   String get name => 'Session du ${date.day}/${date.month}/${date.year}';
 
@@ -104,6 +105,7 @@ class ScanSession {
     required this.date,
     this.endDate,
     this.storeName,
+    this.type = 'barcode',
   });
 
   // Donnees fake pour la demo
@@ -151,6 +153,7 @@ class ScanSession {
       date: DateTime.now().subtract(const Duration(days: 2, hours: 10)),
       endDate: DateTime.now().subtract(const Duration(days: 2, hours: 9, minutes: 30)),
       storeName: 'Carrefour',
+      type: 'barcode',
     ),
     ScanSession(
       id: '20260618_002',
@@ -183,6 +186,7 @@ class ScanSession {
       date: DateTime.now().subtract(const Duration(days: 4, hours: 14)),
       endDate: DateTime.now().subtract(const Duration(days: 4, hours: 13, minutes: 45)),
       storeName: 'Leclerc',
+      type: 'ticket',
     ),
     ScanSession(
       id: '20260615_003',
@@ -239,6 +243,7 @@ class ScanSession {
       date: DateTime.now().subtract(const Duration(days: 7, hours: 18)),
       endDate: DateTime.now().subtract(const Duration(days: 7, hours: 17, minutes: 40)),
       storeName: 'Monoprix',
+      type: 'barcode',
     ),
   ];
 }

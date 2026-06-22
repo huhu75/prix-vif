@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../models.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/mistral_service.dart';
+import '../services/scan_repository.dart';
 import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
@@ -20,6 +21,8 @@ class ScanScreen extends StatefulWidget {
   final Function(ScannedItem) onItemScanned;
   final VoidCallback onViewResults;
   final VoidCallback onViewHistory;
+  final ScanRepository? repository;
+  final Function(String) onScanTypeChanged;
 
   const ScanScreen({
     super.key,
@@ -27,6 +30,8 @@ class ScanScreen extends StatefulWidget {
     required this.onItemScanned,
     required this.onViewResults,
     required this.onViewHistory,
+    this.repository,
+    required this.onScanTypeChanged,
   });
 
   @override
@@ -77,6 +82,14 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeInOut),
     );
+
+    // Étape 3c — Injecter le repository dans le service OFF pour le cache
+    if (widget.repository != null) {
+      _offService.setRepository(widget.repository!);
+    }
+    
+    // Notifier le type initial
+    widget.onScanTypeChanged(_isBarcodeMode ? 'barcode' : 'ticket');
     
     // Démarrer la caméra automatiquement
     _startScanner();
@@ -670,6 +683,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       _isBarcodeMode = true;
                       _ticketImage = null;
                     });
+                    widget.onScanTypeChanged('barcode');
                     _startScanner();
                   }
                 },
@@ -698,6 +712,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     setState(() {
                       _isBarcodeMode = false;
                     });
+                    widget.onScanTypeChanged('ticket');
                     _stopScanner();
                   }
                 },

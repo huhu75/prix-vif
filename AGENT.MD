@@ -55,7 +55,6 @@ Appareil photo Flutter
 
 **Critère de validation :** photo prise et compressée, EAN scanné avec demande de saisie du prix, le tout en local (sans appel réseau).
 
-
 ---
 
 ### Étape 2 — Flux code barre → Open Food Facts
@@ -78,21 +77,56 @@ Appareil photo Flutter
 
 ---
 
-### Étape 3 — Flux ticket → Mistral AI → Open Food Facts
+### Étape 3 — Stockage local (socle minimal) ⬅️ TERMINÉE
+
+> ⚠️ Cette étape a été implémentée avant l'étape 4 (Mistral) afin que le flux ticket ait un endroit fiable où persister ses données dès le départ. L'étape 4 s'intégrera directement dans ce pipeline sans refactoring.
+
+**Objectif :** mettre en place le schéma de base et la couche de persistance, avec UI d'analyse complète.
+
+- [x] **Étape 3a — Choix et initialisation de la base** :
+  - [x] Choix : **Hive** (NoSQL, simplicité, pas de code generation nécessaire)
+  - [x] Ajouté `hive: ^2.2.3`, `hive_flutter: ^1.1.0`, `path_provider: ^2.1.1` dans `pubspec.yaml`
+  - [x] Initialisation Hive dans `main()` via `Hive.initFlutter()` + `WidgetsFlutterBinding.ensureInitialized()`
+- [x] **Étape 3b — Schéma de données** :
+  - [x] `StoredScan` (box `scans`) : id, date, endDate, type (`ticket` | `barcode`), storeName, totalAmount
+  - [x] `StoredArticle` (box `articles`) : toutes les propriétés de ScannedItem + `scanId` (clé étrangère vers le scan parent)
+  - [x] `CachedProduct` (box `products_cache`) : cache des fiches OFF (clé = EAN, champs : productName, brands, nutriscoreGrade, imageUrl, categories, cachedAt)
+  - [x] Modèles définis dans `lib/models/hive_models.dart` avec sérialisation Map (pas de TypeAdapter/build_runner)
+  - [x] Ajout du champ `type` dans `ScanSession` pour distinguer code-barres et ticket
+- [x] **Étape 3c — Couche Repository** :
+  - [x] `ScanRepository` créé dans `lib/services/scan_repository.dart`
+  - [x] Méthodes : `saveScan()`, `getAllScans()`, `deleteScan()`, `clearAllScans()`, `saveArticle()`, `getArticlesForScan()`
+  - [x] Méthodes cache : `getCachedProduct()`, `cacheProduct()`, `hasProductInCache()`
+  - [x] Sauvegarde branchée sur le flux code-barre : chaque session sauvegardée est persistée via `_repository.saveScan()`
+  - [x] Suppression et vidage de l'historique persistés via `_repository.deleteScan()` / `clearAllScans()`
+  - [x] Cache OFF intégré dans `OpenFoodFactsService` : lookup cache-first, mise en cache automatique après chaque appel API réussi
+  - [x] Chargement automatique des sessions persistées au démarrage de l'app (fallback données démo si première utilisation)
+  - [x] Transmission du type de scan (barcode/ticket) depuis ScanScreen via callback `onScanTypeChanged`
+- [x] **Étape 3d — UI de liste basique** :
+  - [x] Afficher la liste des scans passés (date, type, nombre d'articles) avec badge de type
+  - [x] Afficher le détail d'un scan (articles, prix, Nutri-Score si disponible) avec badge de type
+  - [x] Mise à jour de `history_screen.dart` et `session_detail_screen.dart` avec affichage du type
+
+**Critère de validation :** ✅ un article scanné via code-barre est persisté et visible dans la liste après redémarrage de l'app.
+
+---
+
+### Étape 4 — Flux ticket → Mistral AI → Open Food Facts
 
 > ⚠️ Partie la plus coûteuse en crédits — à optimiser avant de tester en production.
+> Le stockage (étape 3) étant en place, chaque extraction Mistral est immédiatement persistée, ce qui permet de rejouer et déboguer sans re-consommer de crédits.
 
-#### 3a. Préparation de l'image (côté Flutter, avant envoi)
+#### 4a. Préparation de l'image (côté Flutter, avant envoi)
 
-- [x] Redimensionner à **1024px de large maximum** (package `image`)
-- [x] Compresser en **JPEG à 80%**
-- [x] Encoder en base64 pour l'envoi à l'API
-- [x] Objectif : réduire la taille de 60 à 80% pour limiter les tokens vision
+- [ ] Redimensionner à **1024px de large maximum** (package `image`)
+- [ ] Compresser en **JPEG à 80%**
+- [ ] Encoder en base64 pour l'envoi à l'API
+- [ ] Objectif : réduire la taille de 60 à 80% pour limiter les tokens vision
 
-#### 3b. Appel Mistral AI
+#### 4b. Appel Mistral AI
 
-- [x] Modèle recommandé : `mistral-small-latest` (vision) ou `pixtral-12b-2409`
-- [x] Prompt à forcer en sortie JSON structurée :
+- [ ] Modèle recommandé : `mistral-small-latest` (vision) ou `pixtral-12b-2409`
+- [ ] Prompt à forcer en sortie JSON structurée :
 
 ```
 Extrais les articles de ce ticket de caisse.
@@ -101,28 +135,38 @@ Format attendu :
 {"articles": [{"nom": "...", "prix": 0.00, "quantite": 1}]}
 ```
 
-- [x] Parser la réponse JSON directement — évite tout parsing de texte libre
+- [ ] Parser la réponse JSON directement — évite tout parsing de texte libre
+- [ ] **Persister immédiatement le JSON brut extrait** dans la base (avant le matching OFF) pour pouvoir rejouer sans re-consommer de crédits
 
-#### 3c. Matching Open Food Facts par nom
+#### 4c. Matching Open Food Facts par nom
 
-- [x] Endpoint : `GET https://world.openfoodfacts.org/cgi/search.pl?search_terms={nom}&json=1`
-- [x] Stratégie en deux passes :
+- [ ] Endpoint : `GET https://world.openfoodfacts.org/cgi/search.pl?search_terms={nom}&json=1`
+- [ ] Vérifier d'abord le cache `produits` (étape 3b) avant tout appel réseau
+- [ ] Stratégie en deux passes :
   1. Recherche avec le nom complet → prendre le premier résultat si pertinent
   2. Si échec : retirer les mots génériques (kg, g, %, bio, x2…) et réessayer
-- [x] Toujours afficher les candidats dans une UI de confirmation — le matching par nom n'est pas parfait
+- [ ] Toujours afficher les candidats dans une UI de confirmation — le matching par nom n'est pas parfait
+- [ ] Persister les articles matchés via `ScanRepository.saveArticle()`
 
-**Critère de validation :** photo ticket → liste JSON Mistral → produits OFF avec confirmation utilisateur.
+**Critère de validation :** photo ticket → liste JSON Mistral → produits OFF avec confirmation utilisateur → articles persistés en base.
 
 ---
 
-### Étape 4 — Stockage local et UI de résultats
+### Étape 5 — UI de résultats complète et analyse
 
-- **Base de données locale :** SQLite (`sqflite`) ou Hive (plus simple, NoSQL)
-- Tables / collections à prévoir :
-  - `scans` : date, type (ticket | barcode), montant total
-  - `articles` : nom brut (ticket), produit OFF associé, prix, quantité
-  - `produits` : cache des fiches OFF déjà récupérées (évite les doublons API)
-- UI résultats : Nutri-Score, catégories, analyse du panier dans le temps
+**Objectif :** enrichir l'UI de liste posée à l'étape 3 avec l'analyse nutritionnelle et les tendances.
+
+- [ ] **Étape 5a — Fiche produit enrichie** :
+  - [ ] Afficher Nutri-Score, catégories, image OFF sur la fiche article
+- [ ] **Étape 5b — Analyse du panier** :
+  - [ ] Répartition Nutri-Score du panier (A/B/C/D/E en %)
+  - [ ] Évolution dans le temps (graphique par semaine / mois)
+  - [ ] Montant total par scan et cumul mensuel
+- [ ] **Étape 5c — Mode hors-ligne** :
+  - [ ] Stocker le scan brut (image compressée + JSON Mistral) si pas de réseau
+  - [ ] Relancer le matching OFF automatiquement au retour de la connexion
+
+**Critère de validation :** tableau de bord avec historique, répartition nutritionnelle et totaux par période.
 
 ---
 
@@ -142,8 +186,9 @@ Format attendu :
 
 1. **Toujours compresser l'image avant envoi** — ne jamais envoyer le fichier original
 2. **Mettre en cache les résultats** — si un EAN ou un libellé a déjà été matché, ne pas re-appeler l'API
-3. **Utiliser des réponses mockées en développement** — tester le parsing JSON sans consommer de crédits
-4. **`mistral-small` en dev, `mistral-medium` en prod** — passer à un modèle supérieur seulement si la qualité d'extraction est insuffisante
+3. **Persister le JSON brut Mistral** — permet de rejouer le matching OFF sans re-consommer de crédits vision
+4. **Utiliser des réponses mockées en développement** — tester le parsing JSON sans consommer de crédits
+5. **`mistral-small` en dev, `mistral-medium` en prod** — passer à un modèle supérieur seulement si la qualité d'extraction est insuffisante
 
 ---
 
@@ -161,3 +206,4 @@ Format attendu :
 - **Matching par nom (tickets)** : non déterministe — toujours laisser l'utilisateur valider ou corriger
 - **Qualité de la photo** : un ticket froissé ou mal éclairé dégradera l'extraction Mistral — prévoir un feedback visuel avant envoi
 - **Hors ligne** : prévoir un mode gracieux si pas de réseau (stocker le scan brut et matcher plus tard)
+- **Rejouer sans coût** : grâce à la persistance du JSON Mistral brut, un bug de parsing ou de matching peut être corrigé et re-exécuté sans re-appeler l'API vision

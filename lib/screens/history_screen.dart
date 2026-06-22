@@ -212,23 +212,36 @@ class _SessionCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${_formatDate(session.date)}',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          storeLabel,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppTheme.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_formatDate(session.date)}',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    storeLabel,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppTheme.primary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Badge de type de scan
+                            _buildScanTypeBadge(session.type),
+                          ],
                         ),
                       ],
                     ),
@@ -325,6 +338,49 @@ class _SessionCard extends StatelessWidget {
     } else {
       return '${duration.inHours}h${(duration.inMinutes % 60).toString().padLeft(2, '0')}m';
     }
+  }
+
+  Widget _buildScanTypeBadge(String type) {
+    Color color;
+    String label;
+    IconData icon;
+    
+    switch (type) {
+      case 'ticket':
+        color = AppTheme.secondary;
+        label = 'Ticket';
+        icon = Icons.receipt_long;
+        break;
+      case 'barcode':
+      default:
+        color = AppTheme.accent;
+        label = 'Code-barres';
+        icon = Icons.qr_code_scanner;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

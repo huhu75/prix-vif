@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'theme.dart';
 import 'models.dart';
-import 'widgets/logo.dart';
 import 'screens/scan_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/session_detail_screen.dart';
+import 'services/scan_repository.dart';
 
 // Point d'entree de l'application
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Étape 3a — Initialisation de Hive
+  await Hive.initFlutter();
+
   runApp(const PrixVifApp());
 }
 
@@ -41,6 +47,10 @@ class _MainScreenState extends State<MainScreen> {
   // Etat de l'application
   final List<ScannedItem> _currentScannedItems = [];
   final List<ScanSession> _sessions = [];
+  String _currentScanType = 'barcode'; // 'barcode' ou 'ticket'
+
+  // Repository pour la persistance
+  final ScanRepository _repository = ScanRepository();
 
   // Pages
   late final List<Widget> _pages;
@@ -48,8 +58,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialiser avec des sessions de demo
-    _sessions.addAll(ScanSession.demoSessions);
+
+    // Étape 3a — Initialisation du repository et chargement des données persistées
+    _initRepository();
 
     _pages = [
       // Page Scanner
@@ -58,6 +69,8 @@ class _MainScreenState extends State<MainScreen> {
         onItemScanned: _handleItemScanned,
         onViewResults: () => setState(() => _currentIndex = 1),
         onViewHistory: () => setState(() => _currentIndex = 2),
+        repository: _repository,
+        onScanTypeChanged: _handleScanTypeChanged,
       ),
       // Page Resultats
       ResultsScreen(
@@ -75,6 +88,37 @@ class _MainScreenState extends State<MainScreen> {
         onClearAll: _clearAllSessions,
       ),
     ];
+  }
+
+  /// Met à jour le type de scan actuel
+  void _handleScanTypeChanged(String type) {
+    setState(() {
+      _currentScanType = type;
+    });
+  }
+
+  /// Initialise le repository et charge les sessions persistées
+  Future<void> _initRepository() async {
+    try {
+      await _repository.init();
+      final savedSessions = await _repository.getAllScans();
+
+      setState(() {
+        _sessions.clear();
+        if (savedSessions.isEmpty) {
+          // Première utilisation : charger les données de démo
+          _sessions.addAll(ScanSession.demoSessions);
+        } else {
+          _sessions.addAll(savedSessions);
+        }
+      });
+    } catch (e) {
+      print('Erreur initialisation repository: $e');
+      setState(() {
+        // Fallback : charger les données de démo
+        _sessions.addAll(ScanSession.demoSessions);
+      });
+    }
   }
 
   // Gestion des articles scannes
@@ -96,7 +140,7 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  // Gestion des sessions
+  // Gestion des sessions — Étape 3c : persistance via ScanRepository
   void _saveSession() {
     if (_currentScannedItems.isEmpty) return;
 
@@ -110,12 +154,16 @@ class _MainScreenState extends State<MainScreen> {
       date: DateTime.now(),
       endDate: DateTime.now(),
       storeName: storeName,
+      type: _currentScanType,
     );
 
     setState(() {
       _sessions.insert(0, session);
       _currentScannedItems.clear();
     });
+
+    // Persister la session en base Hive
+    _repository.saveScan(session);
   }
 
   void _handleSessionSelected(ScanSession session) {
@@ -134,6 +182,9 @@ class _MainScreenState extends State<MainScreen> {
       _sessions.removeWhere((s) => s.id == session.id);
     });
 
+    // Supprimer de la base Hive
+    _repository.deleteScan(session.id);
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         backgroundColor: Colors.red,
@@ -150,6 +201,9 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _sessions.clear();
     });
+
+    // Supprimer tout de la base Hive
+    _repository.clearAllScans();
   }
 
   @override
