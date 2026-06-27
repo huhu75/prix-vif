@@ -53,11 +53,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   void _removeSelected() {
     for (final id in _selectedItems) {
-      final item = widget.scannedItems.firstWhere(
-        (item) => item.id == id,
-        orElse: () => widget.scannedItems.first,
-      );
-      widget.onItemRemoved(item);
+      try {
+        final item = widget.scannedItems.firstWhere((item) => item.id == id);
+        widget.onItemRemoved(item);
+      } catch (e) {
+        // Si l'item n'est pas trouvé, ignorer
+        debugPrint('⚠️ Item $id non trouvé dans la liste');
+      }
     }
     _clearSelection();
   }

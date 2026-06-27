@@ -151,3 +151,74 @@ class StoredScan {
     totalAmount: (map['totalAmount'] as num).toDouble(),
   );
 }
+
+// Table `mistral_extractions` : JSON brut retourné par Mistral AI pour un ticket
+// Permet de rejouer le matching OFF sans re-consommer de crédits
+class StoredMistralExtraction {
+  final String id; // ID unique de l'extraction
+  final String scanId; // Référence au StoredScan parent
+  final String rawJson; // JSON brut retourné par Mistral
+  final DateTime extractedAt;
+  final String? imageBase64; // Optionnel : image compressée utilisée pour l'extraction
+
+  StoredMistralExtraction({
+    required this.id,
+    required this.scanId,
+    required this.rawJson,
+    required this.extractedAt,
+    this.imageBase64,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'scanId': scanId,
+    'rawJson': rawJson,
+    'extractedAt': extractedAt.toIso8601String(),
+    'imageBase64': imageBase64,
+  };
+
+  factory StoredMistralExtraction.fromMap(Map<dynamic, dynamic> map) => StoredMistralExtraction(
+    id: map['id'] as String,
+    scanId: map['scanId'] as String,
+    rawJson: map['rawJson'] as String,
+    extractedAt: DateTime.parse(map['extractedAt'] as String),
+    imageBase64: map['imageBase64'] as String?,
+  );
+}
+
+// Étape 5c — Table `pending_offline_scans` : scans en attente de matching OFF (hors-ligne)
+class PendingOfflineScan {
+  final String id; // ID unique
+  final String? scanId; // Référence optionnelle à un StoredScan
+  final String? imageBase64; // Image compressée du ticket
+  final String? rawMistralJson; // JSON brut de Mistral si déjà extrait
+  final DateTime createdAt;
+  final bool isMistralExtracted; // Si l'extraction Mistral a été faite
+  
+  PendingOfflineScan({
+    required this.id,
+    this.scanId,
+    this.imageBase64,
+    this.rawMistralJson,
+    required this.createdAt,
+    this.isMistralExtracted = false,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'scanId': scanId,
+    'imageBase64': imageBase64,
+    'rawMistralJson': rawMistralJson,
+    'createdAt': createdAt.toIso8601String(),
+    'isMistralExtracted': isMistralExtracted,
+  };
+
+  factory PendingOfflineScan.fromMap(Map<dynamic, dynamic> map) => PendingOfflineScan(
+    id: map['id'] as String,
+    scanId: map['scanId'] as String?,
+    imageBase64: map['imageBase64'] as String?,
+    rawMistralJson: map['rawMistralJson'] as String?,
+    createdAt: DateTime.parse(map['createdAt'] as String),
+    isMistralExtracted: map['isMistralExtracted'] as bool? ?? false,
+  );
+}

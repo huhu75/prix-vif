@@ -8,8 +8,8 @@ import '../widgets/magic_title.dart';
 class HistoryScreen extends StatefulWidget {
   final List<ScanSession> sessions;
   final Function(ScanSession) onSessionSelected;
-  final Function(ScanSession) onSessionDeleted;
-  final VoidCallback onClearAll;
+  final Future<void> Function(ScanSession) onSessionDeleted;
+  final Future<void> Function() onClearAll;
 
   const HistoryScreen({
     super.key,
@@ -165,7 +165,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             return _SessionCard(
                               session: session,
                               onTap: () => widget.onSessionSelected(session),
-                              onDelete: () => widget.onSessionDeleted(session),
+                              onDelete: () async => await widget.onSessionDeleted(session),
                             );
                           },
                         ),
@@ -483,7 +483,7 @@ class _EmptyHistoryState extends StatelessWidget {
 
 // Dialogue de confirmation
 class _ConfirmClearDialog extends StatelessWidget {
-  final VoidCallback onConfirm;
+  final Future<void> Function() onConfirm;
 
   const _ConfirmClearDialog({required this.onConfirm});
 
@@ -518,8 +518,8 @@ class _ConfirmClearDialog extends StatelessWidget {
         ),
         MagicButton(
           text: 'Supprimer',
-          onPressed: () {
-            onConfirm();
+          onPressed: () async {
+            await onConfirm();
             Navigator.of(context).pop();
           },
           color: AppTheme.error,

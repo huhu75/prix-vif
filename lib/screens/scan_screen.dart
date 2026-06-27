@@ -1,14 +1,18 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image/image.dart' as img;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../theme.dart';
 import '../models.dart';
+import '../models/hive_models.dart';
+import '../utils/image_utils.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/mistral_service.dart';
 import '../services/scan_repository.dart';
+import '../services/connectivity_service.dart';
 import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
@@ -23,6 +27,7 @@ class ScanScreen extends StatefulWidget {
   final VoidCallback onViewHistory;
   final ScanRepository? repository;
   final Function(String) onScanTypeChanged;
+  final Future<void> Function()? onScanSaved;
 
   const ScanScreen({
     super.key,
@@ -32,6 +37,7 @@ class ScanScreen extends StatefulWidget {
     required this.onViewHistory,
     this.repository,
     required this.onScanTypeChanged,
+    this.onScanSaved,
   });
 
   @override
@@ -58,8 +64,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   int? _compressedSize;
   Uint8List? _compressedImageBytes;
   bool _isCompressing = false;
+  String? _compressionMessage;
   final OpenFoodFactsService _offService = OpenFoodFactsService();
   bool _isLoadingProduct = false;
+  
+  // Service de connectivité (Étape 5c)
+  final ConnectivityService _connectivityService = ConnectivityService();
+  bool _isOnline = true;
   
   // Service de caméra
   final CameraService _cameraService = CameraService();
@@ -87,6 +98,22 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     if (widget.repository != null) {
       _offService.setRepository(widget.repository!);
     }
+    
+    // Étape 5c — Initialiser le service de connectivité
+    if (widget.repository != null) {
+      _connectivityService.setRepository(widget.repository!);
+    }
+    _connectivityService.setOffService(_offService);
+    _connectivityService.onConnectivityChanged = (isOnline) {
+      setState(() {
+        _isOnline = isOnline;
+      });
+      if (isOnline) {
+        // Au retour du réseau, vérifier s'il y a des scans en attente
+        _showPendingScansNotification();
+      }
+    };
+    _connectivityService.init();
     
     // Notifier le type initial
     widget.onScanTypeChanged(_isBarcodeMode ? 'barcode' : 'ticket');
@@ -124,6 +151,77 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           _errorMessage = 'Erreur caméra: ${e.toString()}';
         });
       }
+    }
+  }
+
+  // ==================== ÉTAPE 5C — MODE HORS-LIGNE ====================
+
+  /// Stocke un scan pour traitement hors-ligne
+  Future<void> _storeForOfflineProcessing(String rawMistralJson, List<ExtractedArticle> articles) async {
+    if (widget.repository == null || _compressedImageBytes == null) return;
+    
+    // Utiliser le même timestamp pour extractionId et scanId pour éviter les race conditions
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final extractionId = 'mistral_$timestamp';
+    final scanId = 'ticket_$timestamp';
+    
+    final mistralExtraction = StoredMistralExtraction(
+      id: extractionId,
+      scanId: scanId,
+      rawJson: rawMistralJson,
+      extractedAt: DateTime.now(),
+      imageBase64: base64Encode(_compressedImageBytes!),
+    );
+    
+    // Sauvegarder l'extraction Mistral
+    await widget.repository!.saveMistralExtraction(mistralExtraction);
+    
+    // Stocker dans les scans en attente
+    await _connectivityService.storeForOfflineProcessing(
+      scanId: scanId,
+      imageBase64: base64Encode(_compressedImageBytes!),
+      rawMistralJson: rawMistralJson,
+      isMistralExtracted: true,
+    );
+    
+    debugPrint('💾 [5c] Scan ticket stocké pour traitement hors-ligne');
+    
+    // Notifier l'utilisateur
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.textMuted,
+          content: const Text(
+            'Pas de connexion Internet. Le scan sera traité dès que le réseau sera de retour.',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+          ),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  /// Affiche une notification quand des scans en attente sont traités au retour du réseau
+  void _showPendingScansNotification() {
+    if (_connectivityService.pendingScanCount > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppTheme.secondary,
+              content: Text(
+                '${_connectivityService.pendingScanCount} scan(s) en attente sont en cours de traitement...',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              ),
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      });
     }
   }
 
@@ -244,6 +342,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           _compressedSize = null;
           _compressedImageBytes = null;
           _errorMessage = null;
+          _compressionMessage = null;
         });
       }
     } catch (e) {
@@ -257,38 +356,42 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     if (_ticketImage == null) return;
     setState(() {
       _isCompressing = true;
+      _errorMessage = null;
+      _compressionMessage = null;
     });
 
     try {
-      final File imageFile = File(_ticketImage!.path);
-      final originalBytes = await imageFile.readAsBytes();
-      final int origSize = originalBytes.length;
+      // Utiliser l'utilitaire centralisé pour la 4a
+      final result = await prepareImageForMistral(_ticketImage!);
 
-      // Décoder l'image avec le package 'image'
-      final img.Image? decodedImage = img.decodeImage(originalBytes);
-      if (decodedImage == null) throw Exception('Impossible de décoder l\'image');
-
-      // Redimensionner à max 1024px de large (si plus large)
-      img.Image resizedImage = decodedImage;
-      if (decodedImage.width > 1024) {
-        resizedImage = img.copyResize(decodedImage, width: 1024);
+      if (!result.success) {
+        throw Exception(result.error ?? 'Erreur inconnue lors de la préparation de l\'image');
       }
 
-      // Compresser en JPEG 80%
-      final compressedBytes = Uint8List.fromList(
-        img.encodeJpg(resizedImage, quality: 80),
-      );
+      // Extraire les données du résultat
+      final base64 = result.base64!;
+      final compressedBytes = base64Decode(base64);
 
       setState(() {
-        _originalSize = origSize;
-        _compressedSize = compressedBytes.length;
-        _compressedImageBytes = compressedBytes;
+        _originalSize = result.originalSize;
+        _compressedSize = result.compressedSize;
+        _compressedImageBytes = Uint8List.fromList(compressedBytes);
+        _compressionMessage = getCompressionMessage(result);
         _isCompressing = false;
       });
+
+      // Vérifier le critère de réduction (≥ 60%)
+      if (result.reductionPercent != null && result.reductionPercent! < 60) {
+        debugPrint(
+          "⚠️ [ScanScreen] Réduction insuffisante : ${result.reductionPercent!.toStringAsFixed(1)}% "
+          "(objectif : ≥ 60%)"
+        );
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors de la compression : ${e.toString()}';
         _isCompressing = false;
+        _compressionMessage = null;
       });
     }
   }
@@ -303,22 +406,51 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     try {
       final mistralService = MistralService();
       // 1. Extraire les articles avec Mistral (ou mock)
-      final extractedArticles = await mistralService.extractArticles(_compressedImageBytes!);
+      final extractionResult = await mistralService.extractArticles(_compressedImageBytes!);
+
+      // 4b — Persister immédiatement le JSON brut avant le matching OFF
+      // Cela permet de rejouer sans re-consommer de crédits Mistral
+      // Utiliser le même ID pour l'extraction Mistral et la ScanSession
+      String? scanId;
+      if (widget.repository != null) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final extractionId = 'mistral_$timestamp';
+        scanId = 'ticket_$timestamp';
+        
+        final mistralExtraction = StoredMistralExtraction(
+          id: extractionId,
+          scanId: scanId,
+          rawJson: extractionResult.rawJson,
+          extractedAt: DateTime.now(),
+          imageBase64: _compressionMessage != null ? base64Encode(_compressedImageBytes!) : null,
+        );
+        
+        await widget.repository!.saveMistralExtraction(mistralExtraction);
+      }
 
       // 2. Pour chaque article, rechercher sur Open Food Facts et récupérer le meilleur candidat + les autres candidats
       final List<ExtractedTicketItem> confirmationItems = [];
 
-      for (var article in extractedArticles) {
-        // Appeler Open Food Facts
-        // Première passe: nom complet
-        List<OFFProduct> candidates = await _offService.searchByName(article.name);
+      // Étape 5c — Vérifier la connectivité avant le matching OFF
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final hasNetwork = connectivityResult.any((result) => result != ConnectivityResult.none);
+      
+      for (var article in extractionResult.articles) {
+        // Étape 4c — Stratégie deux passes : nom complet → nom nettoyé
+        // Logique centralisée dans OpenFoodFactsService.searchByNameWithTwoPasses()
+        List<OFFProduct> candidates = [];
         
-        // Deuxième passe si vide: nom nettoyé
-        if (candidates.isEmpty) {
-          final cleanedName = _offService.cleanProductName(article.name);
-          if (cleanedName.isNotEmpty && cleanedName != article.name.toLowerCase()) {
-            candidates = await _offService.searchByName(cleanedName);
+        if (hasNetwork) {
+          try {
+            candidates = await _offService.searchByNameWithTwoPasses(article.name);
+          } catch (e) {
+            debugPrint('⚠️ [ScanScreen] Erreur matching OFF pour ${article.name}: $e');
+            // En cas d'erreur, on continue sans candidat
           }
+        } else {
+          debugPrint('⚠️ [ScanScreen] Pas de réseau - stockage pour traitement hors-ligne');
+          // Stocker pour traitement ultérieur
+          await _storeForOfflineProcessing(extractionResult.rawJson, extractionResult.articles);
         }
 
         confirmationItems.add(
@@ -357,6 +489,28 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             widget.onItemScanned(item);
           }
 
+          // Étape 4c — Persister immédiatement les articles matchés via ScanRepository
+          // Crée une session 'ticket' et la sauvegarde en base sans action manuelle
+          // Utiliser le même scanId que celui de l'extraction Mistral
+          if (widget.repository != null) {
+            final ticketSession = ScanSession(
+              id: scanId ?? 'ticket_${DateTime.now().millisecondsSinceEpoch}',
+              items: List<ScannedItem>.from(imported),
+              date: DateTime.now(),
+              endDate: DateTime.now(),
+              storeName: _selectedStore,
+              type: 'ticket',
+            );
+            try {
+              await widget.repository!.saveScan(ticketSession);
+              debugPrint('✅ [4c] Session ticket persistée : ${imported.length} articles via saveArticle()');
+              // Notifier le parent pour recharger les sessions
+              await widget.onScanSaved?.call();
+            } catch (e) {
+              debugPrint('⚠️ [4c] Erreur persistance session ticket: $e');
+            }
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: AppTheme.secondary,
@@ -376,6 +530,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             _originalSize = null;
             _compressedSize = null;
             _compressedImageBytes = null;
+            _compressionMessage = null;
           });
         }
       }
@@ -626,6 +781,24 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         );
         
         widget.onItemScanned(scannedItem);
+        
+        // 💾 SAUVEGARDE AUTOMATIQUE (Solution robuste - Étape 5c)
+        // Créer une session avec cet article unique et la persister immédiatement
+        // Cela résout le problème où les articles ne sont pas visibles sans appuyer sur "Enregistrer"
+        if (widget.repository != null) {
+          final singleItemSession = ScanSession(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            items: [scannedItem],
+            date: DateTime.now(),
+            endDate: DateTime.now(),
+            storeName: _selectedStore,
+            type: 'barcode',
+          );
+          await widget.repository!.saveScan(singleItemSession);
+          debugPrint('✅ [5c] Article sauvegardé automatiquement : ${scannedItem.name}');
+          // Notifier le parent pour recharger les sessions
+          await widget.onScanSaved?.call();
+        }
         
         // Afficher notification
         if (mounted) {
@@ -907,22 +1080,33 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Taille originale : ${(_originalSize! / 1024).toStringAsFixed(1)} Ko',
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                        ),
-                        Text(
-                          'Taille compressée : ${(_compressedSize! / 1024).toStringAsFixed(1)} Ko',
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                        ),
-                        Text(
-                          'Gain : -${ratio!.toStringAsFixed(1)}% de bande passante',
-                          style: const TextStyle(
-                            color: Colors.greenAccent,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                        if (_compressionMessage != null && _compressionMessage!.isNotEmpty)
+                          Text(
+                            _compressionMessage!,
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        else ...[
+                          Text(
+                            'Taille originale : ${(_originalSize! / 1024).toStringAsFixed(1)} Ko',
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
                           ),
-                        ),
+                          Text(
+                            'Taille compressée : ${(_compressedSize! / 1024).toStringAsFixed(1)} Ko',
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                          Text(
+                            'Gain : -${ratio!.toStringAsFixed(1)}% de bande passante',
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -938,6 +1122,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                             _originalSize = null;
                             _compressedSize = null;
                             _compressedImageBytes = null;
+                            _compressionMessage = null;
                           });
                         },
                         icon: const Icon(Icons.refresh, size: 18),

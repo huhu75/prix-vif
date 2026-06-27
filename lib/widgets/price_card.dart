@@ -136,6 +136,21 @@ class PriceCard extends StatelessWidget {
                             ),
                           ),
                         
+                        // Catégories
+                        if (item.categories != null && item.categories!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(
+                              item.categories!.join(' • '),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textMuted,
+                                fontSize: 10,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        
                         // Nutri-Score
                         if (item.nutriscore != null)
                           Padding(

@@ -173,13 +173,34 @@ class OpenFoodFactsService {
   }
 
   /// Recherche des produits par nom sur Open Food Facts
+  /// Vérifie d'abord le cache si un repository est disponible
   /// Retourne une liste de [OFFProduct]
   Future<List<OFFProduct>> searchByName(String name) async {
     final cleanName = name.trim();
     if (cleanName.isEmpty) return [];
 
+    // Étape 4c — Vérifier le cache avant l'appel réseau (clé = nom normalisé)
+    if (_repository != null) {
+      final cacheKey = 'name:${cleanName.toLowerCase()}';
+      final cached = _repository!.getCachedProduct(cacheKey);
+      if (cached != null) {
+        print('Cache HIT (nom) pour: $cleanName');
+        return [
+          OFFProduct(
+            barcode: cached.ean,
+            name: cached.productName,
+            brand: cached.brands ?? 'Marque inconnue',
+            nutriscore: cached.nutriscoreGrade,
+            categories: cached.categories ?? [],
+            imageUrl: cached.imageUrl,
+          )
+        ];
+      }
+    }
+
     try {
-      final url = Uri.parse('https://world.openfoodfacts.org/cgi/search.pl?search_terms=${Uri.encodeComponent(cleanName)}&json=1');
+      final url = Uri.parse(
+          'https://world.openfoodfacts.org/cgi/search.pl?search_terms=${Uri.encodeComponent(cleanName)}&json=1&page_size=10');
       final response = await http.get(
         url,
         headers: {
@@ -190,7 +211,7 @@ class OpenFoodFactsService {
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         final List<dynamic>? productsJson = data['products'];
-        if (productsJson != null) {
+        if (productsJson != null && productsJson.isNotEmpty) {
           final List<OFFProduct> products = [];
           for (var p in productsJson) {
             final barcode = p['code']?.toString() ?? '';
@@ -198,6 +219,23 @@ class OpenFoodFactsService {
               products.add(OFFProduct.fromJson(barcode, {'product': p}));
             }
           }
+
+          // Étape 4c — Mettre en cache le premier résultat sous la clé 'name:...'
+          if (products.isNotEmpty && _repository != null) {
+            final best = products.first;
+            final cacheKey = 'name:${cleanName.toLowerCase()}';
+            await _repository!.cacheProduct(CachedProduct(
+              ean: cacheKey,
+              productName: best.name,
+              brands: best.brand,
+              nutriscoreGrade: best.nutriscore,
+              imageUrl: best.imageUrl,
+              categories: best.categories,
+              cachedAt: DateTime.now(),
+            ));
+            print('Cache STORE (nom) pour: $cleanName → ${best.name}');
+          }
+
           return products;
         }
       }
@@ -206,6 +244,26 @@ class OpenFoodFactsService {
       print('Erreur Open Food Facts search API: $e');
       return [];
     }
+  }
+
+  /// Stratégie de recherche en deux passes :
+  /// 1. Nom complet → premier résultat si pertinent
+  /// 2. Si vide : nom nettoyé des mots génériques → réessayer
+  /// Retourne la liste des candidats (peut être vide)
+  Future<List<OFFProduct>> searchByNameWithTwoPasses(String rawName) async {
+    // Première passe : nom complet
+    List<OFFProduct> candidates = await searchByName(rawName);
+
+    // Deuxième passe : nom nettoyé si pas de résultats
+    if (candidates.isEmpty) {
+      final cleaned = cleanProductName(rawName);
+      if (cleaned.isNotEmpty && cleaned != rawName.toLowerCase().trim()) {
+        print('OFF search — 2ème passe avec nom nettoyé: "$cleaned"');
+        candidates = await searchByName(cleaned);
+      }
+    }
+
+    return candidates;
   }
 
   /// Nettoie un nom de produit en retirant les mots génériques courants sur les tickets

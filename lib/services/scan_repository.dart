@@ -13,10 +13,14 @@ class ScanRepository {
   static const String _scansBoxName = 'scans';
   static const String _articlesBoxName = 'articles';
   static const String _productsBoxName = 'products_cache';
+  static const String _mistralExtractionsBoxName = 'mistral_extractions';
+  static const String _pendingOfflineScansBoxName = 'pending_offline_scans';
 
   late Box<Map> _scansBox;
   late Box<Map> _articlesBox;
   late Box<Map> _productsBox;
+  late Box<Map> _mistralExtractionsBox;
+  late Box<Map> _pendingOfflineScansBox;
 
   bool _isInitialized = false;
 
@@ -24,11 +28,11 @@ class ScanRepository {
   Future<void> init() async {
     if (_isInitialized) return;
 
-    await Hive.initFlutter();
-
     _scansBox = await Hive.openBox<Map>(_scansBoxName);
     _articlesBox = await Hive.openBox<Map>(_articlesBoxName);
     _productsBox = await Hive.openBox<Map>(_productsBoxName);
+    _mistralExtractionsBox = await Hive.openBox<Map>(_mistralExtractionsBoxName);
+    _pendingOfflineScansBox = await Hive.openBox<Map>(_pendingOfflineScansBoxName);
 
     _isInitialized = true;
   }
@@ -193,4 +197,98 @@ class ScanRepository {
 
   /// Nombre total d'articles persistés
   int get articleCount => _articlesBox.length;
+
+  // ==========================================
+  // Extractions Mistral — Pour rejouer sans coût
+  // ==========================================
+
+  /// Sauvegarde une extraction Mistral brute
+  Future<void> saveMistralExtraction(StoredMistralExtraction extraction) async {
+    await _mistralExtractionsBox.put(extraction.id, extraction.toMap());
+  }
+
+  /// Récupère une extraction Mistral par ID
+  StoredMistralExtraction? getMistralExtraction(String id) {
+    final map = _mistralExtractionsBox.get(id);
+    if (map == null) return null;
+    return StoredMistralExtraction.fromMap(map);
+  }
+
+  /// Récupère toutes les extractions Mistral pour un scan donné
+  List<StoredMistralExtraction> getMistralExtractionsForScan(String scanId) {
+    final extractions = <StoredMistralExtraction>[];
+    for (final key in _mistralExtractionsBox.keys) {
+      final map = _mistralExtractionsBox.get(key);
+      if (map == null) continue;
+      final extraction = StoredMistralExtraction.fromMap(map);
+      if (extraction.scanId == scanId) {
+        extractions.add(extraction);
+      }
+    }
+    return extractions;
+  }
+
+  /// Supprime une extraction Mistral
+  Future<void> deleteMistralExtraction(String id) async {
+    await _mistralExtractionsBox.delete(id);
+  }
+
+  /// Supprime toutes les extractions Mistral pour un scan
+  Future<void> deleteMistralExtractionsForScan(String scanId) async {
+    final extractions = getMistralExtractionsForScan(scanId);
+    for (final extraction in extractions) {
+      await deleteMistralExtraction(extraction.id);
+    }
+  }
+
+  /// Nombre total d'extractions Mistral persistées
+  int get mistralExtractionCount => _mistralExtractionsBox.length;
+
+  // ==========================================
+  // Scans en attente — Mode hors-ligne (Étape 5c)
+  // ==========================================
+
+  /// Sauvegarde un scan en attente de traitement (hors-ligne)
+  Future<void> savePendingOfflineScan(PendingOfflineScan scan) async {
+    await _pendingOfflineScansBox.put(scan.id, scan.toMap());
+  }
+
+  /// Récupère tous les scans en attente
+  List<PendingOfflineScan> getAllPendingOfflineScans() {
+    final pending = <PendingOfflineScan>[];
+    for (final key in _pendingOfflineScansBox.keys) {
+      final map = _pendingOfflineScansBox.get(key);
+      if (map != null) {
+        pending.add(PendingOfflineScan.fromMap(map));
+      }
+    }
+    // Tri par date croissante (FIFO)
+    pending.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return pending;
+  }
+
+  /// Récupère un scan en attente par ID
+  PendingOfflineScan? getPendingOfflineScan(String id) {
+    final map = _pendingOfflineScansBox.get(id);
+    if (map == null) return null;
+    return PendingOfflineScan.fromMap(map);
+  }
+
+  /// Supprime un scan en attente
+  Future<void> deletePendingOfflineScan(String id) async {
+    await _pendingOfflineScansBox.delete(id);
+  }
+
+  /// Supprime tous les scans en attente
+  Future<void> clearAllPendingOfflineScans() async {
+    await _pendingOfflineScansBox.clear();
+  }
+
+  /// Vérifie s'il y a des scans en attente
+  bool hasPendingOfflineScans() {
+    return _pendingOfflineScansBox.isNotEmpty;
+  }
+
+  /// Nombre de scans en attente
+  int get pendingOfflineScanCount => _pendingOfflineScansBox.length;
 }
