@@ -135,7 +135,7 @@ class AppTheme {
         shape: CircleBorder(),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: surfaceDark.withOpacity(0.8),
+        backgroundColor: surfaceDark, // Fond opaque pour meilleur contraste
         selectedItemColor: primary, // #00AAFF pour l'item sélectionné
         unselectedItemColor: textSecondary,
         selectedLabelStyle: const TextStyle(
