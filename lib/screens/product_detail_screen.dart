@@ -13,12 +13,14 @@ class ProductDetailScreen extends StatefulWidget {
   final ScanRepository repository;
   final String productId;
   final String productName;
+  final int initialTabIndex;
 
   const ProductDetailScreen({
     super.key,
     required this.repository,
     required this.productId,
     required this.productName,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -243,6 +245,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     
     return DefaultTabController(
       length: 4,
+      initialIndex: widget.initialTabIndex.clamp(0, 3),
       child: Scaffold(
         backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(

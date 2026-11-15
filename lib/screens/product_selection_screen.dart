@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models/product_analysis_models.dart';
 import '../services/scan_repository.dart';
+import '../utils/product_type_utils.dart';
 import '../widgets/magic_title.dart';
 import 'product_detail_screen.dart';
 
@@ -23,10 +24,23 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   List<UniqueProductInfo> _products = [];
   List<UniqueProductInfo> _filteredProducts = [];
   String _searchQuery = '';
+  String? _selectedType; // null = tous les types
   bool _isLoading = true;
   
   // Options de tri
   SortOption _sortOption = SortOption.name;
+  
+  /// Types de produit disponibles (catégorie OFF la plus spécifique), triés
+  List<String> get _availableTypes {
+    final types = <String>{};
+    for (final product in _products) {
+      final type = productTypeLabel(product.categories);
+      if (type != uncategorizedTypeLabel) types.add(type);
+    }
+    final sorted = types.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return sorted;
+  }
   
   @override
   void initState() {
@@ -93,6 +107,11 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     _filterAndSortProducts();
   }
 
+  void _onTypeSelected(String? type) {
+    setState(() => _selectedType = type);
+    _filterAndSortProducts();
+  }
+
   void _onSortChanged(SortOption option) {
     setState(() {
       _sortOption = option;
@@ -101,19 +120,26 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   }
 
   void _filterAndSortProducts() {
-    if (_searchQuery.isEmpty) {
-      _filteredProducts = List.from(_products);
-    } else {
-      _filteredProducts = _products.where((product) {
-        final nameMatch = product.productName
-            .toLowerCase()
-            .contains(_searchQuery.toLowerCase());
-        final brandMatch = product.brand?.toLowerCase()
-            .contains(_searchQuery.toLowerCase()) ?? false;
-        final barcodeMatch = product.barcode?.contains(_searchQuery) ?? false;
-        return nameMatch || brandMatch || barcodeMatch;
-      }).toList();
-    }
+    final query = _searchQuery.trim().toLowerCase();
+    _filteredProducts = _products.where((product) {
+      // Filtre par type de produit (catégorie OFF)
+      if (_selectedType != null &&
+          productTypeLabel(product.categories) != _selectedType) {
+        return false;
+      }
+      // Sans recherche textuelle, le filtre par type suffit
+      if (query.isEmpty) return true;
+      // Recherche dans le nom, la marque, le code-barres ET les catégories
+      // (permet de trouver un produit en tapant son type, ex: "lait")
+      final nameMatch = product.productName.toLowerCase().contains(query);
+      final brandMatch =
+          product.brand?.toLowerCase().contains(query) ?? false;
+      final barcodeMatch = product.barcode?.contains(_searchQuery) ?? false;
+      final categoryMatch =
+          product.categories?.any((c) => c.toLowerCase().contains(query)) ??
+              false;
+      return nameMatch || brandMatch || barcodeMatch || categoryMatch;
+    }).toList();
     _applySort();
   }
 
@@ -165,7 +191,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               children: [
                 // Barre de recherche
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: TextField(
                     decoration: InputDecoration(
                       hintText: 'Rechercher un produit...',
@@ -188,13 +214,40 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                   ),
                 ),
                 
+                // Filtre par type de produit (catégories Open Food Facts)
+                if (_availableTypes.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: SizedBox(
+                      height: 36,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          _TypeChip(
+                            label: 'Tous',
+                            selected: _selectedType == null,
+                            onSelected: () => _onTypeSelected(null),
+                          ),
+                          ..._availableTypes.map((type) => Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: _TypeChip(
+                                  label: type,
+                                  selected: _selectedType == type,
+                                  onSelected: () => _onTypeSelected(type),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+                
                 // En-tête de tri
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
                       Text(
-                        '(${_filteredProducts.length} produits)',
+                        '(${_filteredProducts.length} produits${_selectedType != null ? ' · $_selectedType' : ''})',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppTheme.textMuted,
                         ),
@@ -262,9 +315,9 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              _searchQuery.isEmpty
+              _searchQuery.isEmpty && _selectedType == null
                   ? 'Aucun produit n\'a encore été scanné'
-                  : 'Essayez une autre recherche',
+                  : 'Essayez une autre recherche ou un autre type',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondary,
@@ -301,6 +354,39 @@ enum SortOption {
   final String label;
   
   const SortOption(this.label);
+}
+
+/// Chip de filtre par type de produit
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _TypeChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: AppTheme.primary,
+      backgroundColor: AppTheme.surfaceDark,
+      labelStyle: TextStyle(
+        color: selected ? AppTheme.backgroundDark : AppTheme.textSecondary,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        fontSize: 12,
+      ),
+      side: BorderSide(
+        color: selected ? AppTheme.primary : AppTheme.surfaceLight,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+    );
+  }
 }
 
 /// Carte d'un produit dans la liste de sélection
@@ -401,6 +487,31 @@ class _ProductCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  // Type de produit (catégorie Open Food Facts)
+                  if (isCategorized(product.categories)) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.category_outlined,
+                          size: 12,
+                          color: AppTheme.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            productTypeLabel(product.categories),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textMuted,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -8,6 +8,47 @@
 
 ## 📋 Historique des versions
 
+### v1.5.1 — 2026-11-15 — Données de démo complètes et initialisation Hive
+
+- **Ajouté** : enrichissement complet de `ScanSession.demoSessions` avec catégories Open Food Facts réelles (`Milks`, `Breads`, `Waters`, `Butters`, `Cheeses`, etc.), Nutri-Score, historique de prix et scans croisés multi-enseignes (Carrefour, Leclerc, Monoprix)
+- **Corrigé** : persistance automatique des données de démo dans Hive lors du tout premier démarrage (`_loadSessions`), permettant à l'analyse de produit, aux fiches détaillées et aux graphiques de fonctionner immédiatement sans aucun scan préalable
+- **Modifié** : nettoyage des logs de débogage obsolètes dans `main.dart`
+
+### v1.5.0 — 2026-11-15 — Comparatif enseignes × types de produits dans le Dashboard (Étape 4/4)
+
+- **Ajouté** : matrice et comparatif inter-magasins directement intégrés dans la section « Comparaison par type de produit »
+- **Ajouté** : affichage pour chaque catégorie du classement des enseignes du moins cher au plus cher, mise en avant du magasin leader (🥇) et calcul de l'écart de prix au sein de la catégorie
+- **Ajouté** : bascule interactive par vue : « Par type de produit » (avec comparatif enseignes par rayon) et « Par enseigne » (avec identification des catégories où chaque magasin est le plus compétitif)
+- **Ajouté** : modèle d'agrégation `_ProductTypeStoreStats` dans `_ProductTypeStats` et suite de tests d'interaction dans `dashboard_screen_test.dart`
+
+### v1.4.0 — 2026-11-15 — Recommandations d'alternatives moins chères dans le Dashboard (Étape 3/4)
+
+- **Ajouté** : section « Alternatives moins chères » directement intégrée sur le Dashboard identifiant proactivement les produits équivalents (même type ou catégorie OFF, ou famille de produit) moins chers repérés dans d'autres enseignes
+- **Ajouté** : calcul automatique des gains en euros et en pourcentage d'économie (« Prenez [Produit B] chez [Magasin B] au lieu de [Produit A] chez [Magasin A] : économisez X € »)
+- **Ajouté** : navigation directe en 1 clic vers l'onglet « Similaires » de la fiche produit (`ProductDetailScreen` avec `initialTabIndex: 3`)
+- **Ajouté** : modèle d'agrégation `ProductRecommendationItem` avec détection d'équivalence intelligente (catégories OFF et mot-clé de produit) et suite de tests unitaires / widgets dans `dashboard_screen_test.dart`
+
+### v1.3.0 — 2026-11-15 — Comparateur multi-magasins dans le Dashboard (Étape 2/4)
+
+- **Ajouté** : section « Comparateur multi-magasins » directement intégrée sur le Dashboard identifiant pour chaque produit scanné dans plusieurs enseignes le magasin le moins cher vs le plus cher
+- **Ajouté** : calcul automatique des gains réalisables (écart en euros et en pourcentage d'économie) avec mise en avant du magasin le plus compétitif
+- **Ajouté** : navigation directe en 1 clic vers l'onglet « Magasins » de la fiche produit (`ProductDetailScreen` avec `initialTabIndex: 2`)
+- **Ajouté** : modèle d'agrégation `ProductStoreComparisonItem` et tests unitaires / widgets associés dans `dashboard_screen_test.dart`
+
+### v1.2.0 — 2026-11-15 — Section Évolution des prix des produits dans le Dashboard (Étape 1/4)
+
+- **Ajouté** : section « Évolution des prix des produits » directement intégrée sur le Dashboard avec calcul automatique des hausses, baisses et stabilités de prix
+- **Ajouté** : cartes interactives avec badge de tendance (+X% / -X% / stable), dernier prix, enseigne et nombre de scans
+- **Ajouté** : navigation directe en 1 clic depuis le Dashboard vers l'onglet « Évolution » de la fiche produit (`ProductDetailScreen` avec `initialTabIndex: 1`)
+- **Ajouté** : modèle d'agrégation `ProductPriceEvolutionItem` et tests unitaires / widgets associés dans `dashboard_screen_test.dart`
+
+### v1.1.0 — 2026-11-15 — Comparaison et filtrage par type de produit (Open Food Facts)
+
+- **Ajouté** : utilitaire `product_type_utils.dart` extrayant le type de produit le plus précis issu de la hiérarchie `categories` Open Food Facts (`Milks`, `Breads`, etc.)
+- **Ajouté** : section « Comparaison par type de produit » dans le tableau de bord avec prix moyen par type, fourchette min/max et barre de ratio comparative
+- **Ajouté** : barre de filtres horizontaux par type de produit (`ChoiceChip`) dans l'écran de sélection de produits avec recherche étendue aux catégories
+- **Ajouté** : suite de tests unitaires et widgets dédiée (`product_type_utils_test.dart`, `product_selection_screen_test.dart`, extension de `dashboard_screen_test.dart`)
+
 ### v1.0.3 — 2026-11-14 — Nettoyage du code mort
 
 - **Supprimé** : 16 méthodes/getters jamais appelés dans `ScanRepository` (`getPriceHistory`, `getStorePriceComparison`, `getStoresForProduct`, `getArticlesByStore/ByBarcode/ByProductName`, `deleteMistralExtractionsForScan`, `getMistralExtraction(s)`, `getPendingOfflineScan`, `clearAllPendingOfflineScans`, `hasProductInCache`, `cachedProductCount`, `articleCount`, `mistralExtractionCount`)
@@ -74,8 +115,12 @@
 
 ### 📈 Tableau de Bord (Dashboard)
 - **Statistiques globales** : nombre total de scans, articles, montant total, moyenne par article
+- **Évolution des prix des produits** : suivi des variations (hausses, baisses, stabilités) avec accès direct à la courbe détaillée
+- **Comparateur multi-magasins** : identification des écarts de prix inter-enseignes et calcul des économies potentielles par produit
+- **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes avec calcul des gains
+- **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon et vue par enseigne mettant en valeur les forces de chaque magasin
 - **Répartition Nutri-Score** : graphique à barres horizontales avec pourcentages A/B/C/D/E
-- **Évolution temporelle** : graphiques hebdomadaires et mensuels
+- **Évolution temporelle** : graphiques hebdomadaires et mensuels des dépenses
 - **Totaux par période** : cumul semaine et mois en cours
 - **Derniers scans** : aperçu rapide avec navigation vers le détail
 
@@ -364,7 +409,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 14 Novembre 2026 (v1.0.3 — voir Historique des versions)*
+*Dernière mise à jour : 15 Novembre 2026 (v1.5.1 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Dashboard fiable - Synchronisation temps réel fonctionnelle*
+*Statut : ✅ Dashboard complet & fonctionnel dès le premier lancement*
