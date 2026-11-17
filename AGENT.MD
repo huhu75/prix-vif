@@ -392,8 +392,9 @@ Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ;
 
 ---
 
-## Découpage des écrans (v1.9.1 – v1.9.2)
+## Découpage des écrans (v1.9.1 – v1.9.3)
 
+- Dashboard : `dashboard_screen.dart` calcule `DashboardStats` et empile les sections ; chaque section est un widget de `lib/widgets/dashboard/` qui ne reçoit que ses données et ses callbacks.
 - Fiche produit : `product_detail_screen.dart` ne fait que charger (`ProductAnalysisService.load`) et afficher la barre d'onglets ; les onglets sont dans `lib/widgets/product_detail/`. `ProductAnalysisService` accepte un `lookupBarcode` de remplacement pour les tests (pas de réseau).
 - Scanner : `scan_screen.dart` garde l'état (caméra, mode, magasin, image du ticket) et les flux métier (`_onBarcodeScanned`, `_processTicketImage`, hors-ligne) ; les composants d'interface sont dans `lib/widgets/scan/` et ne reçoivent que des valeurs et des callbacks.
 

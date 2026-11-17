@@ -8,6 +8,11 @@
 
 ## 📋 Historique des versions
 
+### v1.9.3 — 2026-11-17 — Dashboard découpé par section
+
+- **Modifié** : `dashboard_screen.dart` découpé (2 579 → 193 lignes) : l'écran ne fait plus qu'assembler les sections ; chaque section a son fichier dans `lib/widgets/dashboard/` (`GlobalStatsSection`, `ProductPriceEvolutionSection`, `ProductStoreComparisonSection`, `ProductRecommendationSection`, `ProductTypeComparisonSection`, `NutriScoreDistributionSection`, `TimeTrendSection`, `PeriodTotalsSection`, `RecentScansSection`, `ProductAnalysisButton`, `EmptyDashboardState`)
+- Plus aucun fichier de `lib/` ne dépasse 900 lignes (le plus gros : `scan_screen.dart`, 873)
+
 ### v1.9.2 — 2026-11-17 — Scanner découpé en composants
 
 - **Modifié** : `scan_screen.dart` découpé (2 147 → 873 lignes) : l'écran garde l'état et les flux (caméra, code-barres, ticket, hors-ligne) ; l'interface est répartie dans `lib/widgets/scan/` : `ScanModeSelector` (bascule code-barres / ticket), `StoreSelector` (magasins), `TicketScanZone` (photo, compression, envoi à l'IA), `TicketConfirmationSheet` + `ExtractedTicketItem` (rapprochement Open Food Facts), `showPriceInputSheet` (saisie du prix), `showMistralSettingsDialog` (clé API)
@@ -349,7 +354,7 @@ prix_vif/
 │   │   ├── results_screen.dart       # Écran résultats
 │   │   ├── history_screen.dart       # Écran historique
 │   │   ├── session_detail_screen.dart # Détails d'une session
-│   │   ├── dashboard_screen.dart     # Tableau de bord avec analyse
+│   │   ├── dashboard_screen.dart     # Tableau de bord : assemble les sections
 │   │   ├── product_selection_screen.dart # Liste des produits scannés (recherche, tri, filtres)
 │   │   └── product_detail_screen.dart    # Fiche produit : chargement + onglets
 │   │
@@ -361,7 +366,7 @@ prix_vif/
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       ├── logo.dart                  # Logo de l'application
-│       ├── dashboard/                 # Sections du Dashboard (panier, alertes, en-tête commun)
+│       ├── dashboard/                 # Une section du Dashboard par fichier (stats, panier, alertes, comparateurs, tendances…)
 │       ├── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
 │       └── scan/                      # Composants du scanner (mode, magasin, zone ticket, prix, confirmation, clé Mistral)
 │
@@ -521,7 +526,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.9.2 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.9.3 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
