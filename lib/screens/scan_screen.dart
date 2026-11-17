@@ -12,6 +12,7 @@ import '../utils/image_utils.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/mistral_service.dart';
 import '../services/scan_repository.dart';
+import '../utils/unit_price.dart';
 import '../services/connectivity_service.dart';
 import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
@@ -2089,6 +2090,11 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
                     final importTimestamp = DateTime.now().millisecondsSinceEpoch;
                     for (var item in _items) {
                       if (item.isSelected) {
+                        final lineQuantity = ticketLineQuantity(
+                          count: item.quantity,
+                          packQuantity: item.matchedProduct?.quantity,
+                          packUnit: item.matchedProduct?.unit,
+                        );
                         importedItems.add(
                           ScannedItem(
                             // Index inclus : deux lignes identiques du ticket gardent des id distincts
@@ -2096,8 +2102,8 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
                             name: item.matchedProduct?.name ?? item.rawName,
                             brand: item.matchedProduct?.brand ?? 'Marque inconnue',
                             price: item.price,
-                            quantity: item.matchedProduct?.quantity ?? item.quantity,
-                            unit: item.matchedProduct?.unit ?? 'unité',
+                            quantity: lineQuantity.quantity,
+                            unit: lineQuantity.unit,
                             scanDate: DateTime.now(),
                             barcode: item.matchedProduct?.barcode,
                             imageUrl: item.matchedProduct?.imageUrl ?? 'https://via.placeholder.com/150x150/CCCCCC/000000?text=📦',

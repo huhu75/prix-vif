@@ -8,6 +8,15 @@
 
 ## 📋 Historique des versions
 
+### v1.6.0 — 2026-11-17 — Comparaisons au prix au kg / L
+
+- **Ajouté** : prix au kg, au litre ou à l'unité (`lib/utils/unit_price.dart`) calculé depuis la contenance de l'article (`1 L`, `500 g`, packs `6 x 1,5 L`, chaînes Open Food Facts brutes comme `℮ 500 g`)
+- **Modifié** : comparatif par type de produit — les enseignes sont classées au kg / L / unité dès que la contenance est connue (leader 🥇, écart et « moins cher sur » inclus) ; la moyenne normalisée du type est affichée avec le nombre d'articles de contenance connue
+- **Modifié** : alternatives moins chères comparées à quantité égale quand les deux contenances sont connues (économie calculée sur la quantité du produit de référence) ; plus de recommandation entre un produit de contenance connue et un produit sans contenance, ou entre kg et litre
+- **Modifié** : onglet « Similaires » de la fiche produit trié au kg / L, prix normalisé affiché sur chaque produit et sur le moins cher ; prix normalisé affiché sur les cartes d'articles
+- **Corrigé** : une ligne de ticket de N articles gardait la contenance d'un seul article (6 bouteilles de 1,5 L comptées comme 1,5 L) ; elle devient un pack `6 x 1.5 L`, aussi lors du rejeu hors-ligne
+- **Ajouté** : tests `test/utils/unit_price_test.dart` (lecture des contenances, packs, lignes de ticket, classement des enseignes, recommandations, produits similaires)
+
 ### v1.5.5 — 2026-11-17 — Calculs du Dashboard sortis de l'écran
 
 - **Modifié** : calculs du tableau de bord sortis de `dashboard_screen.dart` (3 334 → 2 542 lignes) vers une couche d'analyse indépendante de l'interface `lib/analytics/` : `DashboardStats.fromSessions`, `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem`, statistiques par type et par période
@@ -148,8 +157,9 @@
 - **Statistiques globales** : nombre total de scans, articles, montant total, moyenne par article
 - **Évolution des prix des produits** : suivi des variations (hausses, baisses, stabilités) avec accès direct à la courbe détaillée
 - **Comparateur multi-magasins** : identification des écarts de prix inter-enseignes et calcul des économies potentielles par produit
-- **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes avec calcul des gains
-- **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon et vue par enseigne mettant en valeur les forces de chaque magasin
+- **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes, avec calcul des gains à quantité égale (au kg / L) quand les contenances sont connues
+- **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon au kg / L / unité et vue par enseigne mettant en valeur les forces de chaque magasin
+- **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`), utilisé pour toutes les comparaisons entre produits différents
 - **Répartition Nutri-Score** : graphique à barres horizontales avec pourcentages A/B/C/D/E
 - **Évolution temporelle** : graphiques hebdomadaires et mensuels des dépenses
 - **Totaux par période** : cumul semaine et mois en cours
@@ -283,6 +293,7 @@ prix_vif/
 │   │
 │   ├── utils/
 │   │   ├── image_utils.dart          # Utilitaires compression d'image
+│   │   ├── unit_price.dart           # Contenance → prix au kg / L / unité
 │   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
@@ -457,7 +468,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.5.5 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.6.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*

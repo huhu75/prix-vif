@@ -1,4 +1,5 @@
 import '../models.dart';
+import '../utils/unit_price.dart';
 
 // ===================================================
 // Briques communes aux calculs d'analyse des prix
@@ -32,10 +33,14 @@ class ProductObservation {
   final String productId;
   final String? storeName;
 
+  /// Prix au kg / L / unité, `null` si la contenance est inconnue
+  final UnitPrice? unitPrice;
+
   ProductObservation(this.item, ScanSession session)
       : key = productKeyOf(item),
         productId = productIdOf(item),
-        storeName = resolveStoreName(item, session);
+        storeName = resolveStoreName(item, session),
+        unitPrice = item.unitPrice;
 
   double get price => item.price;
   DateTime get date => item.scanDate;

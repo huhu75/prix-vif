@@ -485,6 +485,8 @@ class ScanRepository {
           'barcode': article.barcode,
           'storeName': article.storeName,
           'price': article.price,
+          'quantity': article.quantity,
+          'unit': article.unit,
           'scanDate': article.scanDate,
           'nutriscore': article.nutriscore,
           'imageUrl': article.imageUrl,

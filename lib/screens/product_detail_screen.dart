@@ -135,6 +135,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           barcode: raw['barcode'] as String?,
           storeName: raw['storeName'] as String?,
           price: (raw['price'] as num).toDouble(),
+          quantity: (raw['quantity'] as num?)?.toDouble(),
+          unit: raw['unit'] as String?,
           scanDate: raw['scanDate'] as DateTime,
           nutriscore: raw['nutriscore'] as String?,
           imageUrl: raw['imageUrl'] as String?,
@@ -1615,6 +1617,14 @@ class _SimilarProductsTab extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (cheapest.unitPrice != null)
+                          Text(
+                            cheapest.unitPrice!.format(),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.green,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         if (cheapest.storeName != null) ...[
                           const SizedBox(height: 4),
                           Text(
@@ -1770,6 +1780,15 @@ class _SimilarProductCard extends StatelessWidget {
                   fontSize: 16,
                 ),
               ),
+              if (product.unitPrice != null)
+                Text(
+                  product.unitPrice!.format(),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               if (product.nutriscore != null) ...[
                 const SizedBox(height: 4),
                 Container(

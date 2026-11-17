@@ -1,5 +1,6 @@
 import '../models.dart';
 import '../utils/product_type_utils.dart';
+import '../utils/unit_price.dart';
 import 'product_observation.dart';
 
 /// Profil d'un produit : identité, catégories et dernier prix connu par magasin
@@ -44,6 +45,11 @@ class ProductRecommendationItem {
   final String? alternativeStore;
   final double alternativePrice;
 
+  /// Prix au kg / L / unité des deux produits quand leurs contenances sont connues :
+  /// la comparaison se fait alors à quantité égale.
+  final UnitPrice? referenceUnitPrice;
+  final UnitPrice? alternativeUnitPrice;
+
   final String category;
 
   ProductRecommendationItem({
@@ -61,16 +67,41 @@ class ProductRecommendationItem {
     this.alternativeImageUrl,
     this.alternativeStore,
     required this.alternativePrice,
+    this.referenceUnitPrice,
+    this.alternativeUnitPrice,
     required this.category,
   });
 
-  /// Montant économisé en euros
-  double get savingAmount => referencePrice - alternativePrice;
+  /// Comparaison faite au kg / L / unité (et non par article)
+  bool get comparesByUnit => referenceUnitPrice != null && alternativeUnitPrice != null;
+
+  /// Montant économisé en euros, pour la même quantité que le produit de référence
+  double get savingAmount {
+    if (comparesByUnit) {
+      return referencePrice * (1 - alternativeUnitPrice!.value / referenceUnitPrice!.value);
+    }
+    return referencePrice - alternativePrice;
+  }
 
   /// Pourcentage d'économie
   double get savingPercent {
     if (referencePrice <= 0) return 0.0;
     return (savingAmount / referencePrice) * 100;
+  }
+
+  /// Économie d'une observation A remplacée par B, ou `null` si les deux ne sont pas comparables.
+  /// Contenances connues des deux côtés et de même nature : comparaison au kg / L / unité.
+  /// Contenances inconnues des deux côtés : comparaison par article.
+  /// Sinon (une seule connue, ou kg contre L) : pas de comparaison possible.
+  static double? _saving(ProductObservation a, ProductObservation b) {
+    final unitA = a.unitPrice;
+    final unitB = b.unitPrice;
+    if (unitA != null && unitB != null) {
+      if (unitA.unit != unitB.unit) return null;
+      return a.price * (1 - unitB.value / unitA.value);
+    }
+    if (unitA == null && unitB == null) return a.price - b.price;
+    return null;
   }
 
   /// Indique s'il y a un gain financier notable (> 1 centime)
@@ -164,17 +195,17 @@ class ProductRecommendationItem {
 
         for (final storeAEntry in prodA.storePrices.entries) {
           final storeA = storeAEntry.key;
-          final priceA = storeAEntry.value.price;
+          final obsA = storeAEntry.value;
 
           for (final storeBEntry in prodB.storePrices.entries) {
             final storeB = storeBEntry.key;
-            final priceB = storeBEntry.value.price;
+            final obsB = storeBEntry.value;
 
             // Doit obligatoirement être dans un magasin différent
             if (storeA == storeB) continue;
 
-            final diff = priceA - priceB;
-            if (diff > 0.01 && (bestForA == null || diff > bestForA.savingAmount)) {
+            final diff = _saving(obsA, obsB);
+            if (diff != null && diff > 0.01 && (bestForA == null || diff > bestForA.savingAmount)) {
               bestForA = ProductRecommendationItem(
                 referenceProductId: prodA.productId,
                 referenceProductName: prodA.name,
@@ -182,14 +213,16 @@ class ProductRecommendationItem {
                 referenceBarcode: prodA.barcode,
                 referenceImageUrl: prodA.imageUrl,
                 referenceStore: storeA,
-                referencePrice: priceA,
+                referencePrice: obsA.price,
+                referenceUnitPrice: obsA.unitPrice,
                 alternativeProductId: prodB.productId,
                 alternativeProductName: prodB.name,
                 alternativeBrand: prodB.brand,
                 alternativeBarcode: prodB.barcode,
                 alternativeImageUrl: prodB.imageUrl,
                 alternativeStore: storeB,
-                alternativePrice: priceB,
+                alternativePrice: obsB.price,
+                alternativeUnitPrice: obsB.unitPrice,
                 category: categoryMatch,
               );
             }

@@ -5,6 +5,7 @@ import '../models.dart';
 import '../models/hive_models.dart';
 import 'open_food_facts_service.dart';
 import 'scan_repository.dart';
+import '../utils/unit_price.dart';
 import 'dart:convert';
 
 /// Service de gestion de la connectivité réseau et du mode hors-ligne
@@ -156,14 +157,19 @@ class ConnectivityService with WidgetsBindingObserver {
         final products = await _offService!.searchByNameWithTwoPasses(name);
         
         final product = products.isNotEmpty ? products.first : null;
-        
+        final lineQuantity = ticketLineQuantity(
+          count: quantity?.toDouble() ?? 1,
+          packQuantity: product?.quantity,
+          packUnit: product?.unit,
+        );
+
         final item = ScannedItem(
           id: 'offline_${DateTime.now().millisecondsSinceEpoch}_${items.length}',
           name: product?.name ?? name,
           brand: product?.brand,
           price: price,
-          quantity: quantity?.toDouble(),
-          unit: null,
+          quantity: lineQuantity.quantity,
+          unit: lineQuantity.unit,
           scanDate: DateTime.now(),
           barcode: product?.barcode,
           imageUrl: product?.imageUrl,

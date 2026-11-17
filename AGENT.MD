@@ -379,6 +379,11 @@ Les calculs du tableau de bord ne sont plus dans `dashboard_screen.dart` : ils s
 - `dashboard_stats.dart` : `DashboardStats.fromSessions(sessions, {now})` agrège tout ce qu'affiche le Dashboard (totaux, Nutri-Score, `ProductTypeStats` par type OFF et par magasin, `PeriodStats` par semaine/mois, totaux 7/30 jours).
 - `price_evolution.dart`, `store_comparison.dart`, `recommendations.dart` : `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem` (méthodes statiques `calculate(sessions)`).
 
+- Prix normalisé (v1.6.0) : `lib/utils/unit_price.dart` convertit `quantity` + `unit` (ou la chaîne OFF brute) en `PackageSize` (kg, L ou unités) puis en `UnitPrice`. `ProductObservation.unitPrice` le porte dans tous les calculs. Règles de comparaison :
+  - entre produits **différents** (alternatives, similaires, classement des enseignes par type) : au kg / L / unité dès que les contenances sont connues et de même nature ; par article seulement si aucune contenance n'est connue ; jamais en mélangeant les deux ;
+  - pour un **même** produit (évolution, comparateur multi-magasins) : par article (même contenance).
+  - Lignes de ticket : `ticketLineQuantity` transforme « N articles de X » en pack `N x X` car le prix d'une ligne est un total.
+
 Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ; les écrans ne font qu'afficher.
 
 ---

@@ -1440,6 +1440,19 @@ class _ProductRecommendationCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          if (item.comparesByUnit) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '${item.alternativeUnitPrice!.format()} au lieu de ${item.referenceUnitPrice!.format()} · économie à quantité égale',
+                              style: const TextStyle(
+                                color: AppTheme.accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1695,11 +1708,9 @@ class _ProductTypeComparisonSectionState
         final typesMap = storesMap[storeName]!;
         final cheapestTypes = typesMap.entries.where((e) {
           final stats = widget.productTypeStats[e.key];
-          if (stats == null || stats.storesSortedByAveragePrice.isEmpty) {
-            return false;
-          }
-          return e.value.averagePrice <=
-              stats.storesSortedByAveragePrice.first.averagePrice + 0.001;
+          return stats != null &&
+              stats.storesSortedByAveragePrice.length >= 2 &&
+              stats.isCheapestStore(e.value);
         }).map((e) => e.key).toList();
 
         return Container(
@@ -1778,11 +1789,7 @@ class _ProductTypeComparisonSectionState
                 final storeStats = e.value;
                 final globalTypeStats = widget.productTypeStats[type];
                 final isCheapest = globalTypeStats != null &&
-                    globalTypeStats.storesSortedByAveragePrice.isNotEmpty &&
-                    storeStats.averagePrice <=
-                        globalTypeStats
-                                .storesSortedByAveragePrice.first.averagePrice +
-                            0.001;
+                    globalTypeStats.isCheapestStore(storeStats);
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
@@ -1807,7 +1814,8 @@ class _ProductTypeComparisonSectionState
                             const SizedBox(width: 3),
                           ],
                           Text(
-                            '${storeStats.averagePrice.toStringAsFixed(2)} €/art',
+                            globalTypeStats?.formatStorePrice(storeStats) ??
+                                '${storeStats.averagePrice.toStringAsFixed(2)} €/art',
                             style: TextStyle(
                               color: isCheapest
                                   ? AppTheme.primary
@@ -1887,6 +1895,17 @@ class _ProductTypeBar extends StatelessWidget {
               fontSize: 11,
             ),
           ),
+          if (stats.averageUnitPrice != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Moyenne ${stats.averageUnitPrice!.format()} · ${stats.unitPricedCount}/${stats.itemCount} article${stats.itemCount > 1 ? 's' : ''} de contenance connue',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTheme.accent,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 6),
           Container(
             height: 20,
@@ -1939,7 +1958,7 @@ class _ProductTypeBar extends StatelessWidget {
                       ),
                       if (stats.storePriceSpread > 0.01)
                         Text(
-                          'Écart : ${stats.storePriceSpread.toStringAsFixed(2)} €/art',
+                          'Écart : ${stats.storePriceSpread.toStringAsFixed(2)} ${stats.spreadLabel}',
                           style: const TextStyle(
                             color: AppTheme.primary,
                             fontSize: 11,
@@ -1982,7 +2001,7 @@ class _ProductTypeBar extends StatelessWidget {
                               const SizedBox(width: 3),
                             ],
                             Text(
-                              '${store.storeName} : ${store.averagePrice.toStringAsFixed(2)} €',
+                              '${store.storeName} : ${stats.formatStorePrice(store)}',
                               style: TextStyle(
                                 color: isCheapest
                                     ? AppTheme.primary

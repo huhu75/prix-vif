@@ -1,3 +1,5 @@
+import 'utils/unit_price.dart';
+
 // Modele pour un article scanne
 class ScannedItem {
   final String id;
@@ -83,7 +85,11 @@ class ScannedItem {
   ];
 
   String get formattedPrice => '${price.toStringAsFixed(2)} ${currency ?? '€'}';
-  String get formattedQuantity => quantity != null ? '$quantity $unit' : '';
+  String get formattedQuantity =>
+      quantity != null ? '${formatAmount(quantity!)} ${unit ?? ''}'.trim() : (unit ?? '');
+
+  /// Prix au kg, au litre ou à l'unité ; `null` si la contenance est inconnue
+  UnitPrice? get unitPrice => UnitPrice.of(price, quantity, unit);
 }
 
 // Modele de session de scan

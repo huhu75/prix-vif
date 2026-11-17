@@ -182,6 +182,18 @@ class PriceCard extends StatelessWidget {
                           fontSize: 11,
                         ),
                       ),
+                      if (item.unitPrice != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            item.unitPrice!.format(),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.accent,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
