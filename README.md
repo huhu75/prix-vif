@@ -8,6 +8,13 @@
 
 ## 📋 Historique des versions
 
+### v1.9.1 — 2026-11-17 — Fiche produit découpée par onglet
+
+- **Modifié** : `product_detail_screen.dart` découpé (2 363 → 301 lignes) : l'écran ne garde que le chargement et la barre d'onglets ; chaque onglet a son fichier dans `lib/widgets/product_detail/` (`ProductInfoTab`, `PriceEvolutionTab`, `StoreComparisonTab`, `SimilarProductsTab`)
+- **Modifié** : le chargement des données de la fiche (historique par magasin, comparaison des magasins, produits similaires, fiche Open Food Facts avec repli hors-ligne) sort de l'écran vers `ProductAnalysisService` (`lib/services/product_analysis_service.dart`), testable sans réseau
+- **Corrigé** : la fiche ne fait plus de `setState` si elle a été fermée pendant le chargement
+- **Ajouté** : tests `test/services/product_analysis_service_test.dart` (analyse locale, repli hors-ligne, affichage des quatre onglets)
+
 ### v1.9.0 — 2026-11-17 — Export CSV
 
 - **Ajouté** : export CSV de toutes les sessions depuis l'Historique (bouton partage) : une ligne par article avec date, session, type, magasin, produit, marque, code-barres, prix, contenance, prix au kg / L, Nutri-Score et catégories (`lib/services/csv_export.dart`)
@@ -323,7 +330,8 @@ prix_vif/
 │   │   ├── open_food_facts_service.dart # Service API Open Food Facts
 │   │   ├── mistral_service.dart     # Service API Mistral AI (vision)
 │   │   ├── connectivity_service.dart # Gestion réseau + mode hors-ligne
-│   │   └── csv_export.dart          # Export CSV + feuille de partage
+│   │   ├── csv_export.dart          # Export CSV + feuille de partage
+│   │   └── product_analysis_service.dart # Données de la fiche produit (historique, magasins, similaires, OFF)
 │   │
 │   ├── utils/
 │   │   ├── image_utils.dart          # Utilitaires compression d'image
@@ -337,7 +345,7 @@ prix_vif/
 │   │   ├── session_detail_screen.dart # Détails d'une session
 │   │   ├── dashboard_screen.dart     # Tableau de bord avec analyse
 │   │   ├── product_selection_screen.dart # Liste des produits scannés (recherche, tri, filtres)
-│   │   └── product_detail_screen.dart    # Fiche produit (évolution, magasins, similaires)
+│   │   └── product_detail_screen.dart    # Fiche produit : chargement + onglets
 │   │
 │   └── widgets/
 │       ├── price_card.dart           # Cartes produits (avec Nutri-Score et prix au kg / L)
@@ -347,7 +355,8 @@ prix_vif/
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       ├── logo.dart                  # Logo de l'application
-│       └── dashboard/                 # Sections du Dashboard (panier, alertes, en-tête commun)
+│       ├── dashboard/                 # Sections du Dashboard (panier, alertes, en-tête commun)
+│       └── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
 │
 ├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
 ├── pubspec.yaml                    # Dépendances Flutter
@@ -505,7 +514,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.9.0 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.9.1 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*

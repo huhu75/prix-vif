@@ -392,6 +392,12 @@ Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ;
 
 ---
 
+## Découpage des écrans (v1.9.1 – v1.9.2)
+
+- Fiche produit : `product_detail_screen.dart` ne fait que charger (`ProductAnalysisService.load`) et afficher la barre d'onglets ; les onglets sont dans `lib/widgets/product_detail/`. `ProductAnalysisService` accepte un `lookupBarcode` de remplacement pour les tests (pas de réseau).
+
+---
+
 ## Points techniques à anticiper
 
 1. **Identification unique des produits** :
