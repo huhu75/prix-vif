@@ -4,6 +4,7 @@ import '../models/product_analysis_models.dart';
 import '../services/scan_repository.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/product_analysis_service.dart';
+import '../widgets/off_match_sheet.dart';
 import '../widgets/product_detail/price_evolution_tab.dart';
 import '../widgets/product_detail/product_info_tab.dart';
 import '../widgets/product_detail/similar_products_tab.dart';
@@ -20,6 +21,12 @@ class ProductDetailScreen extends StatefulWidget {
   /// Service de chargement (remplaçable dans les tests pour éviter le réseau)
   final ProductAnalysisService? analysisService;
 
+  /// Recherche Open Food Facts pour corriger la correspondance (remplaçable dans les tests)
+  final Future<List<OFFProduct>> Function(String query)? offSearch;
+
+  /// Appelé après une suppression ou une correction (pour recharger le Dashboard)
+  final Future<void> Function()? onChanged;
+
   const ProductDetailScreen({
     super.key,
     required this.repository,
@@ -27,6 +34,8 @@ class ProductDetailScreen extends StatefulWidget {
     required this.productName,
     this.initialTabIndex = 0,
     this.analysisService,
+    this.offSearch,
+    this.onChanged,
   });
 
   @override
@@ -102,6 +111,81 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  /// Supprime le produit (tous ses scans) après confirmation
+  Future<void> _deleteProduct() async {
+    final count = widget.repository.countProductArticles(widget.productId);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        title: Text('Supprimer « ${widget.productName} » ?'),
+        content: Text(
+          '$count scan${count > 1 ? 's' : ''} de ce produit ${count > 1 ? 'seront retirés' : 'sera retiré'} '
+          'de l\'historique et du tableau de bord. Vous ne pourrez pas annuler.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Annuler')),
+          FilledButton(
+            key: const ValueKey('confirm_delete_product'),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final removed = await widget.repository.deleteProduct(widget.productId);
+    await widget.onChanged?.call();
+    navigator.pop(true);
+    messenger.showSnackBar(SnackBar(
+      content: Text('« ${widget.productName} » supprimé ($removed scan${removed > 1 ? 's' : ''})'),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
+  /// Rattache le produit à une autre fiche Open Food Facts
+  Future<void> _rematchProduct() async {
+    final search = widget.offSearch ??
+        (OpenFoodFactsService()..setRepository(widget.repository)).searchProducts;
+    final chosen = await showOffMatchSheet(context, initialQuery: widget.productName, search: search);
+    if (chosen == null || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final updated = await widget.repository.rematchProduct(
+      widget.productId,
+      name: chosen.name,
+      brand: chosen.brand.isEmpty ? null : chosen.brand,
+      barcode: chosen.barcode.isEmpty ? null : chosen.barcode,
+      imageUrl: chosen.imageUrl,
+      nutriscore: chosen.nutriscore,
+      categories: chosen.categories.isEmpty ? null : chosen.categories,
+      packQuantity: chosen.quantity,
+      packUnit: chosen.unit,
+    );
+    await widget.onChanged?.call();
+
+    // L'identifiant du produit a changé (nouveau code-barres) : rouvrir sa fiche
+    navigator.pushReplacement(MaterialPageRoute(
+      builder: (_) => ProductDetailScreen(
+        repository: widget.repository,
+        productId: chosen.barcode.isNotEmpty ? chosen.barcode : chosen.name,
+        productName: chosen.name,
+        analysisService: widget.analysisService,
+        offSearch: widget.offSearch,
+        onChanged: widget.onChanged,
+      ),
+    ));
+    messenger.showSnackBar(SnackBar(
+      content: Text('$updated scan${updated > 1 ? 's' : ''} rattaché${updated > 1 ? 's' : ''} à « ${chosen.name} »'),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -156,12 +240,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               icon: const Icon(Icons.refresh, color: AppTheme.textPrimary),
               onPressed: _loadAnalysis,
             ),
+            PopupMenuButton<String>(
+              key: const ValueKey('product_actions'),
+              icon: const Icon(Icons.more_vert, color: AppTheme.textPrimary),
+              onSelected: (action) => action == 'delete' ? _deleteProduct() : _rematchProduct(),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'rematch',
+                  child: ListTile(
+                    leading: Icon(Icons.find_replace),
+                    title: Text('Corriger le produit Open Food Facts'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline, color: AppTheme.error),
+                    title: Text('Supprimer ce produit', style: TextStyle(color: AppTheme.error)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
         body: TabBarView(
           children: [
             // Onglet 0 : Fiche détaillée Open Food Facts
-            ProductInfoTab(product: _offProduct, analysis: _analysisResult!),
+            ProductInfoTab(
+              product: _offProduct,
+              analysis: _analysisResult!,
+              onRematch: _rematchProduct,
+              onDelete: _deleteProduct,
+            ),
 
             // Onglet 1 : Évolution des prix
             PriceEvolutionTab(analysis: _analysisResult!),
@@ -176,6 +286,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             SimilarProductsTab(
               analysis: _analysisResult!,
               repository: widget.repository,
+              onChanged: widget.onChanged,
             ),
           ],
         ),
