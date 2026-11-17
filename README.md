@@ -8,6 +8,12 @@
 
 ## 📋 Historique des versions
 
+### v1.9.2 — 2026-11-17 — Scanner découpé en composants
+
+- **Modifié** : `scan_screen.dart` découpé (2 147 → 873 lignes) : l'écran garde l'état et les flux (caméra, code-barres, ticket, hors-ligne) ; l'interface est répartie dans `lib/widgets/scan/` : `ScanModeSelector` (bascule code-barres / ticket), `StoreSelector` (magasins), `TicketScanZone` (photo, compression, envoi à l'IA), `TicketConfirmationSheet` + `ExtractedTicketItem` (rapprochement Open Food Facts), `showPriceInputSheet` (saisie du prix), `showMistralSettingsDialog` (clé API)
+- **Corrigé** : le scanner n'utilise plus son `BuildContext` après une attente si l'écran a été fermé (feuille de prix après la recherche Open Food Facts, message après l'import d'un ticket)
+- **Ajouté** : tests `test/widgets/scan_widgets_test.dart` (saisie du prix, import d'un ticket avec lignes identiques et packs, bascule de mode, sélecteur de magasin)
+
 ### v1.9.1 — 2026-11-17 — Fiche produit découpée par onglet
 
 - **Modifié** : `product_detail_screen.dart` découpé (2 363 → 301 lignes) : l'écran ne garde que le chargement et la barre d'onglets ; chaque onglet a son fichier dans `lib/widgets/product_detail/` (`ProductInfoTab`, `PriceEvolutionTab`, `StoreComparisonTab`, `SimilarProductsTab`)
@@ -339,7 +345,7 @@ prix_vif/
 │   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
-│   │   ├── scan_screen.dart          # Écran scanner (bi-mode: code-barres/ticket)
+│   │   ├── scan_screen.dart          # Écran scanner : état et flux (code-barres, ticket, hors-ligne)
 │   │   ├── results_screen.dart       # Écran résultats
 │   │   ├── history_screen.dart       # Écran historique
 │   │   ├── session_detail_screen.dart # Détails d'une session
@@ -356,7 +362,8 @@ prix_vif/
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       ├── logo.dart                  # Logo de l'application
 │       ├── dashboard/                 # Sections du Dashboard (panier, alertes, en-tête commun)
-│       └── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
+│       ├── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
+│       └── scan/                      # Composants du scanner (mode, magasin, zone ticket, prix, confirmation, clé Mistral)
 │
 ├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
 ├── pubspec.yaml                    # Dépendances Flutter
@@ -514,7 +521,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.9.1 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.9.2 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
