@@ -8,6 +8,15 @@
 
 ## 📋 Historique des versions
 
+### v1.7.0 — 2026-11-17 — Données corrigeables
+
+- **Ajouté** : modification d'un article enregistré depuis le détail d'une session (nom, prix, quantité, unité, magasin, avec aperçu du prix au kg / L) et suppression avec confirmation (`lib/widgets/article_edit_dialog.dart`) ; une session vidée de son dernier article disparaît
+- **Corrigé** : supprimer un article (ou « Tout supprimer ») dans l'onglet Résultats ne le retirait que de l'écran ; il est maintenant supprimé de la base, donc de l'historique et du Dashboard
+- **Ajouté** : les magasins ajoutés dans le scanner et le dernier magasin choisi sont conservés après un redémarrage (box `settings`)
+- **Ajouté** : bouton « Retirer les données de démo » dans l'Historique, qui ne supprime que les sessions d'exemple
+- **Modifié** : la liste de l'onglet Résultats reste alignée sur la base quand un article est modifié ou supprimé ailleurs
+- **Ajouté** : tests du dépôt (modification, suppression, magasins, retrait de la démo) et de la fenêtre d'édition (`test/widgets/article_edit_dialog_test.dart`)
+
 ### v1.6.0 — 2026-11-17 — Comparaisons au prix au kg / L
 
 - **Ajouté** : prix au kg, au litre ou à l'unité (`lib/utils/unit_price.dart`) calculé depuis la contenance de l'article (`1 L`, `500 g`, packs `6 x 1,5 L`, chaînes Open Food Facts brutes comme `℮ 500 g`)
@@ -142,13 +151,14 @@
 - Interface intuitive avec animation de ligne de détection
 - **Mode bi-mode** : Bascule entre scan de code-barres et capture de ticket
 - **Saisie de prix** : Après scan d'un code-barres, dialogue modal pour entrer le prix réel
+- **Magasins mémorisés** : les magasins ajoutés et le dernier magasin choisi sont conservés entre deux lancements
 - **Capture photo** : Photographier un ticket de caisse via la galerie ou la caméra
 - **Compression d'image** : Réduction automatique des images à 1024px max, JPEG 80% avec affichage des gains de taille
 
 ### 📊 Résultats
 - Liste des articles scannés avec cartes modernes
 - Statistiques en temps réel : nombre d'articles, total, moyenne
-- Sélection multiple pour suppression groupée
+- Sélection multiple pour suppression groupée (les articles supprimés sont aussi retirés de l'historique et du Dashboard)
 - « Enregistrer » regroupe les articles de la session courante en une seule session dans l'historique (les scans déjà sauvegardés automatiquement y sont fusionnés, sans laisser de session vide)
 - Affichage du total en grand
 - **Sauvegarde automatique après chaque scan**
@@ -169,7 +179,8 @@
 - Liste des sessions de scan précédentes
 - Filtres par : récents, montant, nombre d'articles
 - Affichage compact avec aperçu des produits
-- Détails complets d'une session
+- Détails complets d'une session, avec **correction d'un article** (prix, contenance, magasin) ou suppression en le touchant
+- Bouton « Retirer les données de démo » (ne supprime que les sessions d'exemple)
 - Suppression individuelle ou totale (les données de démo ne sont injectées qu'au tout premier lancement et ne reviennent pas après « Tout supprimer »)
 
 ### 📱 Mode Hors-Ligne
@@ -306,7 +317,8 @@ prix_vif/
 │   │   └── product_detail_screen.dart    # Fiche produit (évolution, magasins, similaires)
 │   │
 │   └── widgets/
-│       ├── price_card.dart           # Cartes produits (avec Nutri-Score)
+│       ├── price_card.dart           # Cartes produits (avec Nutri-Score et prix au kg / L)
+│       ├── article_edit_dialog.dart  # Correction / suppression d'un article enregistré
 │       ├── scanner_overlay.dart      # Overlay scanner
 │       ├── magic_button.dart         # Boutons animés
 │       ├── magic_title.dart          # Titres néon
@@ -347,7 +359,7 @@ prix_vif/
 
 ### Persistance
 - **Hive NoSQL** : Stockage local rapide et efficace
-- **6 boxes** : scans, articles, products_cache, mistral_extractions, pending_offline_scans, settings (clé API Mistral, drapeau des données de démo)
+- **6 boxes** : scans, articles, products_cache, mistral_extractions, pending_offline_scans, settings (clé API Mistral, drapeau des données de démo, magasins ajoutés, magasin sélectionné)
 - **Synchronisation temps réel** : Rechargement automatique après chaque modification
 
 ---
@@ -468,7 +480,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.6.0 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.7.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*

@@ -114,6 +114,9 @@ class ScanSession {
     this.type = 'barcode',
   });
 
+  /// Identifiants des sessions de démo (pour pouvoir les retirer)
+  static Set<String> get demoSessionIds => demoSessions.map((s) => s.id).toSet();
+
   // Donnees fake pour la demo
   static List<ScanSession> get demoSessions => [
     ScanSession(

@@ -1,25 +1,80 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
+import '../services/scan_repository.dart';
+import '../widgets/article_edit_dialog.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_title.dart';
 
-class SessionDetailScreen extends StatelessWidget {
+/// Détail d'une session. Avec un [repository], chaque article peut être
+/// modifié ou supprimé (appui sur la carte) ; [onChanged] est appelé ensuite.
+class SessionDetailScreen extends StatefulWidget {
   final ScanSession session;
   final VoidCallback onBack;
-  final VoidCallback? onItemTap;
+  final ScanRepository? repository;
+  final Future<void> Function()? onChanged;
 
   const SessionDetailScreen({
     super.key,
     required this.session,
     required this.onBack,
-    this.onItemTap,
+    this.repository,
+    this.onChanged,
   });
+
+  @override
+  State<SessionDetailScreen> createState() => _SessionDetailScreenState();
+}
+
+class _SessionDetailScreenState extends State<SessionDetailScreen> {
+  late ScanSession session = widget.session;
+
+  Future<void> _editItem(ScannedItem item) async {
+    final repository = widget.repository;
+    if (repository == null) return;
+    final result = await showArticleEditDialog(context, item);
+    if (result == null || !mounted) return;
+
+    final List<ScannedItem> items;
+    final String message;
+    switch (result) {
+      case ArticleUpdated(item: final updated):
+        await repository.updateArticle(updated);
+        items = [for (final i in session.items) i.id == updated.id ? updated : i];
+        message = 'Article modifié';
+      case ArticleDeleted():
+        await repository.deleteArticle(item.id);
+        items = session.items.where((i) => i.id != item.id).toList();
+        message = 'Article supprimé';
+    }
+    await widget.onChanged?.call();
+    if (!mounted) return;
+
+    if (items.isEmpty) {
+      // Dernier article supprimé : la session n'existe plus
+      widget.onBack();
+      return;
+    }
+    setState(() {
+      session = ScanSession(
+        id: session.id,
+        items: items,
+        date: session.date,
+        endDate: session.endDate,
+        storeName: session.storeName,
+        type: session.type,
+      );
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final stores = session.items.map((i) => i.storeName).toSet();
+    final stores = session.items.map((i) => i.storeName).whereType<String>().toSet();
+    final onBack = widget.onBack;
     
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
@@ -98,6 +153,15 @@ class SessionDetailScreen extends StatelessWidget {
             ),
           ),
           
+          if (widget.repository != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text(
+                'Touchez un article pour corriger son prix, sa contenance ou son magasin.',
+                style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textMuted),
+              ),
+            ),
+
           const SizedBox(height: 16),
           
           // Liste des articles
@@ -111,7 +175,7 @@ class SessionDetailScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: PriceCard(
                     item: item,
-                    onTap: onItemTap,
+                    onTap: widget.repository != null ? () => _editItem(item) : null,
                     showQuantity: true,
                     showDate: true,
                   ),

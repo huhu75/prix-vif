@@ -121,16 +121,38 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _handleItemRemoved(ScannedItem item) {
+  // Les articles sont sauvegardés dès le scan : les retirer de la liste
+  // courante les supprime aussi de la base (historique, Dashboard).
+  Future<void> _handleItemRemoved(ScannedItem item) async {
     setState(() {
       _currentScannedItems.removeWhere((i) => i.id == item.id);
     });
+    await _repository.deleteArticle(item.id);
+    await _reloadSessions();
   }
 
-  void _clearAllItems() {
+  Future<void> _clearAllItems() async {
+    final ids = _currentScannedItems.map((i) => i.id).toList();
     setState(() {
       _currentScannedItems.clear();
     });
+    for (final id in ids) {
+      await _repository.deleteArticle(id);
+    }
+    await _reloadSessions();
+  }
+
+  Future<void> _removeDemoData() async {
+    final removed = await _repository.removeDemoData();
+    await _reloadSessions();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$removed session${removed > 1 ? 's' : ''} de démo retirée${removed > 1 ? 's' : ''}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   // ==================== SYNCHRONISATION HIVE ====================
@@ -138,10 +160,22 @@ class _MainScreenState extends State<MainScreen> {
   // On crée une NOUVELLE liste pour forcer le rebuild des widgets enfants
   Future<void> _reloadSessions() async {
     final allSessions = await _repository.getAllScans();
-    print('DEBUG MainScreen: _reloadSessions - allSessions.length = ${allSessions.length}');
+    // Articles modifiés ou supprimés ailleurs (détail d'une session) :
+    // garder la liste courante de l'onglet Résultats alignée sur la base
+    final storedById = {
+      for (final session in allSessions)
+        for (final item in session.items) item.id: item,
+    };
+    if (!mounted) return;
     setState(() {
       _sessions = List<ScanSession>.from(allSessions);
-      print('DEBUG MainScreen: _reloadSessions - _sessions.length = ${_sessions.length}');
+      final current = _currentScannedItems
+          .where((i) => storedById.containsKey(i.id))
+          .map((i) => storedById[i.id]!)
+          .toList();
+      _currentScannedItems
+        ..clear()
+        ..addAll(current);
     });
   }
 
@@ -179,6 +213,8 @@ class _MainScreenState extends State<MainScreen> {
         builder: (context) => SessionDetailScreen(
           session: session,
           onBack: () => Navigator.of(context).pop(),
+          repository: _repository,
+          onChanged: _reloadSessions,
         ),
       ),
     );
@@ -281,6 +317,7 @@ class _MainScreenState extends State<MainScreen> {
         onSessionSelected: _handleSessionSelected,
         onSessionDeleted: _handleSessionDeleted,
         onClearAll: _clearAllSessions,
+        onRemoveDemoData: _removeDemoData,
       ),
     ];
 

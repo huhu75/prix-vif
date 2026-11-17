@@ -10,6 +10,7 @@ class HistoryScreen extends StatefulWidget {
   final Function(ScanSession) onSessionSelected;
   final Future<void> Function(ScanSession) onSessionDeleted;
   final Future<void> Function() onClearAll;
+  final Future<void> Function()? onRemoveDemoData;
 
   const HistoryScreen({
     super.key,
@@ -17,6 +18,7 @@ class HistoryScreen extends StatefulWidget {
     required this.onSessionSelected,
     required this.onSessionDeleted,
     required this.onClearAll,
+    this.onRemoveDemoData,
   });
 
   @override
@@ -25,6 +27,11 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String? _selectedStoreFilter;
+
+  bool get _hasDemoData {
+    final demoIds = ScanSession.demoSessionIds;
+    return widget.sessions.any((s) => demoIds.contains(s.id));
+  }
 
   List<ScanSession> get _filteredSessions {
     if (_selectedStoreFilter == null) {
@@ -55,6 +62,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: NeonTitle(text: 'HISTORIQUE', fontSize: 22),
         actions: [
+          if (widget.onRemoveDemoData != null && _hasDemoData)
+            IconButton(
+              key: const ValueKey('remove_demo_data'),
+              icon: const Icon(Icons.cleaning_services_outlined, color: AppTheme.textSecondary),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => _ConfirmClearDialog(
+                    title: 'Retirer les données de démo ?',
+                    message: 'Seules les sessions d\'exemple seront supprimées. Vos propres scans sont conservés.',
+                    confirmLabel: 'Retirer',
+                    onConfirm: widget.onRemoveDemoData!,
+                  ),
+                );
+              },
+              tooltip: 'Retirer les données de démo',
+            ),
           if (widget.sessions.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_forever, color: AppTheme.error),
@@ -484,8 +508,16 @@ class _EmptyHistoryState extends StatelessWidget {
 // Dialogue de confirmation
 class _ConfirmClearDialog extends StatelessWidget {
   final Future<void> Function() onConfirm;
+  final String title;
+  final String message;
+  final String confirmLabel;
 
-  const _ConfirmClearDialog({required this.onConfirm});
+  const _ConfirmClearDialog({
+    required this.onConfirm,
+    this.title = 'Tout supprimer ?',
+    this.message = 'L\'historique sera perdu. Vous ne pourrez pas annuler.',
+    this.confirmLabel = 'Supprimer',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -494,16 +526,16 @@ class _ConfirmClearDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      title: const Text(
-        'Tout supprimer ?',
-        style: TextStyle(
+      title: Text(
+        title,
+        style: const TextStyle(
           color: AppTheme.textPrimary,
           fontWeight: FontWeight.w600,
         ),
       ),
-      content: const Text(
-        'L\'historique sera perdu. Vous ne pourrez pas annuler.',
-        style: TextStyle(
+      content: Text(
+        message,
+        style: const TextStyle(
           color: AppTheme.textSecondary,
           height: 1.5,
         ),
@@ -517,10 +549,11 @@ class _ConfirmClearDialog extends StatelessWidget {
           ),
         ),
         MagicButton(
-          text: 'Supprimer',
+          text: confirmLabel,
           onPressed: () async {
+            final navigator = Navigator.of(context);
             await onConfirm();
-            Navigator.of(context).pop();
+            navigator.pop();
           },
           color: AppTheme.error,
           width: 120,

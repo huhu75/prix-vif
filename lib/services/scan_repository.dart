@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models.dart';
 import '../models/hive_models.dart';
@@ -25,6 +27,10 @@ class ScanRepository {
   late Box<Map> _settingsBox;
 
   bool _isInitialized = false;
+  final Completer<void> _ready = Completer<void>();
+
+  /// Se termine quand [init] a ouvert toutes les boxes
+  Future<void> get ready => _ready.future;
 
   /// Initialise Hive et ouvre les boxes
   Future<void> init() async {
@@ -41,6 +47,8 @@ class ScanRepository {
 
     // Réparer les sessions vidées par l'ancien comportement de « Enregistrer »
     await _purgeEmptyScans();
+
+    if (!_ready.isCompleted) _ready.complete();
   }
 
   // ==========================================
@@ -55,6 +63,52 @@ class ScanRepository {
   /// Mémorise que les sessions de démo ont été proposées (ne plus jamais les réinjecter)
   Future<void> markDemoSeeded() async {
     await _settingsBox.put(_demoSeededKey, {'value': true});
+  }
+
+  /// Indique si des sessions de démo sont encore présentes
+  bool get hasDemoData => ScanSession.demoSessionIds.any(_scansBox.containsKey);
+
+  /// Supprime uniquement les sessions de démo (et leurs articles).
+  /// Retourne le nombre de sessions supprimées.
+  Future<int> removeDemoData() async {
+    var removed = 0;
+    for (final scanId in ScanSession.demoSessionIds) {
+      if (_scansBox.containsKey(scanId)) {
+        await deleteScan(scanId);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  // ==========================================
+  // Magasins
+  // ==========================================
+
+  static const String _storesKey = 'stores';
+  static const String _selectedStoreKey = 'selected_store';
+
+  /// Magasins ajoutés par l'utilisateur (en plus de la liste par défaut)
+  List<String> getCustomStores() {
+    if (!_isInitialized) return [];
+    return (_settingsBox.get(_storesKey)?['names'] as List?)?.cast<String>() ?? [];
+  }
+
+  /// Mémorise un magasin ajouté par l'utilisateur
+  Future<void> addCustomStore(String storeName) async {
+    final stores = getCustomStores();
+    if (stores.any((s) => s.toLowerCase() == storeName.toLowerCase())) return;
+    await _settingsBox.put(_storesKey, {'names': [...stores, storeName]});
+  }
+
+  /// Dernier magasin sélectionné dans le scanner
+  String? getSelectedStore() {
+    if (!_isInitialized) return null;
+    return _settingsBox.get(_selectedStoreKey)?['name'] as String?;
+  }
+
+  Future<void> saveSelectedStore(String storeName) async {
+    await _settingsBox.put(_selectedStoreKey, {'name': storeName});
   }
 
   // ==========================================
@@ -208,6 +262,23 @@ class ScanRepository {
     );
 
     await _articlesBox.put(item.id, storedArticle.toMap());
+  }
+
+  /// Met à jour un article déjà enregistré (prix, nom, contenance, magasin…)
+  /// sans changer sa session
+  Future<void> updateArticle(ScannedItem item) async {
+    final scanId = _articlesBox.get(item.id)?['scanId'] as String?;
+    if (scanId == null) return;
+    await saveArticle(item, scanId);
+  }
+
+  /// Supprime un article ; sa session est supprimée si elle devient vide
+  Future<void> deleteArticle(String articleId) async {
+    final scanId = _articlesBox.get(articleId)?['scanId'] as String?;
+    await _articlesBox.delete(articleId);
+    if (scanId != null && !_scanHasArticles(scanId)) {
+      await _scansBox.delete(scanId);
+    }
   }
 
   /// Récupère les articles d'un scan donné

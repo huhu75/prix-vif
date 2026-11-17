@@ -85,6 +85,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     WidgetsBinding.instance.addObserver(this);
     _selectedStore = _stores.first;
     _storeController.text = _selectedStore;
+    _loadSavedStores();
     _buttonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -366,6 +367,41 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  /// Restaure les magasins ajoutés et le dernier magasin choisi (persistés dans Hive)
+  Future<void> _loadSavedStores() async {
+    final repository = widget.repository;
+    if (repository == null) return;
+    await repository.ready;
+    if (!mounted) return;
+    final saved = repository.getSelectedStore();
+    setState(() {
+      repository.getCustomStores().forEach(_insertStore);
+      if (saved != null && _stores.contains(saved)) {
+        _selectedStore = saved;
+        _storeController.text = saved;
+      }
+    });
+  }
+
+  /// Insère un magasin dans la liste triée (sans doublon, casse ignorée)
+  void _insertStore(String store) {
+    if (_stores.any((s) => s.toLowerCase() == store.toLowerCase())) return;
+    final insertIndex = _stores.indexWhere((s) => s.toLowerCase().compareTo(store.toLowerCase()) > 0);
+    if (insertIndex == -1) {
+      _stores.add(store);
+    } else {
+      _stores.insert(insertIndex, store);
+    }
+  }
+
+  void _selectStore(String store) {
+    setState(() {
+      _selectedStore = store;
+      _storeController.text = store;
+    });
+    widget.repository?.saveSelectedStore(store);
+  }
+
   Future<void> _addStore() async {
     _newStoreController.clear();
     final result = await showDialog<String>(
@@ -419,24 +455,15 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     if (result == null) return;
 
     final trimmed = result.trim();
-    final exists = _stores.any((s) => s.toLowerCase() == trimmed.toLowerCase());
-    if (exists) {
-      setState(() => _selectedStore = _stores.firstWhere(
-        (s) => s.toLowerCase() == trimmed.toLowerCase(),
-      ));
+    final existing = _stores.where((s) => s.toLowerCase() == trimmed.toLowerCase());
+    if (existing.isNotEmpty) {
+      _selectStore(existing.first);
       return;
     }
 
-    setState(() {
-      final insertIndex = _stores.indexWhere((s) => s.toLowerCase().compareTo(trimmed.toLowerCase()) > 0);
-      if (insertIndex == -1) {
-        _stores.add(trimmed);
-      } else {
-        _stores.insert(insertIndex, trimmed);
-      }
-      _selectedStore = trimmed;
-      _storeController.text = trimmed;
-    });
+    setState(() => _insertStore(trimmed));
+    _selectStore(trimmed);
+    await widget.repository?.addCustomStore(trimmed);
   }
 
   Future<void> _captureTicket(ImageSource source) async {
@@ -1398,12 +1425,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       child: DropdownMenu<String>(
                         initialSelection: _selectedStore,
                         onSelected: (String? value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedStore = value;
-                              _storeController.text = value;
-                            });
-                          }
+                          if (value != null) _selectStore(value);
                         },
                         dropdownMenuEntries: _stores
                             .map<DropdownMenuEntry<String>>((String value) {

@@ -98,6 +98,77 @@ void main() {
     });
   });
 
+  group('corrections des articles', () {
+    test('updateArticle modifie l\'article sans changer de session', () async {
+      final a = _item('a', price: 1.5);
+      await repository.saveScan(_session('s1', [a, _item('b', name: 'Pain')]));
+
+      await repository.updateArticle(ScannedItem(
+        id: 'a',
+        name: 'Lait entier',
+        brand: 'Candia',
+        price: 1.79,
+        quantity: 1,
+        unit: 'L',
+        scanDate: a.scanDate,
+        barcode: a.barcode,
+        storeName: 'Leclerc',
+      ));
+
+      final session = (await repository.getAllScans()).single;
+      final updated = session.items.firstWhere((i) => i.id == 'a');
+      expect(session.id, 's1');
+      expect(updated.price, 1.79);
+      expect(updated.name, 'Lait entier');
+      expect(updated.storeName, 'Leclerc');
+      expect(updated.unitPrice!.format(), '1.79 €/L');
+    });
+
+    test('deleteArticle supprime la session devenue vide', () async {
+      await repository.saveScan(_session('s1', [_item('a'), _item('b', name: 'Pain')]));
+      await repository.saveScan(_session('s2', [_item('c', name: 'Eau')]));
+
+      await repository.deleteArticle('a');
+      await repository.deleteArticle('c');
+
+      final sessions = await repository.getAllScans();
+      expect(sessions.map((s) => s.id), ['s1']);
+      expect(sessions.single.items.map((i) => i.id), ['b']);
+    });
+  });
+
+  group('magasins', () {
+    test('les magasins ajoutés et le magasin choisi sont conservés', () async {
+      await repository.ready;
+      await repository.addCustomStore('Intermarché');
+      await repository.addCustomStore('intermarché');
+      await repository.addCustomStore('Lidl');
+      await repository.saveSelectedStore('Lidl');
+
+      final reopened = ScanRepository();
+      await reopened.init();
+      expect(reopened.getCustomStores(), ['Intermarché', 'Lidl']);
+      expect(reopened.getSelectedStore(), 'Lidl');
+    });
+  });
+
+  group('retrait des données de démo', () {
+    test('seules les sessions de démo sont supprimées', () async {
+      for (final session in ScanSession.demoSessions) {
+        await repository.saveScan(session);
+      }
+      await repository.saveScan(_session('mon_scan', [_item('perso')]));
+      expect(repository.hasDemoData, isTrue);
+
+      final removed = await repository.removeDemoData();
+
+      expect(removed, ScanSession.demoSessionIds.length);
+      expect(repository.hasDemoData, isFalse);
+      final sessions = await repository.getAllScans();
+      expect(sessions.map((s) => s.id), ['mon_scan']);
+    });
+  });
+
   group('getUniqueProducts', () {
     test('inclut le magasin du premier scan', () async {
       await repository.saveScan(_session('s1', [_item('a', store: 'Carrefour')]));

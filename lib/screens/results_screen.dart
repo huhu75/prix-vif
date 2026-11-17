@@ -9,7 +9,7 @@ class ResultsScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
   final VoidCallback onBack;
   final Function(ScannedItem) onItemRemoved;
-  final VoidCallback onClearAll;
+  final Future<void> Function() onClearAll;
   final VoidCallback onSaveSession;
 
   const ResultsScreen({
@@ -411,7 +411,7 @@ class _ConfirmClearDialog extends StatelessWidget {
         ),
       ),
       content: const Text(
-        'Cette action supprimera tous les articles. Vous ne pourrez pas annuler.',
+        'Les articles de cette liste seront aussi retirés de l\'historique et du tableau de bord. Vous ne pourrez pas annuler.',
         style: TextStyle(
           color: AppTheme.textSecondary,
           height: 1.5,
