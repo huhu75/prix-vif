@@ -88,23 +88,22 @@ class _MainScreenState extends State<MainScreen> {
         print('DEBUG MainScreen: Clé API Mistral chargée depuis Hive');
       }
 
-      final savedSessions = await _repository.getAllScans();
-      print('DEBUG MainScreen: savedSessions.length = ${savedSessions.length}');
-
-      if (savedSessions.isEmpty) {
-        // Première utilisation : initialiser Hive avec les sessions de démo
-        for (final session in ScanSession.demoSessions) {
-          await _repository.saveScan(session);
+      if (!_repository.isDemoSeeded) {
+        // Tout premier lancement : injecter les sessions de démo une seule fois.
+        // Une base déjà remplie (installation antérieure) est laissée telle quelle.
+        // Le drapeau empêche la démo de revenir après « Tout supprimer ».
+        if ((await _repository.getAllScans()).isEmpty) {
+          for (final session in ScanSession.demoSessions) {
+            await _repository.saveScan(session);
+          }
         }
-        final seeded = await _repository.getAllScans();
-        setState(() {
-          _sessions = seeded.isNotEmpty ? seeded : List<ScanSession>.from(ScanSession.demoSessions);
-        });
-      } else {
-        setState(() {
-          _sessions = List<ScanSession>.from(savedSessions);
-        });
+        await _repository.markDemoSeeded();
       }
+
+      final savedSessions = await _repository.getAllScans();
+      setState(() {
+        _sessions = List<ScanSession>.from(savedSessions);
+      });
     } catch (e) {
       print('Erreur initialisation repository: $e');
       setState(() {

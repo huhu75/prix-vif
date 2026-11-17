@@ -147,7 +147,7 @@ Appareil photo Flutter
 
 #### 4b. Appel Mistral AI ✅ **TERMINÉE**
 
-- [x] **Modèle recommandé** : `pixtral-12b-2409` (déjà configuré dans `MistralService`)
+- [x] **Modèle** : `mistral-small-latest` (Mistral Small 4, vision native) configuré dans `MistralService` — `pixtral-12b-2409` est retiré par Mistral depuis le 2025-12-31
 - [x] **Prompt JSON structuré** :
   ```
   Extrais les articles de ce ticket de caisse.
@@ -189,6 +189,9 @@ Appareil photo Flutter
 - [x] **Étape 5c — Mode hors-ligne** :
   - [x] Stocker le scan brut (image compressée + JSON Mistral) si pas de réseau
   - [x] Relancer le matching OFF automatiquement au retour de la connexion
+  - Un ticket hors-ligne est mis en attente **une seule fois** (avec `scanId` de l'extraction Mistral et `storeName`), sans feuille de confirmation : il est importé automatiquement au retour du réseau
+  - `ConnectivityService` empêche deux traitements simultanés de la file ; un scan en attente sans JSON Mistral est conservé (pas supprimé)
+  - Persistance : `ScanRepository.saveScan` déplace les articles déjà rattachés à une autre session (bouton « Enregistrer ») et supprime les sessions d'origine devenues vides ; les données de démo ne sont injectées qu'une fois (drapeau `demo_seeded` dans la box `settings`)
 
 **Critère de validation :** tableau de bord avec historique, répartition nutritionnelle et totaux par période.
 
@@ -235,7 +238,7 @@ Appareil photo Flutter
 
 ---
 
-## Étape 6 — Analyse par produit dans le Dashboard ⬅️ **EN COURS**
+## Étape 6 — Analyse par produit dans le Dashboard ✅ **TERMINÉE**
 
 **Objectif :** Ajouter des fonctionnalités d'analyse par produit pour permettre à l'utilisateur de :
 
@@ -466,7 +469,7 @@ Dashboard → Clique "Analyser un produit" → Liste produits → Sélectionne u
   - Transmission du callback au Dashboard
 
 - **`pubspec.yaml`** (MODIFIÉ) :
-  - Ajout de la dépendance `syncfusion_flutter_charts: ^20.4.48` pour les graphiques
+  - Ajout de la dépendance `syncfusion_flutter_charts` (aujourd'hui `^34.1.29`) pour les graphiques
 
 ### Prochaines étapes (6c. Intégration finale)
 
@@ -489,7 +492,7 @@ Dashboard → Clique "Analyser un produit" → Liste produits → Sélectionne u
 
 - [x] **6c.2 — Dépendances installées** :
   - `flutter pub get` exécuté avec succès
-  - `syncfusion_flutter_charts: ^20.4.48` installé
+  - `syncfusion_flutter_charts` (aujourd'hui `^34.1.29`) installé
 
 - [x] **6c.3 — Code nettoyé** :
   - Suppression des imports inutilisés

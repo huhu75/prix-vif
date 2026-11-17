@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    
+
+    <!-- Accès réseau (Open Food Facts, Mistral) : requis en release,
+         les manifestes debug/profile ne s'appliquent pas aux builds release -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Permissions pour la caméra -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

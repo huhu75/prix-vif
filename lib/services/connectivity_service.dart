@@ -21,6 +21,9 @@ class ConnectivityService with WidgetsBindingObserver {
   final Connectivity _connectivity = Connectivity();
   bool _isOnline = true;
   bool _isInitialized = false;
+  // Empêche deux traitements simultanés des mêmes scans en attente
+  // (vérification initiale + événement réseau + retour au premier plan)
+  bool _isProcessingPending = false;
   ScanRepository? _repository;
   OpenFoodFactsService? _offService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -97,31 +100,40 @@ class ConnectivityService with WidgetsBindingObserver {
       debugPrint('⚠️ [ConnectivityService] Repository ou OFF service non initialisé');
       return;
     }
-    
-    final pendingScans = _repository!.getAllPendingOfflineScans();
-    if (pendingScans.isEmpty) {
-      debugPrint('✅ [ConnectivityService] Aucun scan en attente');
-      return;
-    }
-    
-    debugPrint('🔄 [ConnectivityService] Traitement de ${pendingScans.length} scan(s) en attente...');
-    
-    for (final pendingScan in pendingScans) {
-      try {
-        await _processSinglePendingScan(pendingScan);
-        
-        // Supprimer le scan en attente après traitement réussi
-        await _repository!.deletePendingOfflineScan(pendingScan.id);
-        debugPrint('✅ [ConnectivityService] Scan ${pendingScan.id} traité avec succès');
-      } catch (e) {
-        debugPrint('❌ [ConnectivityService] Erreur traitement scan ${pendingScan.id}: $e');
-        // On ne supprime pas le scan en cas d'erreur, il sera retenté plus tard
+    if (_isProcessingPending) return;
+    _isProcessingPending = true;
+
+    try {
+      final pendingScans = _repository!.getAllPendingOfflineScans();
+      if (pendingScans.isEmpty) {
+        debugPrint('✅ [ConnectivityService] Aucun scan en attente');
+        return;
       }
+
+      debugPrint('🔄 [ConnectivityService] Traitement de ${pendingScans.length} scan(s) en attente...');
+
+      for (final pendingScan in pendingScans) {
+        try {
+          final processed = await _processSinglePendingScan(pendingScan);
+
+          // Supprimer le scan en attente uniquement s'il a réellement été traité
+          if (processed) {
+            await _repository!.deletePendingOfflineScan(pendingScan.id);
+            debugPrint('✅ [ConnectivityService] Scan ${pendingScan.id} traité avec succès');
+          }
+        } catch (e) {
+          debugPrint('❌ [ConnectivityService] Erreur traitement scan ${pendingScan.id}: $e');
+          // On ne supprime pas le scan en cas d'erreur, il sera retenté plus tard
+        }
+      }
+    } finally {
+      _isProcessingPending = false;
     }
   }
 
   /// Traite un seul scan en attente
-  Future<void> _processSinglePendingScan(PendingOfflineScan pendingScan) async {
+  /// Retourne `true` si le scan peut être retiré de la file d'attente.
+  Future<bool> _processSinglePendingScan(PendingOfflineScan pendingScan) async {
     if (_repository == null || _offService == null) {
       throw Exception('Repository ou OFF service non initialisé');
     }
@@ -155,7 +167,7 @@ class ConnectivityService with WidgetsBindingObserver {
           scanDate: DateTime.now(),
           barcode: product?.barcode,
           imageUrl: product?.imageUrl,
-          storeName: null,
+          storeName: pendingScan.storeName,
           nutriscore: product?.nutriscore,
           categories: product?.categories,
         );
@@ -171,22 +183,24 @@ class ConnectivityService with WidgetsBindingObserver {
           items: items,
           date: pendingScan.createdAt,
           endDate: DateTime.now(),
-          storeName: null,
+          storeName: pendingScan.storeName,
           type: 'ticket',
         );
-        
+
         await _repository!.saveScan(session);
         debugPrint('✅ [ConnectivityService] ${items.length} articles récupérés pour scan ${pendingScan.id}');
       }
-    } 
+      return true;
+    }
     // Cas 2: Si on a l'image mais pas encore l'extraction Mistral
     // (Cela nécessiterait d'appeler Mistral, mais on évite de consommer des crédits)
-    // On va juste signaler que le scan est prêt à être retraité manuellement
-    else if (pendingScan.imageBase64 != null) {
-      debugPrint('ℹ️ [ConnectivityService] Scan ${pendingScan.id} a une image mais pas d\'extraction Mistral');
-      // Dans ce cas, on pourrait relancer l'extraction Mistral, mais c'est coûteux
-      // Pour l'instant, on va juste marquer que le scan est prêt
+    // Le scan est conservé en file d'attente : le supprimer ferait perdre l'image.
+    if (pendingScan.imageBase64 != null) {
+      debugPrint('ℹ️ [ConnectivityService] Scan ${pendingScan.id} a une image mais pas d\'extraction Mistral : conservé');
+      return false;
     }
+    // Ni JSON ni image : rien à rejouer
+    return true;
   }
 
   /// Stocke un scan pour traitement hors-ligne
@@ -196,6 +210,7 @@ class ConnectivityService with WidgetsBindingObserver {
     String? imageBase64,
     String? rawMistralJson,
     bool isMistralExtracted = false,
+    String? storeName,
   }) async {
     if (_repository == null) {
       debugPrint('⚠️ [ConnectivityService] Repository non initialisé');
@@ -209,6 +224,7 @@ class ConnectivityService with WidgetsBindingObserver {
       rawMistralJson: rawMistralJson,
       createdAt: DateTime.now(),
       isMistralExtracted: isMistralExtracted,
+      storeName: storeName,
     );
     
     await _repository!.savePendingOfflineScan(pendingScan);

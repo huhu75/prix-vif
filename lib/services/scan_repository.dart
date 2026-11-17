@@ -38,6 +38,23 @@ class ScanRepository {
     _settingsBox = await Hive.openBox<Map>(_settingsBoxName);
 
     _isInitialized = true;
+
+    // Réparer les sessions vidées par l'ancien comportement de « Enregistrer »
+    await _purgeEmptyScans();
+  }
+
+  // ==========================================
+  // Données de démo
+  // ==========================================
+
+  static const String _demoSeededKey = 'demo_seeded';
+
+  /// Indique si les sessions de démo ont déjà été proposées une fois
+  bool get isDemoSeeded => _settingsBox.get(_demoSeededKey)?['value'] == true;
+
+  /// Mémorise que les sessions de démo ont été proposées (ne plus jamais les réinjecter)
+  Future<void> markDemoSeeded() async {
+    await _settingsBox.put(_demoSeededKey, {'value': true});
   }
 
   // ==========================================
@@ -61,7 +78,20 @@ class ScanRepository {
   // ==========================================
 
   /// Sauvegarde une session complète (scan + articles)
+  ///
+  /// Si des articles étaient déjà rattachés à une autre session (cas du bouton
+  /// « Enregistrer » qui regroupe des scans déjà sauvegardés automatiquement),
+  /// ils sont déplacés dans cette session et les sessions d'origine devenues
+  /// vides sont supprimées.
   Future<void> saveScan(ScanSession session) async {
+    final previousScanIds = <String>{};
+    for (final item in session.items) {
+      final previousScanId = _articlesBox.get(item.id)?['scanId'] as String?;
+      if (previousScanId != null && previousScanId != session.id) {
+        previousScanIds.add(previousScanId);
+      }
+    }
+
     final storedScan = StoredScan(
       id: session.id,
       date: session.date,
@@ -77,6 +107,29 @@ class ScanRepository {
     // Persister chaque article du scan
     for (final item in session.items) {
       await saveArticle(item, session.id);
+    }
+
+    // Supprimer les sessions d'origine qui n'ont plus aucun article
+    for (final scanId in previousScanIds) {
+      if (!_scanHasArticles(scanId)) {
+        await _scansBox.delete(scanId);
+      }
+    }
+  }
+
+  bool _scanHasArticles(String scanId) =>
+      _articlesBox.values.any((article) => article['scanId'] == scanId);
+
+  /// Supprime les sessions qui n'ont plus aucun article
+  Future<void> _purgeEmptyScans() async {
+    final scanIdsWithArticles = _articlesBox.values
+        .map((article) => article['scanId'])
+        .toSet();
+    final emptyScanKeys = _scansBox.keys
+        .where((key) => !scanIdsWithArticles.contains(_scansBox.get(key)?['id']))
+        .toList();
+    if (emptyScanKeys.isNotEmpty) {
+      await _scansBox.deleteAll(emptyScanKeys);
     }
   }
 
@@ -330,7 +383,7 @@ class ScanRepository {
           'categories': article.categories,
           'prices': <double>[article.price],
           'scanDates': <DateTime>[article.scanDate],
-          'stores': <String>{},
+          'stores': <String>{?article.storeName},
           'scanCount': 1,
           'totalPrice': article.price,
         };

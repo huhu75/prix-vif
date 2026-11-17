@@ -8,6 +8,18 @@
 
 ## 📋 Historique des versions
 
+### v1.5.2 — 2026-11-17 — Corrections issues de l'état des lieux (Android release, sessions, hors-ligne)
+
+- **Corrigé** : permission `INTERNET` absente du manifeste Android principal → un APK release ne pouvait joindre ni Open Food Facts ni Mistral (seuls les builds debug/profile l'avaient)
+- **Corrigé** : le bouton « Enregistrer » laissait dans l'historique des sessions vides (0 article, 0 €) ; `ScanRepository.saveScan` regroupe désormais les articles déjà sauvegardés et supprime les sessions d'origine devenues vides, et les sessions vides existantes sont nettoyées au démarrage
+- **Corrigé** : les données de démo revenaient au lancement suivant après « Tout supprimer » ; elles ne sont plus injectées qu'une seule fois (drapeau `demo_seeded` dans la box `settings`)
+- **Corrigé** : un ticket scanné hors-ligne était mis en attente une fois par article (N sessions en double au retour du réseau) ; il est maintenant mis en attente une seule fois, sans feuille de confirmation, avec le magasin sélectionné
+- **Corrigé** : traitement des scans en attente protégé contre les exécutions simultanées, et un scan en attente sans extraction Mistral n'est plus supprimé sans avoir été traité
+- **Corrigé** : deux lignes identiques d'un même ticket recevaient le même `id` et l'une écrasait l'autre en base
+- **Corrigé** : le magasin du premier scan n'apparaissait pas dans la liste des produits (`getUniqueProducts`)
+- **Ajouté** : tests du dépôt Hive (`test/services/scan_repository_test.dart`)
+- **Modifié** : `version` du `pubspec.yaml` alignée sur ce changelog ; sections Structure, Dépendances et Évolution possible du README remises à jour ; règle d'alignement de version ajoutée à `CLAUDE.md`
+
 ### v1.5.1 — 2026-11-15 — Données de démo complètes et initialisation Hive
 
 - **Ajouté** : enrichissement complet de `ScanSession.demoSessions` avec catégories Open Food Facts réelles (`Milks`, `Breads`, `Waters`, `Butters`, `Cheeses`, etc.), Nutri-Score, historique de prix et scans croisés multi-enseignes (Carrefour, Leclerc, Monoprix)
@@ -109,7 +121,7 @@
 - Liste des articles scannés avec cartes modernes
 - Statistiques en temps réel : nombre d'articles, total, moyenne
 - Sélection multiple pour suppression groupée
-- Sauvegarde des sessions dans l'historique
+- « Enregistrer » regroupe les articles de la session courante en une seule session dans l'historique (les scans déjà sauvegardés automatiquement y sont fusionnés, sans laisser de session vide)
 - Affichage du total en grand
 - **Sauvegarde automatique après chaque scan**
 
@@ -129,12 +141,12 @@
 - Filtres par : récents, montant, nombre d'articles
 - Affichage compact avec aperçu des produits
 - Détails complets d'une session
-- Suppression individuelle ou totale
+- Suppression individuelle ou totale (les données de démo ne sont injectées qu'au tout premier lancement et ne reviennent pas après « Tout supprimer »)
 
 ### 📱 Mode Hors-Ligne
 - Détection automatique de la connectivité réseau
-- **Stockage des scans** quand pas de réseau (image compressée + JSON Mistral)
-- **Traitement automatique** au retour du réseau
+- **Stockage des scans** quand pas de réseau (image compressée + JSON Mistral + magasin sélectionné), une seule fois par ticket
+- **Traitement automatique** au retour du réseau : matching Open Food Facts et import du ticket sans feuille de confirmation
 - Notifications utilisateur pour les scans en attente
 
 ---
@@ -232,6 +244,7 @@ prix_vif/
 │   ├── main.dart                     # Point d'entrée + navigation
 │   ├── models.dart                  # Modèles de données (ScannedItem, ScanSession)
 │   ├── models/hive_models.dart      # Modèles Hive pour persistance
+│   ├── models/product_analysis_models.dart # Modèles d'analyse par produit (prix, magasins, similaires)
 │   ├── theme.dart                   # Thème moderne 2026
 │   │
 │   ├── services/
@@ -242,14 +255,17 @@ prix_vif/
 │   │   └── connectivity_service.dart # Gestion réseau + mode hors-ligne
 │   │
 │   ├── utils/
-│   │   └── image_utils.dart          # Utilitaires compression d'image
+│   │   ├── image_utils.dart          # Utilitaires compression d'image
+│   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
 │   │   ├── scan_screen.dart          # Écran scanner (bi-mode: code-barres/ticket)
 │   │   ├── results_screen.dart       # Écran résultats
 │   │   ├── history_screen.dart       # Écran historique
 │   │   ├── session_detail_screen.dart # Détails d'une session
-│   │   └── dashboard_screen.dart     # Tableau de bord avec analyse
+│   │   ├── dashboard_screen.dart     # Tableau de bord avec analyse
+│   │   ├── product_selection_screen.dart # Liste des produits scannés (recherche, tri, filtres)
+│   │   └── product_detail_screen.dart    # Fiche produit (évolution, magasins, similaires)
 │   │
 │   └── widgets/
 │       ├── price_card.dart           # Cartes produits (avec Nutri-Score)
@@ -259,6 +275,7 @@ prix_vif/
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       └── logo.dart                  # Logo de l'application
 │
+├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
 ├── pubspec.yaml                    # Dépendances Flutter
 ├── AGENT.md                        # Documentation technique
 └── README.md                       # Cette documentation
@@ -289,7 +306,7 @@ prix_vif/
 
 ### Persistance
 - **Hive NoSQL** : Stockage local rapide et efficace
-- **5 boxes** : scans, articles, cache_produits, mistral_extractions, pending_offline_scans
+- **6 boxes** : scans, articles, products_cache, mistral_extractions, pending_offline_scans, settings (clé API Mistral, drapeau des données de démo)
 - **Synchronisation temps réel** : Rechargement automatique après chaque modification
 
 ---
@@ -327,7 +344,7 @@ prix_vif/
 ### 📜 Consulter les résultats
 - **Icône 🧾 (2ème onglet)** : Affiche la liste des articles scannés dans la session courante
 - Sélection multiple → suppression groupée
-- Bouton "Enregistrer" → sauvegarde la session courante (si non déjà sauvegardée)
+- Bouton "Enregistrer" → regroupe les articles courants en une seule session (les sessions automatiques correspondantes sont fusionnées)
 - Affichage du total en grand avec statistiques (moyenne, nombre d'articles)
 
 ### 🕒 Consulter l'historique
@@ -343,7 +360,7 @@ prix_vif/
 Toutes les fonctionnalités principales sont désormais opérationnelles :
 
 ✅ **API produits (OpenFoodFacts)** - Récupération automatique des infos produits (nom, marque, Nutri-Score, catégories, image)
-✅ **Base de données (Hive NoSQL)** - Persistance locale complète avec 5 boxes
+✅ **Base de données (Hive NoSQL)** - Persistance locale complète avec 6 boxes
 ✅ **Synchronisation automatique** - Rechargement des données après chaque modification
 ✅ **Sauvegarde automatique** - Chaque article scanné est immédiatement persisté
 ✅ **Extraction Mistral AI** - Analyse des tickets via API vision (`mistral-small-latest`, Mistral Small 4) — clé fournie via `--dart-define=MISTRAL_API_KEY=...` ou dans les réglages de l'app
@@ -371,7 +388,6 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 Pour aller plus loin :
 - [ ] Synchronisation cloud (Firebase/Back4App) pour sauvegarder l'historique
 - [ ] Export CSV/PDF des sessions de scan
-- [ ] Comparaison de prix entre magasins
 - [ ] Alertes sur produits peu sains (basé sur Nutri-Score)
 - [ ] Intégration avec des listes de courses
 - [ ] Partage de sessions entre utilisateurs
@@ -389,15 +405,17 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 | Package | Version | Utilisation |
 |---------|---------|-------------|
 | `flutter` | SDK | Framework UI |
-| `mobile_scanner` | ^5.2.3 | Scan de codes-barres en temps réel |
+| `mobile_scanner` | ^5.0.0 | Scan de codes-barres en temps réel |
 | `image_picker` | ^1.0.4 | Capture photo de tickets |
-| `image` | ^4.8.0 | Compression et redimensionnement d'images |
+| `image` | ^4.1.3 | Compression et redimensionnement d'images |
 | `hive` | ^2.2.3 | Stockage local NoSQL |
 | `hive_flutter` | ^1.1.0 | Intégration Hive pour Flutter |
 | `path_provider` | ^2.1.1 | Accès aux chemins de stockage |
 | `http` | ^1.1.0 | Appels API REST (OFF, Mistral) |
-| `connectivity_plus` | ^6.1.5 | Détection de connectivité réseau |
+| `connectivity_plus` | ^6.0.3 | Détection de connectivité réseau |
 | `intl` | ^0.18.1 | Formatage des dates |
+| `syncfusion_flutter_charts` | ^34.1.29 | Graphiques d'évolution des prix |
+| `flutter_svg` | ^2.0.7 | Logo et icônes SVG |
 
 ---
 
@@ -409,7 +427,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 15 Novembre 2026 (v1.5.1 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.5.2 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Dashboard complet & fonctionnel dès le premier lancement*
+*Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*

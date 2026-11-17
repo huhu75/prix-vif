@@ -280,31 +280,17 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   // ==================== ÉTAPE 5C — MODE HORS-LIGNE ====================
 
   /// Stocke un scan pour traitement hors-ligne
-  Future<void> _storeForOfflineProcessing(String rawMistralJson, List<ExtractedArticle> articles) async {
+  /// L'extraction Mistral a déjà été persistée par [_processTicketImage] sous [scanId].
+  Future<void> _storeForOfflineProcessing(String scanId, String rawMistralJson) async {
     if (widget.repository == null || _compressedImageBytes == null) return;
-    
-    // Utiliser le même timestamp pour extractionId et scanId pour éviter les race conditions
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final extractionId = 'mistral_$timestamp';
-    final scanId = 'ticket_$timestamp';
-    
-    final mistralExtraction = StoredMistralExtraction(
-      id: extractionId,
-      scanId: scanId,
-      rawJson: rawMistralJson,
-      extractedAt: DateTime.now(),
-      imageBase64: base64Encode(_compressedImageBytes!),
-    );
-    
-    // Sauvegarder l'extraction Mistral
-    await widget.repository!.saveMistralExtraction(mistralExtraction);
-    
-    // Stocker dans les scans en attente
+
+    // Stocker dans les scans en attente (même scanId que l'extraction Mistral)
     await _connectivityService.storeForOfflineProcessing(
       scanId: scanId,
       imageBase64: base64Encode(_compressedImageBytes!),
       rawMistralJson: rawMistralJson,
       isMistralExtracted: true,
+      storeName: _selectedStore,
     );
     
     debugPrint('💾 [5c] Scan ticket stocké pour traitement hors-ligne');
@@ -551,29 +537,46 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         await widget.repository!.saveMistralExtraction(mistralExtraction);
       }
 
-      // 2. Pour chaque article, rechercher sur Open Food Facts et récupérer le meilleur candidat + les autres candidats
-      final List<ExtractedTicketItem> confirmationItems = [];
-
       // Étape 5c — Vérifier la connectivité avant le matching OFF
       final connectivityResult = await Connectivity().checkConnectivity();
       final hasNetwork = connectivityResult.any((result) => result != ConnectivityResult.none);
-      
+
+      if (!hasNetwork) {
+        // Pas de réseau : mettre le ticket en attente UNE seule fois. Il sera rejoué
+        // automatiquement (matching OFF + sauvegarde) au retour de la connexion,
+        // donc pas de feuille de confirmation ici (elle créerait un doublon).
+        debugPrint('⚠️ [ScanScreen] Pas de réseau - stockage pour traitement hors-ligne');
+        await _storeForOfflineProcessing(
+          scanId ?? 'ticket_${DateTime.now().millisecondsSinceEpoch}',
+          extractionResult.rawJson,
+        );
+        if (mounted) {
+          // Vider la zone ticket pour éviter un second envoi du même ticket
+          setState(() {
+            _isLoadingProduct = false;
+            _ticketImage = null;
+            _originalSize = null;
+            _compressedSize = null;
+            _compressedImageBytes = null;
+            _compressionMessage = null;
+          });
+        }
+        return;
+      }
+
+      // 2. Pour chaque article, rechercher sur Open Food Facts et récupérer le meilleur candidat + les autres candidats
+      final List<ExtractedTicketItem> confirmationItems = [];
+
       for (var article in extractionResult.articles) {
         // Étape 4c — Stratégie deux passes : nom complet → nom nettoyé
         // Logique centralisée dans OpenFoodFactsService.searchByNameWithTwoPasses()
         List<OFFProduct> candidates = [];
-        
-        if (hasNetwork) {
-          try {
-            candidates = await _offService.searchByNameWithTwoPasses(article.name);
-          } catch (e) {
-            debugPrint('⚠️ [ScanScreen] Erreur matching OFF pour ${article.name}: $e');
-            // En cas d'erreur, on continue sans candidat
-          }
-        } else {
-          debugPrint('⚠️ [ScanScreen] Pas de réseau - stockage pour traitement hors-ligne');
-          // Stocker pour traitement ultérieur
-          await _storeForOfflineProcessing(extractionResult.rawJson, extractionResult.articles);
+
+        try {
+          candidates = await _offService.searchByNameWithTwoPasses(article.name);
+        } catch (e) {
+          debugPrint('⚠️ [ScanScreen] Erreur matching OFF pour ${article.name}: $e');
+          // En cas d'erreur, on continue sans candidat
         }
 
         confirmationItems.add(
@@ -2083,11 +2086,13 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
                 ? null 
                 : () {
                     final List<ScannedItem> importedItems = [];
+                    final importTimestamp = DateTime.now().millisecondsSinceEpoch;
                     for (var item in _items) {
                       if (item.isSelected) {
                         importedItems.add(
                           ScannedItem(
-                            id: '${DateTime.now().millisecondsSinceEpoch}_${item.rawName.hashCode}',
+                            // Index inclus : deux lignes identiques du ticket gardent des id distincts
+                            id: '${importTimestamp}_${importedItems.length}',
                             name: item.matchedProduct?.name ?? item.rawName,
                             brand: item.matchedProduct?.brand ?? 'Marque inconnue',
                             price: item.price,
