@@ -8,6 +8,14 @@
 
 ## 📋 Historique des versions
 
+### v1.10.0 — 2026-11-17 — Supprimer ou corriger un produit depuis sa fiche
+
+- **Ajouté** : sur la fiche d'un produit (Dashboard > Analyser un produit > produit), bouton **Supprimer** (onglet Fiche et menu ⋮) : tous les scans du produit sont retirés après confirmation, les sessions vidées disparaissent, la liste des produits et le Dashboard se mettent à jour
+- **Ajouté** : bouton **Pas le bon produit ?** (onglet Fiche et menu ⋮) : recherche Open Food Facts par nom ou code-barres (`lib/widgets/off_match_sheet.dart`, `OpenFoodFactsService.searchProducts`) ; le produit choisi remplace la fiche associée à tous les scans (nom, marque, code-barres, image, Nutri-Score, catégories, contenance), en gardant prix, dates et magasins ; une ligne de ticket de N articles reste un pack de N
+- **Ajouté** : `ScanRepository.deleteProduct`, `rematchProduct`, `countProductArticles`, avec une seule règle d'appartenance d'un article à un produit (id, code-barres ou nom), partagée avec l'historique de la fiche et la suppression d'un magasin
+- **Corrigé** : un produit ouvert depuis « Analyser un produit » (ou depuis l'onglet Similaires) n'affichait que son premier scan : la fiche reçoit maintenant le code-barres (sinon le nom) comme le Dashboard, et retrouve tous les scans
+- **Ajouté** : tests `test/screens/product_corrections_test.dart` (suppression et nouvelle correspondance côté base et depuis la fiche, ouverture depuis la liste)
+
 ### v1.9.3 — 2026-11-17 — Dashboard découpé par section
 
 - **Modifié** : `dashboard_screen.dart` découpé (2 579 → 193 lignes) : l'écran ne fait plus qu'assembler les sections ; chaque section a son fichier dans `lib/widgets/dashboard/` (`GlobalStatsSection`, `ProductPriceEvolutionSection`, `ProductStoreComparisonSection`, `ProductRecommendationSection`, `ProductTypeComparisonSection`, `NutriScoreDistributionSection`, `TimeTrendSection`, `PeriodTotalsSection`, `RecentScansSection`, `ProductAnalysisButton`, `EmptyDashboardState`)
@@ -206,6 +214,7 @@
 - **Comparateur multi-magasins** : identification des écarts de prix inter-enseignes et calcul des économies potentielles par produit
 - **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes, avec calcul des gains à quantité égale (au kg / L) quand les contenances sont connues
 - **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon au kg / L / unité et vue par enseigne mettant en valeur les forces de chaque magasin
+- **Fiche produit** (bouton « Analyser un produit ») : évolution, magasins, produits similaires, fiche Open Food Facts ; boutons **Pas le bon produit ?** (choisir la bonne fiche Open Food Facts par nom ou code-barres) et **Supprimer** (retire tous les scans du produit)
 - **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`), utilisé pour toutes les comparaisons entre produits différents
 - **Répartition Nutri-Score** : graphique à barres horizontales avec pourcentages A/B/C/D/E
 - **Évolution temporelle** : graphiques hebdomadaires et mensuels des dépenses
@@ -361,6 +370,7 @@ prix_vif/
 │   └── widgets/
 │       ├── price_card.dart           # Cartes produits (avec Nutri-Score et prix au kg / L)
 │       ├── article_edit_dialog.dart  # Correction / suppression d'un article enregistré
+│       ├── off_match_sheet.dart       # Choix d'une autre fiche Open Food Facts pour un produit
 │       ├── scanner_overlay.dart      # Overlay scanner
 │       ├── magic_button.dart         # Boutons animés
 │       ├── magic_title.dart          # Titres néon
@@ -526,7 +536,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.9.3 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.10.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*

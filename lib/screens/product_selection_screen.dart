@@ -11,9 +11,13 @@ import 'product_detail_screen.dart';
 class ProductSelectionScreen extends StatefulWidget {
   final ScanRepository repository;
 
+  /// Appelé après la suppression ou la correction d'un produit (pour recharger le Dashboard)
+  final Future<void> Function()? onChanged;
+
   const ProductSelectionScreen({
     super.key,
     required this.repository,
+    this.onChanged,
   });
 
   @override
@@ -329,17 +333,22 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     );
   }
 
-  void _navigateToProductDetail(UniqueProductInfo product) {
-    Navigator.push(
+  Future<void> _navigateToProductDetail(UniqueProductInfo product) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ProductDetailScreen(
           repository: widget.repository,
-          productId: product.productId,
+          // Même identifiant que le Dashboard (code-barres, sinon nom) : la fiche
+          // retrouve ainsi tous les scans du produit, pas seulement le premier
+          productId: (product.barcode?.isNotEmpty ?? false) ? product.barcode! : product.productName,
           productName: product.productName,
+          onChanged: widget.onChanged,
         ),
       ),
     );
+    // Produit supprimé ou corrigé depuis sa fiche : rafraîchir la liste
+    if (mounted) await _loadProducts();
   }
 }
 

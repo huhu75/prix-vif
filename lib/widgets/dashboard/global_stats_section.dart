@@ -7,8 +7,7 @@ import '../../analytics/analytics.dart';
 class GlobalStatsSection extends StatelessWidget {
   final DashboardStats stats;
 
-  const GlobalStatsSection({
-    super.key,required this.stats});
+  const GlobalStatsSection({super.key, required this.stats});
 
   @override
   Widget build(BuildContext context) {

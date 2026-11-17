@@ -13,11 +13,19 @@ class SimilarProductsTab extends StatelessWidget {
   final ProductAnalysisResult analysis;
   final ScanRepository repository;
 
+  /// Transmis aux fiches ouvertes depuis cet onglet (rechargement du Dashboard)
+  final Future<void> Function()? onChanged;
+
   const SimilarProductsTab({
     super.key,
     required this.analysis,
     required this.repository,
+    this.onChanged,
   });
+
+  /// Identifiant de fiche : code-barres, sinon nom (tous les scans du produit)
+  static String _productIdOf(SimilarProductInfo product) =>
+      (product.barcode?.isNotEmpty ?? false) ? product.barcode! : product.productName;
 
   @override
   Widget build(BuildContext context) {
@@ -105,8 +113,9 @@ class SimilarProductsTab extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (context) => ProductDetailScreen(
                       repository: repository,
-                      productId: cheapest.productId,
+                      productId: _productIdOf(cheapest),
                       productName: cheapest.productName,
+                      onChanged: onChanged,
                     ),
                   ),
                 );
@@ -217,8 +226,9 @@ class SimilarProductsTab extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (context) => ProductDetailScreen(
                       repository: repository,
-                      productId: product.productId,
+                      productId: _productIdOf(product),
                       productName: product.productName,
+                      onChanged: onChanged,
                     ),
                   ),
                 );

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models.dart';
 import '../models/hive_models.dart';
+import '../utils/unit_price.dart';
 
 // ===================================================
 // Étape 3c — Couche Repository
@@ -416,16 +417,9 @@ class ScanRepository {
       final articleMap = _articlesBox.get(key);
       if (articleMap == null) continue;
       
-      final articleProductId = articleMap['id'] as String?;
-      final articleBarcode = articleMap['barcode'] as String?;
       final articleStore = articleMap['storeName'] as String? ?? 'Inconnu';
       
-      // Correspondance par ID, barcode ou nom
-      final matchesProduct = articleProductId == productId || 
-          articleBarcode == productId ||
-          (articleMap['name'] as String?) == productId;
-      
-      if (matchesProduct) {
+      if (_matchesProduct(articleMap, productId)) {
         if (!historyByStore.containsKey(articleStore)) {
           historyByStore[articleStore] = [];
         }
@@ -595,12 +589,7 @@ class ScanRepository {
     final allArticles = getAllStoredArticles();
     
     for (final article in allArticles) {
-      // Identifier l'article par productId (qui peut être id, barcode ou name)
-      final matchesProduct = article.id == productId || 
-          article.barcode == productId ||
-          article.name == productId;
-      
-      if (matchesProduct && article.storeName == storeName) {
+      if (_matchesProduct(article.toMap(), productId) && article.storeName == storeName) {
         // Créer une copie modifiée de l'article
         final updatedArticle = StoredArticle(
           id: article.id,
@@ -625,4 +614,79 @@ class ScanRepository {
     }
   }
 
+  // ==========================================
+  // Corrections au niveau d'un produit
+  // ==========================================
+
+  /// Un article appartient au produit [productId] s'il a cet id, ce code-barres
+  /// ou ce nom (même règle que l'historique affiché par la fiche produit)
+  static bool _matchesProduct(Map article, String productId) =>
+      article['id'] == productId || article['barcode'] == productId || article['name'] == productId;
+
+  /// Nombre d'articles (scans) enregistrés pour un produit
+  int countProductArticles(String productId) =>
+      _articlesBox.values.where((a) => _matchesProduct(a, productId)).length;
+
+  /// Supprime tous les articles d'un produit ; les sessions devenues vides sont supprimées.
+  /// Retourne le nombre d'articles supprimés.
+  Future<int> deleteProduct(String productId) async {
+    final ids = _articlesBox.values
+        .where((a) => _matchesProduct(a, productId))
+        .map((a) => a['id'] as String)
+        .toList();
+    for (final id in ids) {
+      await deleteArticle(id);
+    }
+    return ids.length;
+  }
+
+  /// Associe tous les articles d'un produit à une autre fiche Open Food Facts
+  /// (correspondance erronée). Le prix, la date et le magasin de chaque scan
+  /// sont conservés ; une ligne de ticket de N articles reste un pack de N.
+  /// Retourne le nombre d'articles modifiés.
+  Future<int> rematchProduct(
+    String productId, {
+    required String name,
+    String? brand,
+    String? barcode,
+    String? imageUrl,
+    String? nutriscore,
+    List<String>? categories,
+    double? packQuantity,
+    String? packUnit,
+  }) async {
+    final articles = _articlesBox.values
+        .where((a) => _matchesProduct(a, productId))
+        .map(StoredArticle.fromMap)
+        .toList();
+    for (final article in articles) {
+      // Nombre d'articles achetés sur cette ligne (pack « x … » ou unités d'un ticket)
+      final unit = article.unit?.trim();
+      final isPack = unit != null && unit.toLowerCase().startsWith('x ');
+      final isCount = unit == null || unit == 'unité';
+      final count = (isPack || isCount) ? (article.quantity ?? 1) : 1.0;
+      final lineQuantity = ticketLineQuantity(count: count, packQuantity: packQuantity, packUnit: packUnit);
+
+      await _articlesBox.put(
+        article.id,
+        StoredArticle(
+          id: article.id,
+          name: name,
+          brand: brand,
+          price: article.price,
+          currency: article.currency,
+          quantity: lineQuantity.quantity,
+          unit: lineQuantity.unit,
+          scanDate: article.scanDate,
+          imageUrl: imageUrl,
+          barcode: barcode,
+          storeName: article.storeName,
+          nutriscore: nutriscore,
+          categories: categories,
+          scanId: article.scanId,
+        ).toMap(),
+      );
+    }
+    return articles.length;
+  }
 }

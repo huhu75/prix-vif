@@ -12,8 +12,7 @@ import '../../models/product_analysis_models.dart';
 class PriceEvolutionTab extends StatelessWidget {
   final ProductAnalysisResult analysis;
 
-  const PriceEvolutionTab({
-    super.key,required this.analysis});
+  const PriceEvolutionTab({super.key, required this.analysis});
 
   @override
   Widget build(BuildContext context) {

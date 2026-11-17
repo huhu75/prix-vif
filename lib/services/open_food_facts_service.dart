@@ -357,6 +357,18 @@ class OpenFoodFactsService {
     return candidates;
   }
 
+  /// Recherche libre : un code-barres (8 à 14 chiffres) est cherché tel quel,
+  /// tout autre texte est cherché par nom (deux passes)
+  Future<List<OFFProduct>> searchProducts(String query) async {
+    final text = query.trim();
+    if (text.isEmpty) return [];
+    if (RegExp(r'^\d{8,14}$').hasMatch(text)) {
+      final product = await lookupBarcode(text);
+      return product == null ? [] : [product];
+    }
+    return searchByNameWithTwoPasses(text);
+  }
+
   /// Nettoie un nom de produit en retirant les mots génériques courants sur les tickets
   String cleanProductName(String name) {
     var cleaned = name.toLowerCase();

@@ -225,6 +225,7 @@ class _MainScreenState extends State<MainScreen> {
       MaterialPageRoute(
         builder: (context) => ProductSelectionScreen(
           repository: _repository,
+          onChanged: _reloadSessions,
         ),
       ),
     );
@@ -238,6 +239,7 @@ class _MainScreenState extends State<MainScreen> {
           productId: productId,
           productName: productName,
           initialTabIndex: initialTabIndex,
+          onChanged: _reloadSessions,
         ),
       ),
     );

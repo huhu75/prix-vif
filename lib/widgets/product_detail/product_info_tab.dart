@@ -8,17 +8,76 @@ class ProductInfoTab extends StatelessWidget {
   final OFFProduct? product;
   final ProductAnalysisResult analysis;
 
+  /// Ouvre la recherche Open Food Facts pour corriger la correspondance
+  final VoidCallback? onRematch;
+
+  /// Supprime le produit
+  final VoidCallback? onDelete;
+
   const ProductInfoTab({
-    super.key,required this.product, required this.analysis});
+    super.key,
+    required this.product,
+    required this.analysis,
+    this.onRematch,
+    this.onDelete,
+  });
+
+  Widget _buildActions() {
+    if (onRematch == null && onDelete == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          if (onRematch != null)
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('rematch_product'),
+                onPressed: onRematch,
+                icon: const Icon(Icons.find_replace, size: 18),
+                label: const Text('Pas le bon produit ?'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: const BorderSide(color: AppTheme.primary),
+                ),
+              ),
+            ),
+          if (onRematch != null && onDelete != null) const SizedBox(width: 10),
+          if (onDelete != null)
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('delete_product'),
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Supprimer'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.error,
+                  side: const BorderSide(color: AppTheme.error),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (product == null) {
-      return const Center(
-        child: Text(
-          'Aucune information Open Food Facts disponible',
-          style: TextStyle(color: AppTheme.textSecondary),
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildActions(),
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Aucune information Open Food Facts disponible',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -30,6 +89,9 @@ class ProductInfoTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 0. Corriger la correspondance Open Food Facts / supprimer le produit
+          _buildActions(),
+
           // 1. En-tête Premium avec image, marque, quantité, EAN
           _buildPremiumHeader(context, p),
           const SizedBox(height: 16),

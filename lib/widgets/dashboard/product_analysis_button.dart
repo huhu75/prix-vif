@@ -5,8 +5,7 @@ import '../../theme.dart';
 class ProductAnalysisButton extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const ProductAnalysisButton({
-    super.key,required this.onPressed});
+  const ProductAnalysisButton({super.key, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
