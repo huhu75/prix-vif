@@ -8,6 +8,12 @@
 
 ## 📋 Historique des versions
 
+### v1.5.3 — 2026-11-17 — Nettoyage du dépôt
+
+- **Supprimé** : `dashboard_fix_report.md`, rapport ponctuel de juillet sur l'écran Dashboard gris (correctif en place depuis, rapport conservé dans l'historique git)
+- **Supprimé** : `package-lock.json`, fichier npm vide sans objet dans un projet Flutter
+- **Supprimé** : branches obsolètes déjà fusionnées dans `main` (`ai_main_…`, `maj-mag`, `vibe/fix-dashboard-contrast-…` sur `origin`, `vibe/cleanup-dead-code` et `vibe/ticket-mistral-fixes` en local)
+
 ### v1.5.2 — 2026-11-17 — Corrections issues de l'état des lieux (Android release, sessions, hors-ligne)
 
 - **Corrigé** : permission `INTERNET` absente du manifeste Android principal → un APK release ne pouvait joindre ni Open Food Facts ni Mistral (seuls les builds debug/profile l'avaient)
@@ -427,7 +433,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.5.2 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.5.3 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*
