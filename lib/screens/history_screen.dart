@@ -4,6 +4,7 @@ import '../models.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/magic_title.dart';
+import '../services/csv_export.dart';
 
 class HistoryScreen extends StatefulWidget {
   final List<ScanSession> sessions;
@@ -27,6 +28,23 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String? _selectedStoreFilter;
+
+  /// Exporte toutes les sessions en CSV via la feuille de partage du système
+  Future<void> _exportCsv(BuildContext buttonContext) async {
+    final box = buttonContext.findRenderObject() as RenderBox?;
+    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await shareArticlesCsv(widget.sessions, origin: origin);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.error,
+          content: Text('Export impossible : $e'),
+        ),
+      );
+    }
+  }
 
   bool get _hasDemoData {
     final demoIds = ScanSession.demoSessionIds;
@@ -62,6 +80,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: NeonTitle(text: 'HISTORIQUE', fontSize: 22),
         actions: [
+          if (widget.sessions.isNotEmpty)
+            Builder(
+              builder: (buttonContext) => IconButton(
+                key: const ValueKey('export_csv'),
+                icon: const Icon(Icons.ios_share, color: AppTheme.textSecondary),
+                tooltip: 'Exporter en CSV',
+                onPressed: () => _exportCsv(buttonContext),
+              ),
+            ),
           if (widget.onRemoveDemoData != null && _hasDemoData)
             IconButton(
               key: const ValueKey('remove_demo_data'),

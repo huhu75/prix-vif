@@ -1,12 +1,21 @@
 # Prix Vif - Scanner de Prix Moderne 2026
 
-<img src="https://img.shields.io/badge/Flutter-3.19+-02569B?style=for-the-badge&logo=flutter" alt="Flutter">
-<img src="https://img.shields.io/badge/Dart-3.0+-0175C2?style=for-the-badge&logo=dart" alt="Dart">
+<img src="https://img.shields.io/badge/Flutter-3.38+-02569B?style=for-the-badge&logo=flutter" alt="Flutter">
+<img src="https://img.shields.io/badge/Dart-3.10+-0175C2?style=for-the-badge&logo=dart" alt="Dart">
 <img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-333333?style=for-the-badge" alt="Platforms">
 
 ---
 
 ## 📋 Historique des versions
+
+### v1.9.0 — 2026-11-17 — Export CSV
+
+- **Ajouté** : export CSV de toutes les sessions depuis l'Historique (bouton partage) : une ligne par article avec date, session, type, magasin, produit, marque, code-barres, prix, contenance, prix au kg / L, Nutri-Score et catégories (`lib/services/csv_export.dart`)
+- **Ajouté** : format pensé pour Excel en français (séparateur `;`, décimales avec virgule, UTF-8 avec BOM), envoyé via la feuille de partage du téléphone (Fichiers, e-mail, Drive…)
+- **Ajouté** : dépendance `share_plus` (^13.3.1)
+- **Modifié** : Android Gradle Plugin 8.11.1 → 8.12.1 (`android/settings.gradle.kts`), version minimale exigée par `share_plus`
+- **Ajouté** : tests `test/services/csv_export_test.dart` (ordre, échappement des `;` et `"`, magasin de repli, BOM, nom de fichier)
+- **Modifié** : prérequis du README alignés sur le projet réel (Flutter 3.38+, Dart 3.10+, iOS 13+)
 
 ### v1.8.0 — 2026-11-17 — Où faire mes courses ? et alertes prix
 
@@ -191,6 +200,7 @@
 - Affichage compact avec aperçu des produits
 - Détails complets d'une session, avec **correction d'un article** (prix, contenance, magasin) ou suppression en le touchant
 - Bouton « Retirer les données de démo » (ne supprime que les sessions d'exemple)
+- **Export CSV** de toutes les sessions (bouton partage) : un fichier lisible dans Excel / Numbers, envoyé par e-mail, Drive ou enregistré dans Fichiers
 - Suppression individuelle ou totale (les données de démo ne sont injectées qu'au tout premier lancement et ne reviennent pas après « Tout supprimer »)
 
 ### 📱 Mode Hors-Ligne
@@ -226,11 +236,11 @@
 
 ## 📦 Prérequis
 
-- [Flutter SDK](https://flutter.dev/docs/get-started/install) **3.19+**
-- [Dart SDK](https://dart.dev/get-dart) **3.0+**
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) **3.38+**
+- [Dart SDK](https://dart.dev/get-dart) **3.10+**
 - IDE recommandé : Android Studio, VS Code ou IntelliJ IDEA
 - Un émulateur ou un appareil physique connecté
-- **Android 6.0+** ou **iOS 12+** (pour la caméra)
+- **Android 6.0+** ou **iOS 13+** (pour la caméra)
 
 ---
 
@@ -312,7 +322,8 @@ prix_vif/
 │   │   ├── scan_repository.dart     # Repository Hive (CRUD scans, articles, cache)
 │   │   ├── open_food_facts_service.dart # Service API Open Food Facts
 │   │   ├── mistral_service.dart     # Service API Mistral AI (vision)
-│   │   └── connectivity_service.dart # Gestion réseau + mode hors-ligne
+│   │   ├── connectivity_service.dart # Gestion réseau + mode hors-ligne
+│   │   └── csv_export.dart          # Export CSV + feuille de partage
 │   │
 │   ├── utils/
 │   │   ├── image_utils.dart          # Utilitaires compression d'image
@@ -453,7 +464,7 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 
 Pour aller plus loin :
 - [ ] Synchronisation cloud (Firebase/Back4App) pour sauvegarder l'historique
-- [ ] Export CSV/PDF des sessions de scan
+- [ ] Export PDF des sessions de scan
 - [ ] Alertes sur produits peu sains (basé sur Nutri-Score)
 - [ ] Intégration avec des listes de courses
 - [ ] Partage de sessions entre utilisateurs
@@ -482,6 +493,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 | `intl` | ^0.18.1 | Formatage des dates |
 | `syncfusion_flutter_charts` | ^34.1.29 | Graphiques d'évolution des prix |
 | `flutter_svg` | ^2.0.7 | Logo et icônes SVG |
+| `share_plus` | ^13.3.1 | Partage du fichier CSV exporté |
 
 ---
 
@@ -493,7 +505,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.8.0 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.9.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*
+*Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
