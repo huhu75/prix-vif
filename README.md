@@ -8,6 +8,12 @@
 
 ## 📋 Historique des versions
 
+### v1.5.4 — 2026-11-17 — Suppression des API dépréciées
+
+- **Modifié** : les 105 appels `Color.withOpacity(x)` remplacés par `Color.withValues(alpha: x)` (API dépréciée depuis Flutter 3.27)
+- **Modifié** : `ColorScheme` sans `background`/`onBackground` dépréciés (`surface` et `scaffoldBackgroundColor` déjà définis) ; `Matrix4.scale` remplacé par `scaleByDouble` dans le logo animé
+- `flutter analyze` : plus aucune dépréciation (137 → 29 infos de style)
+
 ### v1.5.3 — 2026-11-17 — Nettoyage du dépôt
 
 - **Supprimé** : `dashboard_fix_report.md`, rapport ponctuel de juillet sur l'écran Dashboard gris (correctif en place depuis, rapport conservé dans l'historique git)
@@ -433,7 +439,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.5.3 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.5.4 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*

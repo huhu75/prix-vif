@@ -503,7 +503,7 @@ class _GlobalStatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -2929,7 +2929,7 @@ class _TrendChart extends StatelessWidget {
               width: 32,
               height: (100 * percentage.clamp(0, 1)).toDouble(),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.8),
+                color: color.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -3226,14 +3226,14 @@ class _ProductAnalysisButton extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppTheme.primary.withOpacity(0.3),
-              AppTheme.primary.withOpacity(0.1),
+              AppTheme.primary.withValues(alpha: 0.3),
+              AppTheme.primary.withValues(alpha: 0.1),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
       ),
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -3241,7 +3241,7 @@ class _ProductAnalysisButton extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.2),
+              color: AppTheme.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -3299,7 +3299,7 @@ class _EmptyDashboardState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(

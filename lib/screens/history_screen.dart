@@ -95,7 +95,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 });
                               },
                               backgroundColor: AppTheme.surfaceDark,
-                              selectedColor: AppTheme.primary.withOpacity(0.15),
+                              selectedColor: AppTheme.primary.withValues(alpha: 0.15),
                               labelStyle: TextStyle(
                                 color: _selectedStoreFilter == null 
                                     ? AppTheme.primary 
@@ -106,7 +106,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               side: BorderSide(
                                 color: _selectedStoreFilter == null
                                     ? AppTheme.primary
-                                    : Colors.black.withOpacity(0.1),
+                                    : Colors.black.withValues(alpha: 0.1),
                                 width: 1,
                               ),
                             ),
@@ -124,7 +124,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   });
                                 },
                                 backgroundColor: AppTheme.surfaceDark,
-                                selectedColor: AppTheme.primary.withOpacity(0.15),
+                                selectedColor: AppTheme.primary.withValues(alpha: 0.15),
                                 labelStyle: TextStyle(
                                   color: isSelected 
                                       ? AppTheme.primary 
@@ -135,7 +135,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppTheme.primary
-                                      : Colors.black.withOpacity(0.1),
+                                      : Colors.black.withValues(alpha: 0.1),
                                   width: 1,
                                 ),
                               ),
@@ -361,7 +361,7 @@ class _SessionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color, width: 1),
       ),
@@ -447,7 +447,7 @@ class _EmptyHistoryState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(

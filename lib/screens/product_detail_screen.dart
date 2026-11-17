@@ -338,7 +338,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -397,7 +397,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: AppTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -613,7 +613,7 @@ class _GlobalTrendCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: trend.color.withOpacity(0.2),
+                  color: trend.color.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(trend.icon, color: trend.color, size: 28),
@@ -739,7 +739,7 @@ class _SingleStorePriceHistory extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: history.trend.color.withOpacity(0.2),
+                        color: history.trend.color.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(history.trend.icon, color: history.trend.color),
@@ -1110,14 +1110,14 @@ class _StoreComparisonTab extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.green.withOpacity(0.3),
-                    Colors.green.withOpacity(0.1),
+                    Colors.green.withValues(alpha: 0.3),
+                    Colors.green.withValues(alpha: 0.1),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.green.withOpacity(0.4)),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
               ),
               padding: const EdgeInsets.all(20),
               child: Row(
@@ -1125,7 +1125,7 @@ class _StoreComparisonTab extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
+                      color: Colors.green.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -1326,8 +1326,8 @@ class _StorePriceBarChart extends StatelessWidget {
             pointColorMapper: (info, _) {
               // Mettre en vert le moins cher
               return info.storeName == comparison.cheapestStore?.storeName
-                  ? Colors.green.withOpacity(0.8)
-                  : AppTheme.primary.withOpacity(0.8);
+                  ? Colors.green.withValues(alpha: 0.8)
+                  : AppTheme.primary.withValues(alpha: 0.8);
             },
             dataLabelSettings: const DataLabelSettings(
               isVisible: true,
@@ -1428,7 +1428,7 @@ class _StorePriceCard extends StatelessWidget {
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.delete_forever, size: 18),
-              color: Colors.red.withOpacity(0.7),
+              color: Colors.red.withValues(alpha: 0.7),
               tooltip: 'Supprimer ce magasin',
               onPressed: onDelete,
             ),
@@ -1476,7 +1476,7 @@ class _SimilarProductsTab extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: AppTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -1558,14 +1558,14 @@ class _SimilarProductsTab extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.green.withOpacity(0.3),
-                      Colors.green.withOpacity(0.1),
+                      Colors.green.withValues(alpha: 0.3),
+                      Colors.green.withValues(alpha: 0.1),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.green.withOpacity(0.4)),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
                 ),
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -1573,7 +1573,7 @@ class _SimilarProductsTab extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
+                        color: Colors.green.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -1906,9 +1906,9 @@ class _ProductInfoTab extends StatelessWidget {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               padding: const EdgeInsets.all(16),
               child: Wrap(
@@ -1919,7 +1919,7 @@ class _ProductInfoTab extends StatelessWidget {
                     allergen,
                     style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
-                  backgroundColor: Colors.red.withOpacity(0.15),
+                  backgroundColor: Colors.red.withValues(alpha: 0.15),
                   side: BorderSide.none,
                   padding: EdgeInsets.zero,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

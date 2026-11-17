@@ -98,7 +98,7 @@ class _AnimatedLogoState extends State<AnimatedLogo> with SingleTickerProviderSt
       builder: (context, child) {
         return Transform(
           transform: Matrix4.identity()
-            ..scale(_scaleAnimation.value)
+            ..scaleByDouble(_scaleAnimation.value, _scaleAnimation.value, _scaleAnimation.value, 1.0)
             ..rotateZ(_rotationAnimation.value * 0.0174533), // Convert to radians
           alignment: Alignment.center,
           child: AppLogo(

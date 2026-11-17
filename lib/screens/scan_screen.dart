@@ -383,11 +383,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -704,7 +704,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppTheme.textSecondary.withOpacity(0.3),
+                      color: AppTheme.textSecondary.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -724,10 +724,10 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceLight.withOpacity(0.5),
+                    color: AppTheme.surfaceLight.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                     ),
                   ),
                   child: Row(
@@ -818,7 +818,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     suffixText: '€',
                     suffixStyle: const TextStyle(fontSize: 24, color: AppTheme.accent),
                     hintText: '0.00',
-                    hintStyle: TextStyle(color: AppTheme.textMuted.withOpacity(0.5)),
+                    hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -970,7 +970,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         decoration: BoxDecoration(
           color: AppTheme.surfaceDark,
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.2), width: 1),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2), width: 1),
         ),
         child: Row(
           children: [
@@ -1047,7 +1047,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           decoration: BoxDecoration(
             color: AppTheme.surfaceDark,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.1), width: 1.5),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1), width: 1.5),
           ),
           clipBehavior: Clip.antiAlias,
           child: _ticketImage == null
@@ -1063,7 +1063,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.95),
+                color: AppTheme.error.withValues(alpha: 0.95),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -1086,7 +1086,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             child: Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
+                color: Colors.black.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Center(
@@ -1118,7 +1118,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             Icon(
               Icons.receipt_long,
               size: 64,
-              color: AppTheme.primary.withOpacity(0.5),
+              color: AppTheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1174,7 +1174,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         foregroundColor: AppTheme.primary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppTheme.primary.withOpacity(0.3)),
+          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3)),
         ),
       ),
     );
@@ -1204,7 +1204,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               gradient: LinearGradient(
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(0.85),
+                  Colors.black.withValues(alpha: 0.85),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -1238,9 +1238,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.surfaceDark.withOpacity(0.9),
+                      color: AppTheme.surfaceDark.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
+                      border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1420,11 +1420,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           fillColor: AppTheme.surfaceLight,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+                            borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+                            borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -1493,7 +1493,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       // Loader de chargement API ("Recherche du produit...")
                       if (_isLoadingProduct)
                         Container(
-                          color: Colors.black.withOpacity(0.75),
+                          color: Colors.black.withValues(alpha: 0.75),
                           child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1582,7 +1582,7 @@ class _AddStoreButtonState extends State<_AddStoreButton> {
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withOpacity(0.25),
+                color: AppTheme.primary.withValues(alpha: 0.25),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1850,7 +1850,7 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.textSecondary.withOpacity(0.3),
+                color: AppTheme.textSecondary.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1892,13 +1892,13 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: item.isSelected 
-                              ? AppTheme.surfaceLight.withOpacity(0.3)
-                              : AppTheme.surfaceDark.withOpacity(0.5),
+                              ? AppTheme.surfaceLight.withValues(alpha: 0.3)
+                              : AppTheme.surfaceDark.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: item.isSelected 
-                                ? AppTheme.primary.withOpacity(0.2)
-                                : Colors.white.withOpacity(0.05),
+                                ? AppTheme.primary.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.05),
                           ),
                         ),
                         child: Row(

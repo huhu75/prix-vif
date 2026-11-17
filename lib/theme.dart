@@ -39,20 +39,20 @@ class AppTheme {
     return BoxDecoration(
       gradient: LinearGradient(
         colors: [
-          Colors.white.withOpacity(opacity),
-          Colors.white.withOpacity(opacity / 2),
+          Colors.white.withValues(alpha: opacity),
+          Colors.white.withValues(alpha: opacity / 2),
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
       borderRadius: BorderRadius.circular(20),
       border: Border.all(
-        color: Colors.white.withOpacity(opacity * 2),
+        color: Colors.white.withValues(alpha: opacity * 2),
         width: 0.5,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           blurRadius: blur,
           spreadRadius: 0,
           offset: const Offset(0, 4),
@@ -69,12 +69,10 @@ class AppTheme {
         primary: primary,
         secondary: secondary,
         surface: surfaceDark,
-        background: backgroundDark,
         error: error,
         onPrimary: backgroundDark,
         onSecondary: Colors.white,
         onSurface: textPrimary,
-        onBackground: textPrimary,
         onError: Colors.white,
         brightness: Brightness.dark,
       ),
@@ -111,7 +109,7 @@ class AppTheme {
             letterSpacing: 0.5,
           ),
           elevation: 0,
-          shadowColor: primary.withOpacity(0.4),
+          shadowColor: primary.withValues(alpha: 0.4),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -248,7 +246,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(16),
         ),
         tileColor: surfaceLight,
-        selectedTileColor: primary.withOpacity(0.1),
+        selectedTileColor: primary.withValues(alpha: 0.1),
       ),
       dividerTheme: const DividerThemeData(
         color: Color(0xFF334155),
