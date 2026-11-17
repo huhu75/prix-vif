@@ -8,6 +8,13 @@
 
 ## 📋 Historique des versions
 
+### v1.5.5 — 2026-11-17 — Calculs du Dashboard sortis de l'écran
+
+- **Modifié** : calculs du tableau de bord sortis de `dashboard_screen.dart` (3 334 → 2 542 lignes) vers une couche d'analyse indépendante de l'interface `lib/analytics/` : `DashboardStats.fromSessions`, `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem`, statistiques par type et par période
+- **Ajouté** : `ProductObservation` (article + identité produit + magasin résolus) et les utilitaires `productKeyOf`, `productIdOf`, `latestByStore`, qui remplacent trois copies de la même logique d'identification
+- **Ajouté** : tests `test/analytics/dashboard_stats_test.dart` (identité produit, magasin de repli, totaux par période avec date de référence fixe, statistiques par type)
+- **Modifié** : les alternatives moins chères ouvrent la fiche produit avec le même identifiant que les autres sections (EAN, sinon nom)
+
 ### v1.5.4 — 2026-11-17 — Suppression des API dépréciées
 
 - **Modifié** : les 105 appels `Color.withOpacity(x)` remplacés par `Color.withValues(alpha: x)` (API dépréciée depuis Flutter 3.27)
@@ -259,6 +266,14 @@ prix_vif/
 │   ├── models/product_analysis_models.dart # Modèles d'analyse par produit (prix, magasins, similaires)
 │   ├── theme.dart                   # Thème moderne 2026
 │   │
+│   ├── analytics/                   # Calculs d'analyse des prix, sans UI (testables seuls)
+│   │   ├── analytics.dart            # Point d'entrée (exports)
+│   │   ├── product_observation.dart  # Identité produit, magasin résolu, dernier prix par magasin
+│   │   ├── dashboard_stats.dart      # Statistiques globales, par type et par période
+│   │   ├── price_evolution.dart      # Évolution des prix par produit
+│   │   ├── store_comparison.dart     # Comparateur multi-magasins
+│   │   └── recommendations.dart      # Alternatives moins chères
+│   │
 │   ├── services/
 │   │   ├── camera_service.dart      # Service de gestion de la caméra
 │   │   ├── scan_repository.dart     # Repository Hive (CRUD scans, articles, cache)
@@ -296,6 +311,9 @@ prix_vif/
 ---
 
 ## 🛠️ Architecture
+
+### Couche d'analyse
+- Les calculs (statistiques, comparaisons, recommandations) vivent dans `lib/analytics/`, sans dépendance à Flutter UI : les écrans ne font qu'afficher leurs résultats
 
 ### Gestion d'État
 - État local avec `setState`
@@ -439,7 +457,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.5.4 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.5.5 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*

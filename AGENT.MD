@@ -371,6 +371,18 @@ Appareil photo Flutter
 
 ---
 
+## Couche d'analyse `lib/analytics/` (v1.5.5)
+
+Les calculs du tableau de bord ne sont plus dans `dashboard_screen.dart` : ils sont dans `lib/analytics/`, sans widget, et testés seuls (`test/analytics/`).
+
+- `product_observation.dart` : `ProductObservation` = un `ScannedItem` + sa clé produit (`productKeyOf` : `bc_<EAN>` sinon `name_<nom>_<marque>`), son identifiant de fiche (`productIdOf` : EAN, sinon nom, sinon id) et son magasin résolu (article, sinon session). `groupByProduct` et `latestByStore` sont les briques réutilisées par tous les calculs.
+- `dashboard_stats.dart` : `DashboardStats.fromSessions(sessions, {now})` agrège tout ce qu'affiche le Dashboard (totaux, Nutri-Score, `ProductTypeStats` par type OFF et par magasin, `PeriodStats` par semaine/mois, totaux 7/30 jours).
+- `price_evolution.dart`, `store_comparison.dart`, `recommendations.dart` : `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem` (méthodes statiques `calculate(sessions)`).
+
+Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ; les écrans ne font qu'afficher.
+
+---
+
 ## Points techniques à anticiper
 
 1. **Identification unique des produits** :

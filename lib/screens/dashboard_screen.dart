@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../models/product_analysis_models.dart';
+import '../analytics/analytics.dart';
 import '../services/scan_repository.dart';
 import '../utils/product_type_utils.dart';
 import '../widgets/magic_title.dart';
-import 'package:intl/intl.dart';
 import 'product_detail_screen.dart';
 
 /// Écran de tableau de bord avec analyse nutritionnelle et tendances
@@ -28,7 +28,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Calculer les statistiques globales
-    final stats = _calculateDashboardStats(sessions);
+    final stats = DashboardStats.fromSessions(sessions);
     
     return Scaffold(
       key: const ValueKey('dashboard_scaffold'),
@@ -162,248 +162,13 @@ class DashboardScreen extends StatelessWidget {
       onProductAnalysisRequested!();
     }
   }
-
-  /// Calcule toutes les statistiques pour le tableau de bord
-  _DashboardStats _calculateDashboardStats(List<ScanSession> sessions) {
-    final allItems = <ScannedItem>[];
-    for (final session in sessions) {
-      allItems.addAll(session.items);
-    }
-    
-    // Calculer la répartition Nutri-Score
-    final nutriscoreCounts = <String, int>{};
-    for (final item in allItems) {
-      if (item.nutriscore != null) {
-        final score = item.nutriscore!.toLowerCase();
-        nutriscoreCounts[score] = (nutriscoreCounts[score] ?? 0) + 1;
-      }
-    }
-    
-    // Calculer les statistiques par type de produit (catégorie OFF la plus spécifique)
-    final productTypeStats = <String, _ProductTypeStats>{};
-    for (final session in sessions) {
-      for (final item in session.items) {
-        final type = productTypeLabel(item.categories);
-        final rawStore = (item.storeName ?? session.storeName ?? '').trim();
-        final storeName = rawStore.isNotEmpty ? rawStore : null;
-        productTypeStats
-            .putIfAbsent(type, () => _ProductTypeStats())
-            .addItem(item.price, storeName: storeName);
-      }
-    }
-    
-    // Calculer l'évolution des prix par produit
-    final productEvolutions = ProductPriceEvolutionItem.calculate(sessions);
-
-    // Calculer les comparaisons de prix par magasin pour les mêmes produits
-    final storeComparisons = ProductStoreComparisonItem.calculate(sessions);
-
-    // Calculer les recommandations d'alternatives moins chères
-    final recommendations = ProductRecommendationItem.calculate(sessions);
-
-    // Calculer les statistiques par semaine
-    final weeklyStats = _calculateWeeklyStats(sessions);
-    
-    // Calculer les statistiques par mois
-    final monthlyStats = _calculateMonthlyStats(sessions);
-    
-    // Calculer les totaux
-    final totalAmount = allItems.fold(0.0, (sum, item) => sum + item.price);
-    final totalItems = allItems.length;
-    final avgPrice = totalItems > 0 ? totalAmount / totalItems : 0.0;
-    
-    // Calculer les totaux par période
-    final now = DateTime.now();
-    final weeklyTotal = _calculatePeriodTotal(sessions, now, 7);
-    final monthlyTotal = _calculatePeriodTotal(sessions, now, 30);
-    
-    return _DashboardStats(
-      totalScans: sessions.length,
-      totalItems: totalItems,
-      totalAmount: totalAmount,
-      averagePrice: avgPrice,
-      nutriScoreDistribution: nutriscoreCounts,
-      productTypeStats: productTypeStats,
-      productEvolutions: productEvolutions,
-      storeComparisons: storeComparisons,
-      recommendations: recommendations,
-      weeklyStats: weeklyStats,
-      monthlyStats: monthlyStats,
-      weeklyTotal: weeklyTotal,
-      monthlyTotal: monthlyTotal,
-    );
-  }
-
-  Map<String, _PeriodStats> _calculateWeeklyStats(List<ScanSession> sessions) {
-    final weeklyStats = <String, _PeriodStats>{};
-    
-    for (final session in sessions) {
-      final weekKey = _formatWeekKey(session.date);
-      if (!weeklyStats.containsKey(weekKey)) {
-        weeklyStats[weekKey] = _PeriodStats(scanCount: 0, itemCount: 0, totalAmount: 0.0);
-      }
-      
-      weeklyStats[weekKey]!.scanCount += 1;
-      weeklyStats[weekKey]!.itemCount += session.items.length;
-      weeklyStats[weekKey]!.totalAmount += session.totalAmount;
-    }
-    
-    return weeklyStats;
-  }
-
-  Map<String, _PeriodStats> _calculateMonthlyStats(List<ScanSession> sessions) {
-    final monthlyStats = <String, _PeriodStats>{};
-    
-    for (final session in sessions) {
-      final monthKey = _formatMonthKey(session.date);
-      if (!monthlyStats.containsKey(monthKey)) {
-        monthlyStats[monthKey] = _PeriodStats(scanCount: 0, itemCount: 0, totalAmount: 0.0);
-      }
-      
-      monthlyStats[monthKey]!.scanCount += 1;
-      monthlyStats[monthKey]!.itemCount += session.items.length;
-      monthlyStats[monthKey]!.totalAmount += session.totalAmount;
-    }
-    
-    return monthlyStats;
-  }
-
-  double _calculatePeriodTotal(List<ScanSession> sessions, DateTime now, int days) {
-    final cutoff = now.subtract(Duration(days: days));
-    double total = 0.0;
-    
-    for (final session in sessions) {
-      if (session.date.isAfter(cutoff) || session.date.isAtSameMomentAs(cutoff)) {
-        total += session.totalAmount;
-      }
-    }
-    
-    return total;
-  }
-
-  String _formatWeekKey(DateTime date) {
-    final startOfWeek = date.subtract(Duration(days: date.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
-    final formatter = DateFormat('dd MMM', 'fr_FR');
-    return '${formatter.format(startOfWeek)} - ${formatter.format(endOfWeek)}';
-  }
-
-  String _formatMonthKey(DateTime date) {
-    final formatter = DateFormat('MMM yyyy', 'fr_FR');
-    return formatter.format(date);
-  }
-}
-
-/// Statistiques pour le tableau de bord
-class _DashboardStats {
-  final int totalScans;
-  final int totalItems;
-  final double totalAmount;
-  final double averagePrice;
-  final Map<String, int> nutriScoreDistribution;
-  final Map<String, _ProductTypeStats> productTypeStats;
-  final List<ProductPriceEvolutionItem> productEvolutions;
-  final List<ProductStoreComparisonItem> storeComparisons;
-  final List<ProductRecommendationItem> recommendations;
-  final Map<String, _PeriodStats> weeklyStats;
-  final Map<String, _PeriodStats> monthlyStats;
-  final double weeklyTotal;
-  final double monthlyTotal;
-
-  _DashboardStats({
-    required this.totalScans,
-    required this.totalItems,
-    required this.totalAmount,
-    required this.averagePrice,
-    required this.nutriScoreDistribution,
-    required this.productTypeStats,
-    required this.productEvolutions,
-    required this.storeComparisons,
-    required this.recommendations,
-    required this.weeklyStats,
-    required this.monthlyStats,
-    required this.weeklyTotal,
-    required this.monthlyTotal,
-  });
-}
-
-/// Statistiques d'un magasin pour un type de produit donné
-class _ProductTypeStoreStats {
-  final String storeName;
-  int itemCount = 0;
-  double totalAmount = 0.0;
-  double minPrice = double.infinity;
-  double maxPrice = 0.0;
-
-  _ProductTypeStoreStats({required this.storeName});
-
-  void addItem(double price) {
-    itemCount += 1;
-    totalAmount += price;
-    if (price < minPrice) minPrice = price;
-    if (price > maxPrice) maxPrice = price;
-  }
-
-  double get averagePrice => itemCount > 0 ? totalAmount / itemCount : 0.0;
-}
-
-/// Statistiques agrégées pour un type de produit (catégorie OFF)
-class _ProductTypeStats {
-  int itemCount = 0;
-  double totalAmount = 0.0;
-  double minPrice = double.infinity;
-  double maxPrice = 0.0;
-  final Map<String, _ProductTypeStoreStats> storeStats = {};
-
-  void addItem(double price, {String? storeName}) {
-    itemCount += 1;
-    totalAmount += price;
-    if (price < minPrice) minPrice = price;
-    if (price > maxPrice) maxPrice = price;
-
-    if (storeName != null && storeName.trim().isNotEmpty) {
-      final clean = storeName.trim();
-      storeStats
-          .putIfAbsent(clean, () => _ProductTypeStoreStats(storeName: clean))
-          .addItem(price);
-    }
-  }
-
-  double get averagePrice => itemCount > 0 ? totalAmount / itemCount : 0.0;
-
-  /// Magasins triés du moins cher au plus cher en moyenne
-  List<_ProductTypeStoreStats> get storesSortedByAveragePrice {
-    final list = storeStats.values.toList()
-      ..sort((a, b) => a.averagePrice.compareTo(b.averagePrice));
-    return list;
-  }
-
-  /// Écart absolu entre le magasin le plus cher et le moins cher pour ce type
-  double get storePriceSpread {
-    final sorted = storesSortedByAveragePrice;
-    if (sorted.length < 2) return 0.0;
-    return sorted.last.averagePrice - sorted.first.averagePrice;
-  }
-}
-
-/// Statistiques pour une période
-class _PeriodStats {
-  int scanCount;
-  int itemCount;
-  double totalAmount;
-
-  _PeriodStats({
-    required this.scanCount,
-    required this.itemCount,
-    required this.totalAmount,
-  });
 }
 
 // ==================== SECTIONS ====================
 
 /// Section des statistiques globales
 class _GlobalStatsSection extends StatelessWidget {
-  final _DashboardStats stats;
+  final DashboardStats stats;
 
   const _GlobalStatsSection({required this.stats});
 
@@ -733,162 +498,6 @@ class _NutriScoreBar extends StatelessWidget {
 
 // ==================== ÉVOLUTION DES PRIX DES PRODUITS ====================
 
-/// Observation d'un article dans une session pour reconstituer l'historique
-class _ArticleObservation {
-  final String id;
-  final String name;
-  final String? brand;
-  final String? barcode;
-  final String? imageUrl;
-  final double price;
-  final DateTime date;
-  final String? storeName;
-
-  _ArticleObservation({
-    required this.id,
-    required this.name,
-    this.brand,
-    this.barcode,
-    this.imageUrl,
-    required this.price,
-    required this.date,
-    this.storeName,
-  });
-}
-
-/// Résumé d'évolution de prix d'un produit pour le tableau de bord
-class ProductPriceEvolutionItem {
-  final String productId;
-  final String name;
-  final String? brand;
-  final String? barcode;
-  final String? imageUrl;
-  final double latestPrice;
-  final double firstPrice;
-  final double previousPrice;
-  final DateTime latestDate;
-  final String? latestStore;
-  final int scanCount;
-  final List<double> prices;
-  final List<DateTime> dates;
-
-  ProductPriceEvolutionItem({
-    required this.productId,
-    required this.name,
-    this.brand,
-    this.barcode,
-    this.imageUrl,
-    required this.latestPrice,
-    required this.firstPrice,
-    required this.previousPrice,
-    required this.latestDate,
-    this.latestStore,
-    required this.scanCount,
-    required this.prices,
-    required this.dates,
-  });
-
-  /// Variation en euros par rapport au prix précédent (ou premier prix)
-  double get priceDiff => latestPrice - (prices.length > 1 ? previousPrice : firstPrice);
-
-  /// Variation globale depuis le tout premier scan
-  double get totalDiff => latestPrice - firstPrice;
-
-  /// Pourcentage de variation par rapport au prix précédent (ou premier prix)
-  double get percentDiff {
-    final base = prices.length > 1 ? previousPrice : firstPrice;
-    if (base <= 0) return 0.0;
-    return ((latestPrice - base) / base) * 100;
-  }
-
-  /// Tendance du prix
-  PriceTrend get trend {
-    final diff = priceDiff;
-    if (diff > 0.01) return PriceTrend.up;
-    if (diff < -0.01) return PriceTrend.down;
-    return PriceTrend.stable;
-  }
-
-  bool get hasEvolution => prices.length >= 2;
-
-  /// Calcule la liste des évolutions de produits à partir d'une liste de sessions
-  static List<ProductPriceEvolutionItem> calculate(List<ScanSession> sessions) {
-    final productMap = <String, List<_ArticleObservation>>{};
-
-    for (final session in sessions) {
-      for (final item in session.items) {
-        final key = (item.barcode != null && item.barcode!.trim().isNotEmpty)
-            ? 'bc_${item.barcode!.trim()}'
-            : 'name_${item.name.trim().toLowerCase()}_${(item.brand ?? '').trim().toLowerCase()}';
-
-        productMap.putIfAbsent(key, () => []).add(_ArticleObservation(
-          id: item.id,
-          name: item.name,
-          brand: item.brand,
-          barcode: item.barcode,
-          imageUrl: item.imageUrl,
-          price: item.price,
-          date: item.scanDate,
-          storeName: item.storeName ?? session.storeName,
-        ));
-      }
-    }
-
-    final evolutions = <ProductPriceEvolutionItem>[];
-
-    for (final observations in productMap.values) {
-      if (observations.isEmpty) continue;
-
-      // Trier par date croissante
-      observations.sort((a, b) => a.date.compareTo(b.date));
-
-      final first = observations.first;
-      final latest = observations.last;
-      final previous = observations.length > 1
-          ? observations[observations.length - 2]
-          : first;
-
-      final productId = (latest.barcode != null && latest.barcode!.trim().isNotEmpty)
-          ? latest.barcode!.trim()
-          : (latest.name.trim().isNotEmpty ? latest.name.trim() : latest.id);
-
-      evolutions.add(ProductPriceEvolutionItem(
-        productId: productId,
-        name: latest.name,
-        brand: latest.brand,
-        barcode: latest.barcode,
-        imageUrl: latest.imageUrl,
-        latestPrice: latest.price,
-        firstPrice: first.price,
-        previousPrice: previous.price,
-        latestDate: latest.date,
-        latestStore: latest.storeName,
-        scanCount: observations.length,
-        prices: observations.map((o) => o.price).toList(),
-        dates: observations.map((o) => o.date).toList(),
-      ));
-    }
-
-    // Priorité de tri :
-    // 1. Produits avec vraie variation de prix (|diff| > 0.01)
-    // 2. Produits avec plusieurs scans (historique prêt)
-    // 3. Produits les plus récents
-    evolutions.sort((a, b) {
-      final aHasVar = a.hasEvolution && a.priceDiff.abs() > 0.01;
-      final bHasVar = b.hasEvolution && b.priceDiff.abs() > 0.01;
-      if (aHasVar && !bHasVar) return -1;
-      if (!aHasVar && bHasVar) return 1;
-
-      if (a.hasEvolution && !b.hasEvolution) return -1;
-      if (!a.hasEvolution && b.hasEvolution) return 1;
-
-      return b.latestDate.compareTo(a.latestDate);
-    });
-
-    return evolutions;
-  }
-}
-
 /// Section affichant l'évolution des prix des produits scannés
 class _ProductPriceEvolutionSection extends StatelessWidget {
   static const int _maxDisplayed = 5;
@@ -1153,140 +762,6 @@ class _ProductPriceEvolutionCard extends StatelessWidget {
 }
 
 // ==================== COMPARATEUR MULTI-MAGASINS ====================
-
-class _StorePriceObservation {
-  final double price;
-  final DateTime date;
-
-  _StorePriceObservation({required this.price, required this.date});
-}
-
-/// Comparaison multi-magasins d'un produit pour le tableau de bord
-class ProductStoreComparisonItem {
-  final String productId;
-  final String name;
-  final String? brand;
-  final String? barcode;
-  final String? imageUrl;
-  final String cheapestStore;
-  final double cheapestPrice;
-  final String mostExpensiveStore;
-  final double mostExpensivePrice;
-  final int storeCount;
-  final Map<String, double> latestPriceByStore;
-
-  ProductStoreComparisonItem({
-    required this.productId,
-    required this.name,
-    this.brand,
-    this.barcode,
-    this.imageUrl,
-    required this.cheapestStore,
-    required this.cheapestPrice,
-    required this.mostExpensiveStore,
-    required this.mostExpensivePrice,
-    required this.storeCount,
-    required this.latestPriceByStore,
-  });
-
-  /// Écart absolu entre le magasin le plus cher et le moins cher
-  double get priceDiff => mostExpensivePrice - cheapestPrice;
-
-  /// Pourcentage d'économie possible
-  double get savingPercent {
-    if (mostExpensivePrice <= 0) return 0.0;
-    return (priceDiff / mostExpensivePrice) * 100;
-  }
-
-  bool get hasPriceDifference => priceDiff > 0.01;
-
-  /// Calcule les comparaisons inter-magasins depuis les sessions
-  static List<ProductStoreComparisonItem> calculate(List<ScanSession> sessions) {
-    final productStoreMap = <String, Map<String, _StorePriceObservation>>{};
-    final productMetaMap = <String, _ArticleObservation>{};
-
-    for (final session in sessions) {
-      for (final item in session.items) {
-        final rawStore = (item.storeName ?? session.storeName ?? '').trim();
-        if (rawStore.isEmpty) continue;
-
-        final key = (item.barcode != null && item.barcode!.trim().isNotEmpty)
-            ? 'bc_${item.barcode!.trim()}'
-            : 'name_${item.name.trim().toLowerCase()}_${(item.brand ?? '').trim().toLowerCase()}';
-
-        productMetaMap.putIfAbsent(key, () => _ArticleObservation(
-          id: item.id,
-          name: item.name,
-          brand: item.brand,
-          barcode: item.barcode,
-          imageUrl: item.imageUrl,
-          price: item.price,
-          date: item.scanDate,
-          storeName: rawStore,
-        ));
-
-        final storeMap = productStoreMap.putIfAbsent(key, () => {});
-        final existing = storeMap[rawStore];
-        if (existing == null || item.scanDate.isAfter(existing.date)) {
-          storeMap[rawStore] = _StorePriceObservation(
-            price: item.price,
-            date: item.scanDate,
-          );
-        }
-      }
-    }
-
-    final comparisons = <ProductStoreComparisonItem>[];
-
-    for (final entry in productStoreMap.entries) {
-      final key = entry.key;
-      final storePrices = entry.value;
-
-      if (storePrices.length < 2) continue;
-
-      final meta = productMetaMap[key]!;
-      final latestPriceByStore = storePrices.map((s, obs) => MapEntry(s, obs.price));
-
-      var cheapestStore = '';
-      var cheapestPrice = double.infinity;
-      var mostExpensiveStore = '';
-      var mostExpensivePrice = 0.0;
-
-      for (final sEntry in latestPriceByStore.entries) {
-        if (sEntry.value < cheapestPrice) {
-          cheapestPrice = sEntry.value;
-          cheapestStore = sEntry.key;
-        }
-        if (sEntry.value > mostExpensivePrice) {
-          mostExpensivePrice = sEntry.value;
-          mostExpensiveStore = sEntry.key;
-        }
-      }
-
-      final productId = (meta.barcode != null && meta.barcode!.trim().isNotEmpty)
-          ? meta.barcode!.trim()
-          : (meta.name.trim().isNotEmpty ? meta.name.trim() : meta.id);
-
-      comparisons.add(ProductStoreComparisonItem(
-        productId: productId,
-        name: meta.name,
-        brand: meta.brand,
-        barcode: meta.barcode,
-        imageUrl: meta.imageUrl,
-        cheapestStore: cheapestStore,
-        cheapestPrice: cheapestPrice,
-        mostExpensiveStore: mostExpensiveStore,
-        mostExpensivePrice: mostExpensivePrice,
-        storeCount: storePrices.length,
-        latestPriceByStore: latestPriceByStore,
-      ));
-    }
-
-    comparisons.sort((a, b) => b.priceDiff.compareTo(a.priceDiff));
-
-    return comparisons;
-  }
-}
 
 /// Section comparateur multi-magasins sur le tableau de bord
 class _ProductStoreComparisonSection extends StatelessWidget {
@@ -1629,275 +1104,6 @@ class _ProductStoreComparisonCard extends StatelessWidget {
 }
 
 // ==================== ALTERNATIVES MOINS CHÈRES ====================
-
-/// Profil résumé d'un produit pour la détection d'alternatives équivalentes
-class _ProductProfile {
-  final String key;
-  final String id;
-  final String name;
-  final String? brand;
-  final String? barcode;
-  final String? imageUrl;
-  List<String>? categories;
-  double latestPrice;
-  DateTime latestDate;
-  String? latestStore;
-  final Map<String, _StorePriceObservation> storeObservations;
-
-  _ProductProfile({
-    required this.key,
-    required this.id,
-    required this.name,
-    this.brand,
-    this.barcode,
-    this.imageUrl,
-    this.categories,
-    required this.latestPrice,
-    required this.latestDate,
-    this.latestStore,
-    required this.storeObservations,
-  });
-}
-
-/// Recommandation d'un produit équivalent moins cher pour le tableau de bord
-class ProductRecommendationItem {
-  final String referenceProductId;
-  final String referenceProductName;
-  final String? referenceBrand;
-  final String? referenceBarcode;
-  final String? referenceImageUrl;
-  final String? referenceStore;
-  final double referencePrice;
-
-  final String alternativeProductId;
-  final String alternativeProductName;
-  final String? alternativeBrand;
-  final String? alternativeBarcode;
-  final String? alternativeImageUrl;
-  final String? alternativeStore;
-  final double alternativePrice;
-
-  final String category;
-
-  ProductRecommendationItem({
-    required this.referenceProductId,
-    required this.referenceProductName,
-    this.referenceBrand,
-    this.referenceBarcode,
-    this.referenceImageUrl,
-    this.referenceStore,
-    required this.referencePrice,
-    required this.alternativeProductId,
-    required this.alternativeProductName,
-    this.alternativeBrand,
-    this.alternativeBarcode,
-    this.alternativeImageUrl,
-    this.alternativeStore,
-    required this.alternativePrice,
-    required this.category,
-  });
-
-  /// Montant économisé en euros
-  double get savingAmount => referencePrice - alternativePrice;
-
-  /// Pourcentage d'économie
-  double get savingPercent {
-    if (referencePrice <= 0) return 0.0;
-    return (savingAmount / referencePrice) * 100;
-  }
-
-  /// Indique s'il y a un gain financier notable (> 1 centime)
-  bool get hasSaving => savingAmount > 0.01;
-
-  static const _stopWords = {
-    'le', 'la', 'les', 'de', 'du', 'des', 'au', 'aux', 'd', 'l', 'un', 'une', 'uht', 'bio',
-    'en', 'et', 'a', 'sur', 'pour', 'pur', 'pure', '100%'
-  };
-
-  static String? _firstSignificantWord(String name) {
-    final cleaned = name
-        .toLowerCase()
-        .replaceAll(RegExp(r"[^\w\sàâäéèêëîïôöùûüç]"), ' ');
-    final parts = cleaned.split(RegExp(r'\s+'));
-    for (final part in parts) {
-      final p = part.trim();
-      if (p.length >= 3 && !_stopWords.contains(p)) {
-        return p;
-      }
-    }
-    return null;
-  }
-
-  static String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1);
-  }
-
-  static String? _checkEquivalence(_ProductProfile a, _ProductProfile b) {
-    // 1. Si les deux produits disposent de catégories OFF
-    if (isCategorized(a.categories) && isCategorized(b.categories)) {
-      final typeA = productTypeOf(a.categories);
-      final typeB = productTypeOf(b.categories);
-      if (typeA != null && typeA == typeB) {
-        return typeA;
-      }
-      // Intersection sur les catégories
-      if (a.categories != null && b.categories != null) {
-        for (final cat in a.categories!) {
-          final trimmed = cat.trim();
-          if (trimmed.isNotEmpty &&
-              b.categories!.any((c) => c.trim().toLowerCase() == trimmed.toLowerCase())) {
-            return productTypeLabel(a.categories);
-          }
-        }
-      }
-    } else if (isCategorized(a.categories) || isCategorized(b.categories)) {
-      final type = productTypeOf(a.categories) ?? productTypeOf(b.categories);
-      final wordA = _firstSignificantWord(a.name);
-      final wordB = _firstSignificantWord(b.name);
-      if (wordA != null && wordA == wordB) {
-        return type ?? _capitalize(wordA);
-      }
-    }
-
-    // 2. Fallback par mot-clé principal de nom
-    final wordA = _firstSignificantWord(a.name);
-    final wordB = _firstSignificantWord(b.name);
-    if (wordA != null && wordA.length >= 3 && wordA == wordB) {
-      return _capitalize(wordA);
-    }
-
-    return null;
-  }
-
-  /// Calcule les recommandations de produits équivalents moins chers depuis les sessions
-  static List<ProductRecommendationItem> calculate(List<ScanSession> sessions) {
-    final productMap = <String, _ProductProfile>{};
-
-    for (final session in sessions) {
-      for (final item in session.items) {
-        final rawStore = (item.storeName ?? session.storeName ?? '').trim();
-        final storeName = rawStore.isNotEmpty ? rawStore : null;
-
-        final key = (item.barcode != null && item.barcode!.trim().isNotEmpty)
-            ? 'bc_${item.barcode!.trim()}'
-            : 'name_${item.name.trim().toLowerCase()}_${(item.brand ?? '').trim().toLowerCase()}';
-
-        final existing = productMap[key];
-        if (existing == null) {
-          productMap[key] = _ProductProfile(
-            key: key,
-            id: item.id,
-            name: item.name,
-            brand: item.brand,
-            barcode: item.barcode,
-            imageUrl: item.imageUrl,
-            categories: item.categories,
-            latestPrice: item.price,
-            latestDate: item.scanDate,
-            latestStore: storeName,
-            storeObservations: storeName != null
-                ? {
-                    storeName: _StorePriceObservation(
-                      price: item.price,
-                      date: item.scanDate,
-                    )
-                  }
-                : {},
-          );
-        } else {
-          final isMoreRecent = item.scanDate.isAfter(existing.latestDate);
-          if (isMoreRecent) {
-            existing.latestPrice = item.price;
-            existing.latestDate = item.scanDate;
-            if (storeName != null) existing.latestStore = storeName;
-          }
-          if (existing.categories == null && item.categories != null) {
-            existing.categories = item.categories;
-          }
-          if (storeName != null) {
-            final storeObs = existing.storeObservations[storeName];
-            if (storeObs == null || item.scanDate.isAfter(storeObs.date)) {
-              existing.storeObservations[storeName] = _StorePriceObservation(
-                price: item.price,
-                date: item.scanDate,
-              );
-            }
-          }
-        }
-      }
-    }
-
-    final products = productMap.values.toList();
-    if (products.length < 2) return [];
-
-    final recommendations = <ProductRecommendationItem>[];
-
-    // Pour chaque produit A (produit acheté/scanné), chercher la meilleure alternative B moins chère dans un autre magasin
-    for (final prodA in products) {
-      if (prodA.storeObservations.isEmpty) continue;
-      ProductRecommendationItem? bestForA;
-
-      for (final prodB in products) {
-        if (prodA.key == prodB.key) continue;
-        if (prodA.barcode != null &&
-            prodB.barcode != null &&
-            prodA.barcode == prodB.barcode) {
-          continue;
-        }
-        if (prodB.storeObservations.isEmpty) continue;
-
-        final categoryMatch = _checkEquivalence(prodA, prodB);
-        if (categoryMatch == null) continue;
-
-        for (final storeAEntry in prodA.storeObservations.entries) {
-          final storeA = storeAEntry.key;
-          final priceA = storeAEntry.value.price;
-
-          for (final storeBEntry in prodB.storeObservations.entries) {
-            final storeB = storeBEntry.key;
-            final priceB = storeBEntry.value.price;
-
-            // Doit obligatoirement être dans un magasin différent
-            if (storeA == storeB) continue;
-
-            final diff = priceA - priceB;
-            if (diff > 0.01) {
-              if (bestForA == null || diff > bestForA.savingAmount) {
-                bestForA = ProductRecommendationItem(
-                  referenceProductId: prodA.barcode ?? prodA.id,
-                  referenceProductName: prodA.name,
-                  referenceBrand: prodA.brand,
-                  referenceBarcode: prodA.barcode,
-                  referenceImageUrl: prodA.imageUrl,
-                  referenceStore: storeA,
-                  referencePrice: priceA,
-                  alternativeProductId: prodB.barcode ?? prodB.id,
-                  alternativeProductName: prodB.name,
-                  alternativeBrand: prodB.brand,
-                  alternativeBarcode: prodB.barcode,
-                  alternativeImageUrl: prodB.imageUrl,
-                  alternativeStore: storeB,
-                  alternativePrice: priceB,
-                  category: categoryMatch,
-                );
-              }
-            }
-          }
-        }
-      }
-
-      if (bestForA != null) {
-        recommendations.add(bestForA);
-      }
-    }
-
-    // Trier par montant d'économie décroissant
-    recommendations.sort((a, b) => b.savingAmount.compareTo(a.savingAmount));
-
-    return recommendations;
-  }
-}
 
 /// Section des recommandations de produits alternatifs moins chers
 class _ProductRecommendationSection extends StatelessWidget {
@@ -2287,7 +1493,7 @@ class _ProductRecommendationCard extends StatelessWidget {
 class _ProductTypeComparisonSection extends StatefulWidget {
   static const int _maxVisibleTypes = 8;
 
-  final Map<String, _ProductTypeStats> productTypeStats;
+  final Map<String, ProductTypeStats> productTypeStats;
   final double globalAveragePrice;
 
   const _ProductTypeComparisonSection({
@@ -2320,7 +1526,7 @@ class _ProductTypeComparisonSectionState
     }
 
     // Calculer les données par enseigne pour la vue comparative
-    final storesMap = <String, Map<String, _ProductTypeStoreStats>>{};
+    final storesMap = <String, Map<String, ProductTypeStoreStats>>{};
     for (final entry in widget.productTypeStats.entries) {
       final type = entry.key;
       for (final storeEntry in entry.value.storeStats.entries) {
@@ -2479,7 +1685,7 @@ class _ProductTypeComparisonSectionState
   }
 
   Widget _buildStoresView(
-      Map<String, Map<String, _ProductTypeStoreStats>> storesMap) {
+      Map<String, Map<String, ProductTypeStoreStats>> storesMap) {
     final theme = Theme.of(context);
     final sortedStores = storesMap.keys.toList()..sort();
 
@@ -2629,7 +1835,7 @@ class _ProductTypeComparisonSectionState
 /// Ligne de comparaison pour un type de produit
 class _ProductTypeBar extends StatelessWidget {
   final String type;
-  final _ProductTypeStats stats;
+  final ProductTypeStats stats;
   final double ratio;
   final Color color;
 
@@ -2805,8 +2011,8 @@ class _ProductTypeBar extends StatelessWidget {
 // ==================== TENDANCES TEMPORELLES ====================
 
 class _TimeTrendSection extends StatelessWidget {
-  final Map<String, _PeriodStats> weeklyStats;
-  final Map<String, _PeriodStats> monthlyStats;
+  final Map<String, PeriodStats> weeklyStats;
+  final Map<String, PeriodStats> monthlyStats;
 
   const _TimeTrendSection({
     required this.weeklyStats,
@@ -2888,7 +2094,7 @@ class _TimeTrendSection extends StatelessWidget {
 
 /// Graphique de tendance simplifié (barres verticales)
 class _TrendChart extends StatelessWidget {
-  final Map<String, _PeriodStats> stats;
+  final Map<String, PeriodStats> stats;
   final Color color;
 
   const _TrendChart({required this.stats, required this.color});

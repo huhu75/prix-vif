@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prix_vif/screens/dashboard_screen.dart';
+import 'package:prix_vif/analytics/analytics.dart';
 import 'package:prix_vif/models.dart';
 import 'package:prix_vif/models/product_analysis_models.dart';
 import 'package:intl/date_symbol_data_local.dart';
