@@ -255,6 +255,7 @@ void main() {
     expect(find.textContaining('+0.40 €'), findsOneWidget);
 
     // Cliquer sur la carte produit
+    await tester.ensureVisible(find.text('Chocolat Noir'));
     await tester.tap(find.text('Chocolat Noir'));
     await tester.pump();
 
@@ -379,7 +380,9 @@ void main() {
     expect(find.textContaining('-0.60 €'), findsOneWidget);
 
     // Tap sur la carte comparative
-    final storeTarget = find.text('Lidl').first;
+    final storeTarget = find
+        .descendant(of: find.byKey(const ValueKey('store_comparison_section')), matching: find.text('Lidl'))
+        .first;
     await tester.ensureVisible(storeTarget);
     await tester.tap(storeTarget);
     await tester.pump();

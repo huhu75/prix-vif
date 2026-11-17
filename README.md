@@ -8,6 +8,14 @@
 
 ## 📋 Historique des versions
 
+### v1.8.0 — 2026-11-17 — Où faire mes courses ? et alertes prix
+
+- **Ajouté** : section « Où faire mes courses ? » dans le Dashboard (`ShoppingBasketAnalysis`) — coût du panier habituel (produits achetés au moins 2 fois, un de chaque) dans chaque magasin, meilleur magasin et économie par rapport au plus cher ; un prix inconnu dans un magasin est estimé au prix moyen observé ailleurs, et la couverture (« prix connus : 6/8 ») est affichée
+- **Ajouté** : panier optimal en combinant les magasins, avec le détail des produits à acheter dans chacun
+- **Ajouté** : section « Alertes prix » (`PriceAlert`) — produits dont le prix a augmenté d'au moins 5, 10 ou 20 % (seuil réglable et mémorisé) depuis le scan précédent dans le même magasin, avec le magasin où il est moins cher ; accès direct à l'onglet « Évolution » de la fiche produit
+- **Ajouté** : nouvelles sections dans `lib/widgets/dashboard/` (et non dans `dashboard_screen.dart`) avec un en-tête commun `DashboardSectionHeader` ; couleur `AppTheme.success` ajoutée au thème (déjà documentée dans la palette)
+- **Ajouté** : tests `test/analytics/basket_and_alerts_test.dart` (calculs et widgets) ; tests du Dashboard ciblés par section pour ne plus dépendre de l'ordre d'affichage
+
 ### v1.7.0 — 2026-11-17 — Données corrigeables
 
 - **Ajouté** : modification d'un article enregistré depuis le détail d'une session (nom, prix, quantité, unité, magasin, avec aperçu du prix au kg / L) et suppression avec confirmation (`lib/widgets/article_edit_dialog.dart`) ; une session vidée de son dernier article disparaît
@@ -165,6 +173,8 @@
 
 ### 📈 Tableau de Bord (Dashboard)
 - **Statistiques globales** : nombre total de scans, articles, montant total, moyenne par article
+- **Où faire mes courses ?** : coût de ton panier habituel dans chaque magasin, meilleur magasin, économie possible et panier optimal en combinant les magasins
+- **Alertes prix** : hausses d'au moins 5 / 10 / 20 % (seuil réglable) depuis le scan précédent dans le même magasin, avec le magasin où le produit est moins cher
 - **Évolution des prix des produits** : suivi des variations (hausses, baisses, stabilités) avec accès direct à la courbe détaillée
 - **Comparateur multi-magasins** : identification des écarts de prix inter-enseignes et calcul des économies potentielles par produit
 - **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes, avec calcul des gains à quantité égale (au kg / L) quand les contenances sont connues
@@ -293,7 +303,9 @@ prix_vif/
 │   │   ├── dashboard_stats.dart      # Statistiques globales, par type et par période
 │   │   ├── price_evolution.dart      # Évolution des prix par produit
 │   │   ├── store_comparison.dart     # Comparateur multi-magasins
-│   │   └── recommendations.dart      # Alternatives moins chères
+│   │   ├── recommendations.dart      # Alternatives moins chères
+│   │   ├── shopping_basket.dart      # « Où faire mes courses ? » (panier par magasin)
+│   │   └── price_alerts.dart         # Alertes de hausse de prix
 │   │
 │   ├── services/
 │   │   ├── camera_service.dart      # Service de gestion de la caméra
@@ -323,7 +335,8 @@ prix_vif/
 │       ├── magic_button.dart         # Boutons animés
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
-│       └── logo.dart                  # Logo de l'application
+│       ├── logo.dart                  # Logo de l'application
+│       └── dashboard/                 # Sections du Dashboard (panier, alertes, en-tête commun)
 │
 ├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
 ├── pubspec.yaml                    # Dépendances Flutter
@@ -480,7 +493,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.7.0 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.8.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
 *Statut : ✅ Dashboard complet, historique fiable (plus de sessions vides ni de doublons hors-ligne), APK release Android avec accès réseau*

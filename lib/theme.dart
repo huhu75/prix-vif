@@ -11,6 +11,7 @@ class AppTheme {
   static const Color accent = Color(0xFF00F5FF); // Cyan/bleu clair pour accents
   static const Color error = Color(0xFFEF4444); // Rouge erreur
   static const Color warning = Color(0xFFF59E0B); // Orange avertissement
+  static const Color success = Color(0xFF10B981); // Vert éléments positifs
   static const Color textPrimary = Color(0xFFFFFFFF); // Blanc
   static const Color textSecondary = Color(0xFF94A3B8); // Gris-bleu clair
   static const Color textMuted = Color(0xFF64748B); // Gris moyen

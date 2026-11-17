@@ -82,6 +82,22 @@ class ScanRepository {
   }
 
   // ==========================================
+  // Alertes de prix
+  // ==========================================
+
+  static const String _alertThresholdKey = 'price_alert_threshold';
+
+  /// Seuil des alertes de hausse de prix, en %
+  int getPriceAlertThreshold({int fallback = 10}) {
+    if (!_isInitialized) return fallback;
+    return _settingsBox.get(_alertThresholdKey)?['percent'] as int? ?? fallback;
+  }
+
+  Future<void> savePriceAlertThreshold(int percent) async {
+    await _settingsBox.put(_alertThresholdKey, {'percent': percent});
+  }
+
+  // ==========================================
   // Magasins
   // ==========================================
 

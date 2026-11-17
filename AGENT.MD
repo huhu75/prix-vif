@@ -384,6 +384,10 @@ Les calculs du tableau de bord ne sont plus dans `dashboard_screen.dart` : ils s
   - pour un **même** produit (évolution, comparateur multi-magasins) : par article (même contenance).
   - Lignes de ticket : `ticketLineQuantity` transforme « N articles de X » en pack `N x X` car le prix d'une ligne est un total.
 
+- `shopping_basket.dart` (v1.8.0) : `ShoppingBasketAnalysis.calculate` — panier = produits achetés ≥ 2 fois (sinon tous ceux vus en magasin si moins de 3), un de chaque ; coût par magasin avec les derniers prix connus, prix manquants estimés au prix moyen observé ailleurs (couverture exposée par `pricedCount`) ; panier optimal = chaque produit dans son magasin le moins cher. Calculé dans `DashboardStats.shoppingBasket` (`null` s'il y a moins de 2 magasins).
+- `price_alerts.dart` (v1.8.0) : `PriceAlert.calculate(sessions, thresholdPercent:)` — dernier prix vs scan précédent **dans le même magasin**, seuil mémorisé dans la box `settings` (`price_alert_threshold`).
+- Les sections d'UI nouvelles vont dans `lib/widgets/dashboard/` (pas dans `dashboard_screen.dart`).
+
 Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ; les écrans ne font qu'afficher.
 
 ---

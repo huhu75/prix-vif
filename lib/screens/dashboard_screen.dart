@@ -5,6 +5,8 @@ import '../models/product_analysis_models.dart';
 import '../analytics/analytics.dart';
 import '../services/scan_repository.dart';
 import '../utils/product_type_utils.dart';
+import '../widgets/dashboard/price_alerts_section.dart';
+import '../widgets/dashboard/shopping_basket_section.dart';
 import '../widgets/magic_title.dart';
 import 'product_detail_screen.dart';
 
@@ -59,6 +61,23 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   // Statistiques globales
                   _GlobalStatsSection(stats: stats),
+                  const SizedBox(height: 24),
+
+                  // Où faire mes courses ? (panier habituel par magasin)
+                  ShoppingBasketSection(analysis: stats.shoppingBasket),
+                  const SizedBox(height: 24),
+
+                  // Alertes de hausse de prix
+                  PriceAlertsSection(
+                    sessions: sessions,
+                    repository: repository,
+                    onProductTap: (productId, productName) => _handleProductTap(
+                      context,
+                      productId,
+                      productName,
+                      initialTabIndex: 1,
+                    ),
+                  ),
                   const SizedBox(height: 24),
 
                   // Évolution des prix des produits
@@ -784,6 +803,7 @@ class _ProductStoreComparisonSection extends StatelessWidget {
     final remainingCount = comparisons.length - displayed.length;
 
     return Column(
+      key: const ValueKey('store_comparison_section'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(

@@ -6,6 +6,7 @@ import '../utils/unit_price.dart';
 import 'price_evolution.dart';
 import 'product_observation.dart';
 import 'recommendations.dart';
+import 'shopping_basket.dart';
 import 'store_comparison.dart';
 
 /// Moyenne incrémentale
@@ -164,6 +165,9 @@ class DashboardStats {
   final List<ProductPriceEvolutionItem> productEvolutions;
   final List<ProductStoreComparisonItem> storeComparisons;
   final List<ProductRecommendationItem> recommendations;
+
+  /// « Où faire mes courses ? », `null` tant qu'il n'y a pas 2 magasins à comparer
+  final ShoppingBasketAnalysis? shoppingBasket;
   final Map<String, PeriodStats> weeklyStats;
   final Map<String, PeriodStats> monthlyStats;
   final double weeklyTotal;
@@ -179,6 +183,7 @@ class DashboardStats {
     required this.productEvolutions,
     required this.storeComparisons,
     required this.recommendations,
+    this.shoppingBasket,
     required this.weeklyStats,
     required this.monthlyStats,
     required this.weeklyTotal,
@@ -222,6 +227,7 @@ class DashboardStats {
       productEvolutions: ProductPriceEvolutionItem.calculate(sessions),
       storeComparisons: ProductStoreComparisonItem.calculate(sessions),
       recommendations: ProductRecommendationItem.calculate(sessions),
+      shoppingBasket: ShoppingBasketAnalysis.calculate(sessions),
       weeklyStats: _groupByPeriod(sessions, formatWeekKey),
       monthlyStats: _groupByPeriod(sessions, formatMonthKey),
       weeklyTotal: _periodTotal(sessions, reference, 7),
