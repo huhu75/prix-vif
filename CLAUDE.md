@@ -39,6 +39,16 @@ Ce fichier définit des règles **obligatoires** pour toute session de travail s
 
 6. **Versionner = commiter** : la mise à jour du README fait partie de l'étape. Le commit git de l'étape doit inclure le `README.md` modifié (ne jamais livrer du code sans son entrée de changelog).
 
+7. **Aligner la version de l'app** : la ligne `version:` de `pubspec.yaml` doit porter la même version `X.Y.Z` que la dernière entrée de l'historique (ex. `version: 1.5.2+1` pour `v1.5.2`). Le numéro de build après `+` n'est incrémenté que pour une publication sur les stores.
+
+### Checklist avant chaque commit
+
+- [ ] Nouvelle entrée `### vX.Y.Z — AAAA-MM-JJ — <titre>` en tête de `## 📋 Historique des versions`
+- [ ] Pied de page `*Dernière mise à jour : ...*` et `*Statut : ...*` à jour
+- [ ] Sections du README concernées (fonctionnalités, utilisation, structure, dépendances) synchronisées avec le code
+- [ ] `version:` de `pubspec.yaml` = version de la dernière entrée
+- [ ] `AGENT.MD` mis à jour si l'architecture a changé (Règle 2)
+
 ### Exemple d'entrée
 
 ```markdown

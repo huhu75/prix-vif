@@ -4,12 +4,14 @@ import '../models.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/magic_title.dart';
+import '../services/csv_export.dart';
 
 class HistoryScreen extends StatefulWidget {
   final List<ScanSession> sessions;
   final Function(ScanSession) onSessionSelected;
   final Future<void> Function(ScanSession) onSessionDeleted;
   final Future<void> Function() onClearAll;
+  final Future<void> Function()? onRemoveDemoData;
 
   const HistoryScreen({
     super.key,
@@ -17,6 +19,7 @@ class HistoryScreen extends StatefulWidget {
     required this.onSessionSelected,
     required this.onSessionDeleted,
     required this.onClearAll,
+    this.onRemoveDemoData,
   });
 
   @override
@@ -25,6 +28,28 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String? _selectedStoreFilter;
+
+  /// Exporte toutes les sessions en CSV via la feuille de partage du système
+  Future<void> _exportCsv(BuildContext buttonContext) async {
+    final box = buttonContext.findRenderObject() as RenderBox?;
+    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await shareArticlesCsv(widget.sessions, origin: origin);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.error,
+          content: Text('Export impossible : $e'),
+        ),
+      );
+    }
+  }
+
+  bool get _hasDemoData {
+    final demoIds = ScanSession.demoSessionIds;
+    return widget.sessions.any((s) => demoIds.contains(s.id));
+  }
 
   List<ScanSession> get _filteredSessions {
     if (_selectedStoreFilter == null) {
@@ -55,6 +80,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: NeonTitle(text: 'HISTORIQUE', fontSize: 22),
         actions: [
+          if (widget.sessions.isNotEmpty)
+            Builder(
+              builder: (buttonContext) => IconButton(
+                key: const ValueKey('export_csv'),
+                icon: const Icon(Icons.ios_share, color: AppTheme.textSecondary),
+                tooltip: 'Exporter en CSV',
+                onPressed: () => _exportCsv(buttonContext),
+              ),
+            ),
+          if (widget.onRemoveDemoData != null && _hasDemoData)
+            IconButton(
+              key: const ValueKey('remove_demo_data'),
+              icon: const Icon(Icons.cleaning_services_outlined, color: AppTheme.textSecondary),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => _ConfirmClearDialog(
+                    title: 'Retirer les données de démo ?',
+                    message: 'Seules les sessions d\'exemple seront supprimées. Vos propres scans sont conservés.',
+                    confirmLabel: 'Retirer',
+                    onConfirm: widget.onRemoveDemoData!,
+                  ),
+                );
+              },
+              tooltip: 'Retirer les données de démo',
+            ),
           if (widget.sessions.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_forever, color: AppTheme.error),
@@ -95,7 +146,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 });
                               },
                               backgroundColor: AppTheme.surfaceDark,
-                              selectedColor: AppTheme.primary.withOpacity(0.15),
+                              selectedColor: AppTheme.primary.withValues(alpha: 0.15),
                               labelStyle: TextStyle(
                                 color: _selectedStoreFilter == null 
                                     ? AppTheme.primary 
@@ -106,7 +157,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               side: BorderSide(
                                 color: _selectedStoreFilter == null
                                     ? AppTheme.primary
-                                    : Colors.black.withOpacity(0.1),
+                                    : Colors.black.withValues(alpha: 0.1),
                                 width: 1,
                               ),
                             ),
@@ -124,7 +175,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   });
                                 },
                                 backgroundColor: AppTheme.surfaceDark,
-                                selectedColor: AppTheme.primary.withOpacity(0.15),
+                                selectedColor: AppTheme.primary.withValues(alpha: 0.15),
                                 labelStyle: TextStyle(
                                   color: isSelected 
                                       ? AppTheme.primary 
@@ -135,7 +186,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppTheme.primary
-                                      : Colors.black.withOpacity(0.1),
+                                      : Colors.black.withValues(alpha: 0.1),
                                   width: 1,
                                 ),
                               ),
@@ -361,7 +412,7 @@ class _SessionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color, width: 1),
       ),
@@ -447,7 +498,7 @@ class _EmptyHistoryState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -484,8 +535,16 @@ class _EmptyHistoryState extends StatelessWidget {
 // Dialogue de confirmation
 class _ConfirmClearDialog extends StatelessWidget {
   final Future<void> Function() onConfirm;
+  final String title;
+  final String message;
+  final String confirmLabel;
 
-  const _ConfirmClearDialog({required this.onConfirm});
+  const _ConfirmClearDialog({
+    required this.onConfirm,
+    this.title = 'Tout supprimer ?',
+    this.message = 'L\'historique sera perdu. Vous ne pourrez pas annuler.',
+    this.confirmLabel = 'Supprimer',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -494,16 +553,16 @@ class _ConfirmClearDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      title: const Text(
-        'Tout supprimer ?',
-        style: TextStyle(
+      title: Text(
+        title,
+        style: const TextStyle(
           color: AppTheme.textPrimary,
           fontWeight: FontWeight.w600,
         ),
       ),
-      content: const Text(
-        'L\'historique sera perdu. Vous ne pourrez pas annuler.',
-        style: TextStyle(
+      content: Text(
+        message,
+        style: const TextStyle(
           color: AppTheme.textSecondary,
           height: 1.5,
         ),
@@ -517,10 +576,11 @@ class _ConfirmClearDialog extends StatelessWidget {
           ),
         ),
         MagicButton(
-          text: 'Supprimer',
+          text: confirmLabel,
           onPressed: () async {
+            final navigator = Navigator.of(context);
             await onConfirm();
-            Navigator.of(context).pop();
+            navigator.pop();
           },
           color: AppTheme.error,
           width: 120,

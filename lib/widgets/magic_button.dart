@@ -77,12 +77,12 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
                         borderRadius: BorderRadius.circular(50),
                         boxShadow: [
                           BoxShadow(
-                            color: buttonColor.withOpacity(0.3),
+                            color: buttonColor.withValues(alpha: 0.3),
                             blurRadius: _glowAnimation.value * 20,
                             spreadRadius: _glowAnimation.value * 4,
                           ),
                           BoxShadow(
-                            color: buttonColor.withOpacity(0.2),
+                            color: buttonColor.withValues(alpha: 0.2),
                             blurRadius: _glowAnimation.value * 30,
                             spreadRadius: _glowAnimation.value * 6,
                           ),
@@ -99,7 +99,7 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
                     gradient: LinearGradient(
                       colors: [
                         buttonColor,
-                        buttonColor.withOpacity(0.9),
+                        buttonColor.withValues(alpha: 0.9),
                         buttonColor.withValues(alpha: 0.8),
                       ],
                       begin: Alignment.topLeft,
@@ -107,13 +107,13 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
                     ),
                     borderRadius: BorderRadius.circular(50),
                     border: Border.all(
-                      color: buttonColor.withOpacity(0.6),
+                      color: buttonColor.withValues(alpha: 0.6),
                       width: 1.5,
                     ),
                     boxShadow: _isHovered
                         ? [
                             BoxShadow(
-                              color: buttonColor.withOpacity(0.5),
+                              color: buttonColor.withValues(alpha: 0.5),
                               blurRadius: 20,
                               spreadRadius: 8,
                               offset: const Offset(0, 4),
@@ -121,7 +121,7 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
                           ]
                         : [
                             BoxShadow(
-                              color: buttonColor.withOpacity(0.3),
+                              color: buttonColor.withValues(alpha: 0.3),
                               blurRadius: 12,
                               spreadRadius: 2,
                               offset: const Offset(0, 4),
@@ -178,7 +178,7 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(50),
                         border: Border.all(
-                          color: buttonColor.withOpacity(0.4),
+                          color: buttonColor.withValues(alpha: 0.4),
                           width: 2,
                         ),
                       ),

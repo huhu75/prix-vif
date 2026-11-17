@@ -80,7 +80,7 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
         // Overlay avec fond semi-transparent autour de la zone de scan
         Container(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             backgroundBlendMode: BlendMode.darken,
           ),
         ),
@@ -102,7 +102,7 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
                       border: Border.all(
                         color: widget.isScanning
                             ? AppTheme.primary
-                            : Colors.white.withOpacity(0.3),
+                            : Colors.white.withValues(alpha: 0.3),
                         width: widget.isScanning ? 2 : 1.5,
                       ),
                       borderRadius: BorderRadius.circular(16),
@@ -134,7 +134,7 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
                               color: AppTheme.primary,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppTheme.primary.withOpacity(0.3),
+                                  color: AppTheme.primary.withValues(alpha: 0.3),
                                   blurRadius: 6,
                                 ),
                               ],
@@ -218,10 +218,10 @@ class _ScannerOverlayState extends State<ScannerOverlay> with SingleTickerProvid
                   margin: const EdgeInsets.only(top: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.red.withOpacity(0.3),
+                      color: Colors.red.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
@@ -315,13 +315,13 @@ class _ControlButton extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               color: isActive
-                  ? AppTheme.primary.withOpacity(0.15)
-                  : Colors.white.withOpacity(0.08),
+                  ? AppTheme.primary.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isActive
                     ? AppTheme.primary
-                    : Colors.white.withOpacity(0.15),
+                    : Colors.white.withValues(alpha: 0.15),
                 width: 1,
               ),
             ),
@@ -335,7 +335,7 @@ class _ControlButton extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),

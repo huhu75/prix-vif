@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models.dart';
 import '../models/hive_models.dart';
@@ -25,6 +27,10 @@ class ScanRepository {
   late Box<Map> _settingsBox;
 
   bool _isInitialized = false;
+  final Completer<void> _ready = Completer<void>();
+
+  /// Se termine quand [init] a ouvert toutes les boxes
+  Future<void> get ready => _ready.future;
 
   /// Initialise Hive et ouvre les boxes
   Future<void> init() async {
@@ -38,6 +44,87 @@ class ScanRepository {
     _settingsBox = await Hive.openBox<Map>(_settingsBoxName);
 
     _isInitialized = true;
+
+    // Réparer les sessions vidées par l'ancien comportement de « Enregistrer »
+    await _purgeEmptyScans();
+
+    if (!_ready.isCompleted) _ready.complete();
+  }
+
+  // ==========================================
+  // Données de démo
+  // ==========================================
+
+  static const String _demoSeededKey = 'demo_seeded';
+
+  /// Indique si les sessions de démo ont déjà été proposées une fois
+  bool get isDemoSeeded => _settingsBox.get(_demoSeededKey)?['value'] == true;
+
+  /// Mémorise que les sessions de démo ont été proposées (ne plus jamais les réinjecter)
+  Future<void> markDemoSeeded() async {
+    await _settingsBox.put(_demoSeededKey, {'value': true});
+  }
+
+  /// Indique si des sessions de démo sont encore présentes
+  bool get hasDemoData => ScanSession.demoSessionIds.any(_scansBox.containsKey);
+
+  /// Supprime uniquement les sessions de démo (et leurs articles).
+  /// Retourne le nombre de sessions supprimées.
+  Future<int> removeDemoData() async {
+    var removed = 0;
+    for (final scanId in ScanSession.demoSessionIds) {
+      if (_scansBox.containsKey(scanId)) {
+        await deleteScan(scanId);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  // ==========================================
+  // Alertes de prix
+  // ==========================================
+
+  static const String _alertThresholdKey = 'price_alert_threshold';
+
+  /// Seuil des alertes de hausse de prix, en %
+  int getPriceAlertThreshold({int fallback = 10}) {
+    if (!_isInitialized) return fallback;
+    return _settingsBox.get(_alertThresholdKey)?['percent'] as int? ?? fallback;
+  }
+
+  Future<void> savePriceAlertThreshold(int percent) async {
+    await _settingsBox.put(_alertThresholdKey, {'percent': percent});
+  }
+
+  // ==========================================
+  // Magasins
+  // ==========================================
+
+  static const String _storesKey = 'stores';
+  static const String _selectedStoreKey = 'selected_store';
+
+  /// Magasins ajoutés par l'utilisateur (en plus de la liste par défaut)
+  List<String> getCustomStores() {
+    if (!_isInitialized) return [];
+    return (_settingsBox.get(_storesKey)?['names'] as List?)?.cast<String>() ?? [];
+  }
+
+  /// Mémorise un magasin ajouté par l'utilisateur
+  Future<void> addCustomStore(String storeName) async {
+    final stores = getCustomStores();
+    if (stores.any((s) => s.toLowerCase() == storeName.toLowerCase())) return;
+    await _settingsBox.put(_storesKey, {'names': [...stores, storeName]});
+  }
+
+  /// Dernier magasin sélectionné dans le scanner
+  String? getSelectedStore() {
+    if (!_isInitialized) return null;
+    return _settingsBox.get(_selectedStoreKey)?['name'] as String?;
+  }
+
+  Future<void> saveSelectedStore(String storeName) async {
+    await _settingsBox.put(_selectedStoreKey, {'name': storeName});
   }
 
   // ==========================================
@@ -61,7 +148,20 @@ class ScanRepository {
   // ==========================================
 
   /// Sauvegarde une session complète (scan + articles)
+  ///
+  /// Si des articles étaient déjà rattachés à une autre session (cas du bouton
+  /// « Enregistrer » qui regroupe des scans déjà sauvegardés automatiquement),
+  /// ils sont déplacés dans cette session et les sessions d'origine devenues
+  /// vides sont supprimées.
   Future<void> saveScan(ScanSession session) async {
+    final previousScanIds = <String>{};
+    for (final item in session.items) {
+      final previousScanId = _articlesBox.get(item.id)?['scanId'] as String?;
+      if (previousScanId != null && previousScanId != session.id) {
+        previousScanIds.add(previousScanId);
+      }
+    }
+
     final storedScan = StoredScan(
       id: session.id,
       date: session.date,
@@ -77,6 +177,29 @@ class ScanRepository {
     // Persister chaque article du scan
     for (final item in session.items) {
       await saveArticle(item, session.id);
+    }
+
+    // Supprimer les sessions d'origine qui n'ont plus aucun article
+    for (final scanId in previousScanIds) {
+      if (!_scanHasArticles(scanId)) {
+        await _scansBox.delete(scanId);
+      }
+    }
+  }
+
+  bool _scanHasArticles(String scanId) =>
+      _articlesBox.values.any((article) => article['scanId'] == scanId);
+
+  /// Supprime les sessions qui n'ont plus aucun article
+  Future<void> _purgeEmptyScans() async {
+    final scanIdsWithArticles = _articlesBox.values
+        .map((article) => article['scanId'])
+        .toSet();
+    final emptyScanKeys = _scansBox.keys
+        .where((key) => !scanIdsWithArticles.contains(_scansBox.get(key)?['id']))
+        .toList();
+    if (emptyScanKeys.isNotEmpty) {
+      await _scansBox.deleteAll(emptyScanKeys);
     }
   }
 
@@ -155,6 +278,23 @@ class ScanRepository {
     );
 
     await _articlesBox.put(item.id, storedArticle.toMap());
+  }
+
+  /// Met à jour un article déjà enregistré (prix, nom, contenance, magasin…)
+  /// sans changer sa session
+  Future<void> updateArticle(ScannedItem item) async {
+    final scanId = _articlesBox.get(item.id)?['scanId'] as String?;
+    if (scanId == null) return;
+    await saveArticle(item, scanId);
+  }
+
+  /// Supprime un article ; sa session est supprimée si elle devient vide
+  Future<void> deleteArticle(String articleId) async {
+    final scanId = _articlesBox.get(articleId)?['scanId'] as String?;
+    await _articlesBox.delete(articleId);
+    if (scanId != null && !_scanHasArticles(scanId)) {
+      await _scansBox.delete(scanId);
+    }
   }
 
   /// Récupère les articles d'un scan donné
@@ -330,7 +470,7 @@ class ScanRepository {
           'categories': article.categories,
           'prices': <double>[article.price],
           'scanDates': <DateTime>[article.scanDate],
-          'stores': <String>{},
+          'stores': <String>{?article.storeName},
           'scanCount': 1,
           'totalPrice': article.price,
         };
@@ -432,6 +572,8 @@ class ScanRepository {
           'barcode': article.barcode,
           'storeName': article.storeName,
           'price': article.price,
+          'quantity': article.quantity,
+          'unit': article.unit,
           'scanDate': article.scanDate,
           'nutriscore': article.nutriscore,
           'imageUrl': article.imageUrl,

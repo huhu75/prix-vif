@@ -218,7 +218,8 @@ class PendingOfflineScan {
   final String? rawMistralJson; // JSON brut de Mistral si déjà extrait
   final DateTime createdAt;
   final bool isMistralExtracted; // Si l'extraction Mistral a été faite
-  
+  final String? storeName; // Magasin sélectionné au moment du scan
+
   PendingOfflineScan({
     required this.id,
     this.scanId,
@@ -226,6 +227,7 @@ class PendingOfflineScan {
     this.rawMistralJson,
     required this.createdAt,
     this.isMistralExtracted = false,
+    this.storeName,
   });
 
   Map<String, dynamic> toMap() => {
@@ -235,6 +237,7 @@ class PendingOfflineScan {
     'rawMistralJson': rawMistralJson,
     'createdAt': createdAt.toIso8601String(),
     'isMistralExtracted': isMistralExtracted,
+    'storeName': storeName,
   };
 
   factory PendingOfflineScan.fromMap(Map<dynamic, dynamic> map) => PendingOfflineScan(
@@ -244,5 +247,6 @@ class PendingOfflineScan {
     rawMistralJson: map['rawMistralJson'] as String?,
     createdAt: DateTime.parse(map['createdAt'] as String),
     isMistralExtracted: map['isMistralExtracted'] as bool? ?? false,
+    storeName: map['storeName'] as String?,
   );
 }

@@ -9,7 +9,7 @@ class ResultsScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
   final VoidCallback onBack;
   final Function(ScannedItem) onItemRemoved;
-  final VoidCallback onClearAll;
+  final Future<void> Function() onClearAll;
   final VoidCallback onSaveSession;
 
   const ResultsScreen({
@@ -279,25 +279,25 @@ class _SelectablePriceCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary.withOpacity(0.08) : AppTheme.surfaceLight,
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.08) : AppTheme.surfaceLight,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected 
-              ? AppTheme.primary.withOpacity(0.4)
-              : Colors.black.withOpacity(0.05),
+              ? AppTheme.primary.withValues(alpha: 0.4)
+              : Colors.black.withValues(alpha: 0.05),
             width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.1),
+                    color: AppTheme.primary.withValues(alpha: 0.1),
                     blurRadius: 8,
                     spreadRadius: 0,
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 4,
                     spreadRadius: 0,
                   ),
@@ -349,7 +349,7 @@ class _EmptyState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -411,7 +411,7 @@ class _ConfirmClearDialog extends StatelessWidget {
         ),
       ),
       content: const Text(
-        'Cette action supprimera tous les articles. Vous ne pourrez pas annuler.',
+        'Les articles de cette liste seront aussi retirés de l\'historique et du tableau de bord. Vous ne pourrez pas annuler.',
         style: TextStyle(
           color: AppTheme.textSecondary,
           height: 1.5,

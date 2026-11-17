@@ -1,12 +1,96 @@
 # Prix Vif - Scanner de Prix Moderne 2026
 
-<img src="https://img.shields.io/badge/Flutter-3.19+-02569B?style=for-the-badge&logo=flutter" alt="Flutter">
-<img src="https://img.shields.io/badge/Dart-3.0+-0175C2?style=for-the-badge&logo=dart" alt="Dart">
+<img src="https://img.shields.io/badge/Flutter-3.38+-02569B?style=for-the-badge&logo=flutter" alt="Flutter">
+<img src="https://img.shields.io/badge/Dart-3.10+-0175C2?style=for-the-badge&logo=dart" alt="Dart">
 <img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-333333?style=for-the-badge" alt="Platforms">
 
 ---
 
 ## 📋 Historique des versions
+
+### v1.9.3 — 2026-11-17 — Dashboard découpé par section
+
+- **Modifié** : `dashboard_screen.dart` découpé (2 579 → 193 lignes) : l'écran ne fait plus qu'assembler les sections ; chaque section a son fichier dans `lib/widgets/dashboard/` (`GlobalStatsSection`, `ProductPriceEvolutionSection`, `ProductStoreComparisonSection`, `ProductRecommendationSection`, `ProductTypeComparisonSection`, `NutriScoreDistributionSection`, `TimeTrendSection`, `PeriodTotalsSection`, `RecentScansSection`, `ProductAnalysisButton`, `EmptyDashboardState`)
+- Plus aucun fichier de `lib/` ne dépasse 900 lignes (le plus gros : `scan_screen.dart`, 873)
+
+### v1.9.2 — 2026-11-17 — Scanner découpé en composants
+
+- **Modifié** : `scan_screen.dart` découpé (2 147 → 873 lignes) : l'écran garde l'état et les flux (caméra, code-barres, ticket, hors-ligne) ; l'interface est répartie dans `lib/widgets/scan/` : `ScanModeSelector` (bascule code-barres / ticket), `StoreSelector` (magasins), `TicketScanZone` (photo, compression, envoi à l'IA), `TicketConfirmationSheet` + `ExtractedTicketItem` (rapprochement Open Food Facts), `showPriceInputSheet` (saisie du prix), `showMistralSettingsDialog` (clé API)
+- **Corrigé** : le scanner n'utilise plus son `BuildContext` après une attente si l'écran a été fermé (feuille de prix après la recherche Open Food Facts, message après l'import d'un ticket)
+- **Ajouté** : tests `test/widgets/scan_widgets_test.dart` (saisie du prix, import d'un ticket avec lignes identiques et packs, bascule de mode, sélecteur de magasin)
+
+### v1.9.1 — 2026-11-17 — Fiche produit découpée par onglet
+
+- **Modifié** : `product_detail_screen.dart` découpé (2 363 → 301 lignes) : l'écran ne garde que le chargement et la barre d'onglets ; chaque onglet a son fichier dans `lib/widgets/product_detail/` (`ProductInfoTab`, `PriceEvolutionTab`, `StoreComparisonTab`, `SimilarProductsTab`)
+- **Modifié** : le chargement des données de la fiche (historique par magasin, comparaison des magasins, produits similaires, fiche Open Food Facts avec repli hors-ligne) sort de l'écran vers `ProductAnalysisService` (`lib/services/product_analysis_service.dart`), testable sans réseau
+- **Corrigé** : la fiche ne fait plus de `setState` si elle a été fermée pendant le chargement
+- **Ajouté** : tests `test/services/product_analysis_service_test.dart` (analyse locale, repli hors-ligne, affichage des quatre onglets)
+
+### v1.9.0 — 2026-11-17 — Export CSV
+
+- **Ajouté** : export CSV de toutes les sessions depuis l'Historique (bouton partage) : une ligne par article avec date, session, type, magasin, produit, marque, code-barres, prix, contenance, prix au kg / L, Nutri-Score et catégories (`lib/services/csv_export.dart`)
+- **Ajouté** : format pensé pour Excel en français (séparateur `;`, décimales avec virgule, UTF-8 avec BOM), envoyé via la feuille de partage du téléphone (Fichiers, e-mail, Drive…)
+- **Ajouté** : dépendance `share_plus` (^13.3.1)
+- **Modifié** : Android Gradle Plugin 8.11.1 → 8.12.1 (`android/settings.gradle.kts`), version minimale exigée par `share_plus`
+- **Ajouté** : tests `test/services/csv_export_test.dart` (ordre, échappement des `;` et `"`, magasin de repli, BOM, nom de fichier)
+- **Modifié** : prérequis du README alignés sur le projet réel (Flutter 3.38+, Dart 3.10+, iOS 13+)
+
+### v1.8.0 — 2026-11-17 — Où faire mes courses ? et alertes prix
+
+- **Ajouté** : section « Où faire mes courses ? » dans le Dashboard (`ShoppingBasketAnalysis`) — coût du panier habituel (produits achetés au moins 2 fois, un de chaque) dans chaque magasin, meilleur magasin et économie par rapport au plus cher ; un prix inconnu dans un magasin est estimé au prix moyen observé ailleurs, et la couverture (« prix connus : 6/8 ») est affichée
+- **Ajouté** : panier optimal en combinant les magasins, avec le détail des produits à acheter dans chacun
+- **Ajouté** : section « Alertes prix » (`PriceAlert`) — produits dont le prix a augmenté d'au moins 5, 10 ou 20 % (seuil réglable et mémorisé) depuis le scan précédent dans le même magasin, avec le magasin où il est moins cher ; accès direct à l'onglet « Évolution » de la fiche produit
+- **Ajouté** : nouvelles sections dans `lib/widgets/dashboard/` (et non dans `dashboard_screen.dart`) avec un en-tête commun `DashboardSectionHeader` ; couleur `AppTheme.success` ajoutée au thème (déjà documentée dans la palette)
+- **Ajouté** : tests `test/analytics/basket_and_alerts_test.dart` (calculs et widgets) ; tests du Dashboard ciblés par section pour ne plus dépendre de l'ordre d'affichage
+
+### v1.7.0 — 2026-11-17 — Données corrigeables
+
+- **Ajouté** : modification d'un article enregistré depuis le détail d'une session (nom, prix, quantité, unité, magasin, avec aperçu du prix au kg / L) et suppression avec confirmation (`lib/widgets/article_edit_dialog.dart`) ; une session vidée de son dernier article disparaît
+- **Corrigé** : supprimer un article (ou « Tout supprimer ») dans l'onglet Résultats ne le retirait que de l'écran ; il est maintenant supprimé de la base, donc de l'historique et du Dashboard
+- **Ajouté** : les magasins ajoutés dans le scanner et le dernier magasin choisi sont conservés après un redémarrage (box `settings`)
+- **Ajouté** : bouton « Retirer les données de démo » dans l'Historique, qui ne supprime que les sessions d'exemple
+- **Modifié** : la liste de l'onglet Résultats reste alignée sur la base quand un article est modifié ou supprimé ailleurs
+- **Ajouté** : tests du dépôt (modification, suppression, magasins, retrait de la démo) et de la fenêtre d'édition (`test/widgets/article_edit_dialog_test.dart`)
+
+### v1.6.0 — 2026-11-17 — Comparaisons au prix au kg / L
+
+- **Ajouté** : prix au kg, au litre ou à l'unité (`lib/utils/unit_price.dart`) calculé depuis la contenance de l'article (`1 L`, `500 g`, packs `6 x 1,5 L`, chaînes Open Food Facts brutes comme `℮ 500 g`)
+- **Modifié** : comparatif par type de produit — les enseignes sont classées au kg / L / unité dès que la contenance est connue (leader 🥇, écart et « moins cher sur » inclus) ; la moyenne normalisée du type est affichée avec le nombre d'articles de contenance connue
+- **Modifié** : alternatives moins chères comparées à quantité égale quand les deux contenances sont connues (économie calculée sur la quantité du produit de référence) ; plus de recommandation entre un produit de contenance connue et un produit sans contenance, ou entre kg et litre
+- **Modifié** : onglet « Similaires » de la fiche produit trié au kg / L, prix normalisé affiché sur chaque produit et sur le moins cher ; prix normalisé affiché sur les cartes d'articles
+- **Corrigé** : une ligne de ticket de N articles gardait la contenance d'un seul article (6 bouteilles de 1,5 L comptées comme 1,5 L) ; elle devient un pack `6 x 1.5 L`, aussi lors du rejeu hors-ligne
+- **Ajouté** : tests `test/utils/unit_price_test.dart` (lecture des contenances, packs, lignes de ticket, classement des enseignes, recommandations, produits similaires)
+
+### v1.5.5 — 2026-11-17 — Calculs du Dashboard sortis de l'écran
+
+- **Modifié** : calculs du tableau de bord sortis de `dashboard_screen.dart` (3 334 → 2 542 lignes) vers une couche d'analyse indépendante de l'interface `lib/analytics/` : `DashboardStats.fromSessions`, `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem`, statistiques par type et par période
+- **Ajouté** : `ProductObservation` (article + identité produit + magasin résolus) et les utilitaires `productKeyOf`, `productIdOf`, `latestByStore`, qui remplacent trois copies de la même logique d'identification
+- **Ajouté** : tests `test/analytics/dashboard_stats_test.dart` (identité produit, magasin de repli, totaux par période avec date de référence fixe, statistiques par type)
+- **Modifié** : les alternatives moins chères ouvrent la fiche produit avec le même identifiant que les autres sections (EAN, sinon nom)
+
+### v1.5.4 — 2026-11-17 — Suppression des API dépréciées
+
+- **Modifié** : les 105 appels `Color.withOpacity(x)` remplacés par `Color.withValues(alpha: x)` (API dépréciée depuis Flutter 3.27)
+- **Modifié** : `ColorScheme` sans `background`/`onBackground` dépréciés (`surface` et `scaffoldBackgroundColor` déjà définis) ; `Matrix4.scale` remplacé par `scaleByDouble` dans le logo animé
+- `flutter analyze` : plus aucune dépréciation (137 → 29 infos de style)
+
+### v1.5.3 — 2026-11-17 — Nettoyage du dépôt
+
+- **Supprimé** : `dashboard_fix_report.md`, rapport ponctuel de juillet sur l'écran Dashboard gris (correctif en place depuis, rapport conservé dans l'historique git)
+- **Supprimé** : `package-lock.json`, fichier npm vide sans objet dans un projet Flutter
+- **Supprimé** : branches obsolètes déjà fusionnées dans `main` (`ai_main_…`, `maj-mag`, `vibe/fix-dashboard-contrast-…` sur `origin`, `vibe/cleanup-dead-code` et `vibe/ticket-mistral-fixes` en local)
+
+### v1.5.2 — 2026-11-17 — Corrections issues de l'état des lieux (Android release, sessions, hors-ligne)
+
+- **Corrigé** : permission `INTERNET` absente du manifeste Android principal → un APK release ne pouvait joindre ni Open Food Facts ni Mistral (seuls les builds debug/profile l'avaient)
+- **Corrigé** : le bouton « Enregistrer » laissait dans l'historique des sessions vides (0 article, 0 €) ; `ScanRepository.saveScan` regroupe désormais les articles déjà sauvegardés et supprime les sessions d'origine devenues vides, et les sessions vides existantes sont nettoyées au démarrage
+- **Corrigé** : les données de démo revenaient au lancement suivant après « Tout supprimer » ; elles ne sont plus injectées qu'une seule fois (drapeau `demo_seeded` dans la box `settings`)
+- **Corrigé** : un ticket scanné hors-ligne était mis en attente une fois par article (N sessions en double au retour du réseau) ; il est maintenant mis en attente une seule fois, sans feuille de confirmation, avec le magasin sélectionné
+- **Corrigé** : traitement des scans en attente protégé contre les exécutions simultanées, et un scan en attente sans extraction Mistral n'est plus supprimé sans avoir été traité
+- **Corrigé** : deux lignes identiques d'un même ticket recevaient le même `id` et l'une écrasait l'autre en base
+- **Corrigé** : le magasin du premier scan n'apparaissait pas dans la liste des produits (`getUniqueProducts`)
+- **Ajouté** : tests du dépôt Hive (`test/services/scan_repository_test.dart`)
+- **Modifié** : `version` du `pubspec.yaml` alignée sur ce changelog ; sections Structure, Dépendances et Évolution possible du README remises à jour ; règle d'alignement de version ajoutée à `CLAUDE.md`
 
 ### v1.5.1 — 2026-11-15 — Données de démo complètes et initialisation Hive
 
@@ -102,23 +186,27 @@
 - Interface intuitive avec animation de ligne de détection
 - **Mode bi-mode** : Bascule entre scan de code-barres et capture de ticket
 - **Saisie de prix** : Après scan d'un code-barres, dialogue modal pour entrer le prix réel
+- **Magasins mémorisés** : les magasins ajoutés et le dernier magasin choisi sont conservés entre deux lancements
 - **Capture photo** : Photographier un ticket de caisse via la galerie ou la caméra
 - **Compression d'image** : Réduction automatique des images à 1024px max, JPEG 80% avec affichage des gains de taille
 
 ### 📊 Résultats
 - Liste des articles scannés avec cartes modernes
 - Statistiques en temps réel : nombre d'articles, total, moyenne
-- Sélection multiple pour suppression groupée
-- Sauvegarde des sessions dans l'historique
+- Sélection multiple pour suppression groupée (les articles supprimés sont aussi retirés de l'historique et du Dashboard)
+- « Enregistrer » regroupe les articles de la session courante en une seule session dans l'historique (les scans déjà sauvegardés automatiquement y sont fusionnés, sans laisser de session vide)
 - Affichage du total en grand
 - **Sauvegarde automatique après chaque scan**
 
 ### 📈 Tableau de Bord (Dashboard)
 - **Statistiques globales** : nombre total de scans, articles, montant total, moyenne par article
+- **Où faire mes courses ?** : coût de ton panier habituel dans chaque magasin, meilleur magasin, économie possible et panier optimal en combinant les magasins
+- **Alertes prix** : hausses d'au moins 5 / 10 / 20 % (seuil réglable) depuis le scan précédent dans le même magasin, avec le magasin où le produit est moins cher
 - **Évolution des prix des produits** : suivi des variations (hausses, baisses, stabilités) avec accès direct à la courbe détaillée
 - **Comparateur multi-magasins** : identification des écarts de prix inter-enseignes et calcul des économies potentielles par produit
-- **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes avec calcul des gains
-- **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon et vue par enseigne mettant en valeur les forces de chaque magasin
+- **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes, avec calcul des gains à quantité égale (au kg / L) quand les contenances sont connues
+- **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon au kg / L / unité et vue par enseigne mettant en valeur les forces de chaque magasin
+- **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`), utilisé pour toutes les comparaisons entre produits différents
 - **Répartition Nutri-Score** : graphique à barres horizontales avec pourcentages A/B/C/D/E
 - **Évolution temporelle** : graphiques hebdomadaires et mensuels des dépenses
 - **Totaux par période** : cumul semaine et mois en cours
@@ -128,13 +216,15 @@
 - Liste des sessions de scan précédentes
 - Filtres par : récents, montant, nombre d'articles
 - Affichage compact avec aperçu des produits
-- Détails complets d'une session
-- Suppression individuelle ou totale
+- Détails complets d'une session, avec **correction d'un article** (prix, contenance, magasin) ou suppression en le touchant
+- Bouton « Retirer les données de démo » (ne supprime que les sessions d'exemple)
+- **Export CSV** de toutes les sessions (bouton partage) : un fichier lisible dans Excel / Numbers, envoyé par e-mail, Drive ou enregistré dans Fichiers
+- Suppression individuelle ou totale (les données de démo ne sont injectées qu'au tout premier lancement et ne reviennent pas après « Tout supprimer »)
 
 ### 📱 Mode Hors-Ligne
 - Détection automatique de la connectivité réseau
-- **Stockage des scans** quand pas de réseau (image compressée + JSON Mistral)
-- **Traitement automatique** au retour du réseau
+- **Stockage des scans** quand pas de réseau (image compressée + JSON Mistral + magasin sélectionné), une seule fois par ticket
+- **Traitement automatique** au retour du réseau : matching Open Food Facts et import du ticket sans feuille de confirmation
 - Notifications utilisateur pour les scans en attente
 
 ---
@@ -164,11 +254,11 @@
 
 ## 📦 Prérequis
 
-- [Flutter SDK](https://flutter.dev/docs/get-started/install) **3.19+**
-- [Dart SDK](https://dart.dev/get-dart) **3.0+**
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) **3.38+**
+- [Dart SDK](https://dart.dev/get-dart) **3.10+**
 - IDE recommandé : Android Studio, VS Code ou IntelliJ IDEA
 - Un émulateur ou un appareil physique connecté
-- **Android 6.0+** ou **iOS 12+** (pour la caméra)
+- **Android 6.0+** ou **iOS 13+** (pour la caméra)
 
 ---
 
@@ -232,33 +322,55 @@ prix_vif/
 │   ├── main.dart                     # Point d'entrée + navigation
 │   ├── models.dart                  # Modèles de données (ScannedItem, ScanSession)
 │   ├── models/hive_models.dart      # Modèles Hive pour persistance
+│   ├── models/product_analysis_models.dart # Modèles d'analyse par produit (prix, magasins, similaires)
 │   ├── theme.dart                   # Thème moderne 2026
+│   │
+│   ├── analytics/                   # Calculs d'analyse des prix, sans UI (testables seuls)
+│   │   ├── analytics.dart            # Point d'entrée (exports)
+│   │   ├── product_observation.dart  # Identité produit, magasin résolu, dernier prix par magasin
+│   │   ├── dashboard_stats.dart      # Statistiques globales, par type et par période
+│   │   ├── price_evolution.dart      # Évolution des prix par produit
+│   │   ├── store_comparison.dart     # Comparateur multi-magasins
+│   │   ├── recommendations.dart      # Alternatives moins chères
+│   │   ├── shopping_basket.dart      # « Où faire mes courses ? » (panier par magasin)
+│   │   └── price_alerts.dart         # Alertes de hausse de prix
 │   │
 │   ├── services/
 │   │   ├── camera_service.dart      # Service de gestion de la caméra
 │   │   ├── scan_repository.dart     # Repository Hive (CRUD scans, articles, cache)
 │   │   ├── open_food_facts_service.dart # Service API Open Food Facts
 │   │   ├── mistral_service.dart     # Service API Mistral AI (vision)
-│   │   └── connectivity_service.dart # Gestion réseau + mode hors-ligne
+│   │   ├── connectivity_service.dart # Gestion réseau + mode hors-ligne
+│   │   ├── csv_export.dart          # Export CSV + feuille de partage
+│   │   └── product_analysis_service.dart # Données de la fiche produit (historique, magasins, similaires, OFF)
 │   │
 │   ├── utils/
-│   │   └── image_utils.dart          # Utilitaires compression d'image
+│   │   ├── image_utils.dart          # Utilitaires compression d'image
+│   │   ├── unit_price.dart           # Contenance → prix au kg / L / unité
+│   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
-│   │   ├── scan_screen.dart          # Écran scanner (bi-mode: code-barres/ticket)
+│   │   ├── scan_screen.dart          # Écran scanner : état et flux (code-barres, ticket, hors-ligne)
 │   │   ├── results_screen.dart       # Écran résultats
 │   │   ├── history_screen.dart       # Écran historique
 │   │   ├── session_detail_screen.dart # Détails d'une session
-│   │   └── dashboard_screen.dart     # Tableau de bord avec analyse
+│   │   ├── dashboard_screen.dart     # Tableau de bord : assemble les sections
+│   │   ├── product_selection_screen.dart # Liste des produits scannés (recherche, tri, filtres)
+│   │   └── product_detail_screen.dart    # Fiche produit : chargement + onglets
 │   │
 │   └── widgets/
-│       ├── price_card.dart           # Cartes produits (avec Nutri-Score)
+│       ├── price_card.dart           # Cartes produits (avec Nutri-Score et prix au kg / L)
+│       ├── article_edit_dialog.dart  # Correction / suppression d'un article enregistré
 │       ├── scanner_overlay.dart      # Overlay scanner
 │       ├── magic_button.dart         # Boutons animés
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
-│       └── logo.dart                  # Logo de l'application
+│       ├── logo.dart                  # Logo de l'application
+│       ├── dashboard/                 # Une section du Dashboard par fichier (stats, panier, alertes, comparateurs, tendances…)
+│       ├── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
+│       └── scan/                      # Composants du scanner (mode, magasin, zone ticket, prix, confirmation, clé Mistral)
 │
+├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
 ├── pubspec.yaml                    # Dépendances Flutter
 ├── AGENT.md                        # Documentation technique
 └── README.md                       # Cette documentation
@@ -267,6 +379,9 @@ prix_vif/
 ---
 
 ## 🛠️ Architecture
+
+### Couche d'analyse
+- Les calculs (statistiques, comparaisons, recommandations) vivent dans `lib/analytics/`, sans dépendance à Flutter UI : les écrans ne font qu'afficher leurs résultats
 
 ### Gestion d'État
 - État local avec `setState`
@@ -289,7 +404,7 @@ prix_vif/
 
 ### Persistance
 - **Hive NoSQL** : Stockage local rapide et efficace
-- **5 boxes** : scans, articles, cache_produits, mistral_extractions, pending_offline_scans
+- **6 boxes** : scans, articles, products_cache, mistral_extractions, pending_offline_scans, settings (clé API Mistral, drapeau des données de démo, magasins ajoutés, magasin sélectionné)
 - **Synchronisation temps réel** : Rechargement automatique après chaque modification
 
 ---
@@ -327,7 +442,7 @@ prix_vif/
 ### 📜 Consulter les résultats
 - **Icône 🧾 (2ème onglet)** : Affiche la liste des articles scannés dans la session courante
 - Sélection multiple → suppression groupée
-- Bouton "Enregistrer" → sauvegarde la session courante (si non déjà sauvegardée)
+- Bouton "Enregistrer" → regroupe les articles courants en une seule session (les sessions automatiques correspondantes sont fusionnées)
 - Affichage du total en grand avec statistiques (moyenne, nombre d'articles)
 
 ### 🕒 Consulter l'historique
@@ -343,7 +458,7 @@ prix_vif/
 Toutes les fonctionnalités principales sont désormais opérationnelles :
 
 ✅ **API produits (OpenFoodFacts)** - Récupération automatique des infos produits (nom, marque, Nutri-Score, catégories, image)
-✅ **Base de données (Hive NoSQL)** - Persistance locale complète avec 5 boxes
+✅ **Base de données (Hive NoSQL)** - Persistance locale complète avec 6 boxes
 ✅ **Synchronisation automatique** - Rechargement des données après chaque modification
 ✅ **Sauvegarde automatique** - Chaque article scanné est immédiatement persisté
 ✅ **Extraction Mistral AI** - Analyse des tickets via API vision (`mistral-small-latest`, Mistral Small 4) — clé fournie via `--dart-define=MISTRAL_API_KEY=...` ou dans les réglages de l'app
@@ -370,8 +485,7 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 
 Pour aller plus loin :
 - [ ] Synchronisation cloud (Firebase/Back4App) pour sauvegarder l'historique
-- [ ] Export CSV/PDF des sessions de scan
-- [ ] Comparaison de prix entre magasins
+- [ ] Export PDF des sessions de scan
 - [ ] Alertes sur produits peu sains (basé sur Nutri-Score)
 - [ ] Intégration avec des listes de courses
 - [ ] Partage de sessions entre utilisateurs
@@ -389,15 +503,18 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 | Package | Version | Utilisation |
 |---------|---------|-------------|
 | `flutter` | SDK | Framework UI |
-| `mobile_scanner` | ^5.2.3 | Scan de codes-barres en temps réel |
+| `mobile_scanner` | ^5.0.0 | Scan de codes-barres en temps réel |
 | `image_picker` | ^1.0.4 | Capture photo de tickets |
-| `image` | ^4.8.0 | Compression et redimensionnement d'images |
+| `image` | ^4.1.3 | Compression et redimensionnement d'images |
 | `hive` | ^2.2.3 | Stockage local NoSQL |
 | `hive_flutter` | ^1.1.0 | Intégration Hive pour Flutter |
 | `path_provider` | ^2.1.1 | Accès aux chemins de stockage |
 | `http` | ^1.1.0 | Appels API REST (OFF, Mistral) |
-| `connectivity_plus` | ^6.1.5 | Détection de connectivité réseau |
+| `connectivity_plus` | ^6.0.3 | Détection de connectivité réseau |
 | `intl` | ^0.18.1 | Formatage des dates |
+| `syncfusion_flutter_charts` | ^34.1.29 | Graphiques d'évolution des prix |
+| `flutter_svg` | ^2.0.7 | Logo et icônes SVG |
+| `share_plus` | ^13.3.1 | Partage du fichier CSV exporté |
 
 ---
 
@@ -409,7 +526,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 15 Novembre 2026 (v1.5.1 — voir Historique des versions)*
+*Dernière mise à jour : 17 Novembre 2026 (v1.9.3 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Dashboard complet & fonctionnel dès le premier lancement*
+*Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*

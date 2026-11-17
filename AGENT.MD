@@ -147,7 +147,7 @@ Appareil photo Flutter
 
 #### 4b. Appel Mistral AI ✅ **TERMINÉE**
 
-- [x] **Modèle recommandé** : `pixtral-12b-2409` (déjà configuré dans `MistralService`)
+- [x] **Modèle** : `mistral-small-latest` (Mistral Small 4, vision native) configuré dans `MistralService` — `pixtral-12b-2409` est retiré par Mistral depuis le 2025-12-31
 - [x] **Prompt JSON structuré** :
   ```
   Extrais les articles de ce ticket de caisse.
@@ -189,6 +189,9 @@ Appareil photo Flutter
 - [x] **Étape 5c — Mode hors-ligne** :
   - [x] Stocker le scan brut (image compressée + JSON Mistral) si pas de réseau
   - [x] Relancer le matching OFF automatiquement au retour de la connexion
+  - Un ticket hors-ligne est mis en attente **une seule fois** (avec `scanId` de l'extraction Mistral et `storeName`), sans feuille de confirmation : il est importé automatiquement au retour du réseau
+  - `ConnectivityService` empêche deux traitements simultanés de la file ; un scan en attente sans JSON Mistral est conservé (pas supprimé)
+  - Persistance : `ScanRepository.saveScan` déplace les articles déjà rattachés à une autre session (bouton « Enregistrer ») et supprime les sessions d'origine devenues vides ; les données de démo ne sont injectées qu'une fois (drapeau `demo_seeded` dans la box `settings`)
 
 **Critère de validation :** tableau de bord avec historique, répartition nutritionnelle et totaux par période.
 
@@ -235,7 +238,7 @@ Appareil photo Flutter
 
 ---
 
-## Étape 6 — Analyse par produit dans le Dashboard ⬅️ **EN COURS**
+## Étape 6 — Analyse par produit dans le Dashboard ✅ **TERMINÉE**
 
 **Objectif :** Ajouter des fonctionnalités d'analyse par produit pour permettre à l'utilisateur de :
 
@@ -368,6 +371,35 @@ Appareil photo Flutter
 
 ---
 
+## Couche d'analyse `lib/analytics/` (v1.5.5)
+
+Les calculs du tableau de bord ne sont plus dans `dashboard_screen.dart` : ils sont dans `lib/analytics/`, sans widget, et testés seuls (`test/analytics/`).
+
+- `product_observation.dart` : `ProductObservation` = un `ScannedItem` + sa clé produit (`productKeyOf` : `bc_<EAN>` sinon `name_<nom>_<marque>`), son identifiant de fiche (`productIdOf` : EAN, sinon nom, sinon id) et son magasin résolu (article, sinon session). `groupByProduct` et `latestByStore` sont les briques réutilisées par tous les calculs.
+- `dashboard_stats.dart` : `DashboardStats.fromSessions(sessions, {now})` agrège tout ce qu'affiche le Dashboard (totaux, Nutri-Score, `ProductTypeStats` par type OFF et par magasin, `PeriodStats` par semaine/mois, totaux 7/30 jours).
+- `price_evolution.dart`, `store_comparison.dart`, `recommendations.dart` : `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem` (méthodes statiques `calculate(sessions)`).
+
+- Prix normalisé (v1.6.0) : `lib/utils/unit_price.dart` convertit `quantity` + `unit` (ou la chaîne OFF brute) en `PackageSize` (kg, L ou unités) puis en `UnitPrice`. `ProductObservation.unitPrice` le porte dans tous les calculs. Règles de comparaison :
+  - entre produits **différents** (alternatives, similaires, classement des enseignes par type) : au kg / L / unité dès que les contenances sont connues et de même nature ; par article seulement si aucune contenance n'est connue ; jamais en mélangeant les deux ;
+  - pour un **même** produit (évolution, comparateur multi-magasins) : par article (même contenance).
+  - Lignes de ticket : `ticketLineQuantity` transforme « N articles de X » en pack `N x X` car le prix d'une ligne est un total.
+
+- `shopping_basket.dart` (v1.8.0) : `ShoppingBasketAnalysis.calculate` — panier = produits achetés ≥ 2 fois (sinon tous ceux vus en magasin si moins de 3), un de chaque ; coût par magasin avec les derniers prix connus, prix manquants estimés au prix moyen observé ailleurs (couverture exposée par `pricedCount`) ; panier optimal = chaque produit dans son magasin le moins cher. Calculé dans `DashboardStats.shoppingBasket` (`null` s'il y a moins de 2 magasins).
+- `price_alerts.dart` (v1.8.0) : `PriceAlert.calculate(sessions, thresholdPercent:)` — dernier prix vs scan précédent **dans le même magasin**, seuil mémorisé dans la box `settings` (`price_alert_threshold`).
+- Les sections d'UI nouvelles vont dans `lib/widgets/dashboard/` (pas dans `dashboard_screen.dart`).
+
+Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ; les écrans ne font qu'afficher.
+
+---
+
+## Découpage des écrans (v1.9.1 – v1.9.3)
+
+- Dashboard : `dashboard_screen.dart` calcule `DashboardStats` et empile les sections ; chaque section est un widget de `lib/widgets/dashboard/` qui ne reçoit que ses données et ses callbacks.
+- Fiche produit : `product_detail_screen.dart` ne fait que charger (`ProductAnalysisService.load`) et afficher la barre d'onglets ; les onglets sont dans `lib/widgets/product_detail/`. `ProductAnalysisService` accepte un `lookupBarcode` de remplacement pour les tests (pas de réseau).
+- Scanner : `scan_screen.dart` garde l'état (caméra, mode, magasin, image du ticket) et les flux métier (`_onBarcodeScanned`, `_processTicketImage`, hors-ligne) ; les composants d'interface sont dans `lib/widgets/scan/` et ne reçoivent que des valeurs et des callbacks.
+
+---
+
 ## Points techniques à anticiper
 
 1. **Identification unique des produits** :
@@ -466,7 +498,7 @@ Dashboard → Clique "Analyser un produit" → Liste produits → Sélectionne u
   - Transmission du callback au Dashboard
 
 - **`pubspec.yaml`** (MODIFIÉ) :
-  - Ajout de la dépendance `syncfusion_flutter_charts: ^20.4.48` pour les graphiques
+  - Ajout de la dépendance `syncfusion_flutter_charts` (aujourd'hui `^34.1.29`) pour les graphiques
 
 ### Prochaines étapes (6c. Intégration finale)
 
@@ -489,7 +521,7 @@ Dashboard → Clique "Analyser un produit" → Liste produits → Sélectionne u
 
 - [x] **6c.2 — Dépendances installées** :
   - `flutter pub get` exécuté avec succès
-  - `syncfusion_flutter_charts: ^20.4.48` installé
+  - `syncfusion_flutter_charts` (aujourd'hui `^34.1.29`) installé
 
 - [x] **6c.3 — Code nettoyé** :
   - Suppression des imports inutilisés

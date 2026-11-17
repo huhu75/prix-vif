@@ -38,8 +38,8 @@ class _MagicTitleState extends State<MagicTitle> with SingleTickerProviderStateM
     );
 
     _colorAnimation = ColorTween(
-      begin: AppTheme.primary.withOpacity(0.9),
-      end: AppTheme.accent.withOpacity(1.0),
+      begin: AppTheme.primary.withValues(alpha: 0.9),
+      end: AppTheme.accent.withValues(alpha: 1.0),
     ).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
@@ -84,16 +84,16 @@ class _MagicTitleState extends State<MagicTitle> with SingleTickerProviderStateM
                   foreground: Paint()
                     ..style = PaintingStyle.stroke
                     ..strokeWidth = 2.0
-                    ..color = _colorAnimation.value!.withOpacity(0.5 * _glowAnimation.value),
+                    ..color = _colorAnimation.value!.withValues(alpha: 0.5 * _glowAnimation.value),
                   letterSpacing: 1.0,
                   shadows: [
                     Shadow(
-                      color: _colorAnimation.value!.withOpacity(0.3),
+                      color: _colorAnimation.value!.withValues(alpha: 0.3),
                       blurRadius: _glowAnimation.value * 10,
                       offset: Offset.zero,
                     ),
                     Shadow(
-                      color: _colorAnimation.value!.withOpacity(0.2),
+                      color: _colorAnimation.value!.withValues(alpha: 0.2),
                       blurRadius: _glowAnimation.value * 15,
                       offset: Offset.zero,
                     ),
@@ -112,7 +112,7 @@ class _MagicTitleState extends State<MagicTitle> with SingleTickerProviderStateM
                   letterSpacing: 1.0,
                   shadows: [
                     Shadow(
-                      color: _colorAnimation.value!.withOpacity(0.2),
+                      color: _colorAnimation.value!.withValues(alpha: 0.2),
                       blurRadius: 5,
                       offset: Offset.zero,
                     ),
@@ -210,7 +210,7 @@ class _AITitleState extends State<AITitle> with SingleTickerProviderStateMixin {
                     letterSpacing: 1.0,
                     shadows: [
                       Shadow(
-                        color: AppTheme.primary.withOpacity(0.3),
+                        color: AppTheme.primary.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: Offset.zero,
                       ),
@@ -250,7 +250,7 @@ class ScannerTitle extends StatelessWidget {
               foreground: Paint()
                 ..style = PaintingStyle.stroke
                 ..strokeWidth = 3.0
-                ..color = AppTheme.primary.withOpacity(0.3),
+                ..color = AppTheme.primary.withValues(alpha: 0.3),
               letterSpacing: 1.0,
             ),
             overflow: TextOverflow.fade,
@@ -354,7 +354,7 @@ class NeonTitle extends StatelessWidget {
               foreground: Paint()
                 ..style = PaintingStyle.stroke
                 ..strokeWidth = 3.0
-                ..color = AppTheme.primary.withOpacity(0.4),
+                ..color = AppTheme.primary.withValues(alpha: 0.4),
               letterSpacing: 1.0,
               shadows: [
                 Shadow(

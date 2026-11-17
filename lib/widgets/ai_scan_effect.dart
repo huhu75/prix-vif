@@ -40,7 +40,7 @@ class _AIScanEffectState extends State<AIScanEffect> with SingleTickerProviderSt
         size: 4 + _random.nextDouble() * 6,
         speed: 0.003 + _random.nextDouble() * 0.007,
         direction: _random.nextDouble() * 2 * math.pi,
-        color: AppTheme.primary.withOpacity(0.6 + _random.nextDouble() * 0.4),
+        color: AppTheme.primary.withValues(alpha: 0.6 + _random.nextDouble() * 0.4),
       ));
     }
 
@@ -84,14 +84,14 @@ class _AIScanEffectState extends State<AIScanEffect> with SingleTickerProviderSt
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: AppTheme.primary.withOpacity(0.3),
+                    color: AppTheme.primary.withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
                 child: CustomPaint(
                   painter: _WavePainter(
                     progress: _controller.value,
-                    color: AppTheme.primary.withOpacity(0.2),
+                    color: AppTheme.primary.withValues(alpha: 0.2),
                   ),
                 ),
               ),
@@ -144,8 +144,8 @@ class _AIScanEffectState extends State<AIScanEffect> with SingleTickerProviderSt
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        AppTheme.primary.withOpacity(0.4),
-                        AppTheme.primary.withOpacity(0.05),
+                        AppTheme.primary.withValues(alpha: 0.4),
+                        AppTheme.primary.withValues(alpha: 0.05),
                       ],
                       stops: const [0.0, 0.7],
                     ),
@@ -203,7 +203,7 @@ class _WavePainter extends CustomPainter {
       canvas.drawPath(
         path,
         Paint()
-          ..color = color.withOpacity(0.15 - i * 0.05)
+          ..color = color.withValues(alpha: 0.15 - i * 0.05)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0 - i * 0.5,
       );
@@ -217,7 +217,7 @@ class _WavePainter extends CustomPainter {
         Offset(pointX, pointY),
         4 - i * 1.0,
         Paint()
-          ..color = color.withOpacity(0.8)
+          ..color = color.withValues(alpha: 0.8)
           ..style = PaintingStyle.fill,
       );
     }
@@ -316,7 +316,7 @@ class _AIBackgroundEffectState extends State<AIBackgroundEffect> with SingleTick
                     center: Alignment.center,
                     radius: 0.8,
                     colors: [
-                      AppTheme.primary.withOpacity(0.05 * _pulseAnimation.value),
+                      AppTheme.primary.withValues(alpha: 0.05 * _pulseAnimation.value),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.7],

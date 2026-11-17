@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -18,7 +17,12 @@ import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
 import '../widgets/magic_title.dart';
 import '../services/camera_service.dart';
-import '../widgets/price_card.dart';
+import '../widgets/scan/mistral_settings_dialog.dart';
+import '../widgets/scan/price_input_sheet.dart';
+import '../widgets/scan/scan_mode_selector.dart';
+import '../widgets/scan/store_selector.dart';
+import '../widgets/scan/ticket_confirmation_sheet.dart';
+import '../widgets/scan/ticket_scan_zone.dart';
 
 class ScanScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
@@ -84,6 +88,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     WidgetsBinding.instance.addObserver(this);
     _selectedStore = _stores.first;
     _storeController.text = _selectedStore;
+    _loadSavedStores();
     _buttonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -148,163 +153,42 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     }
   }
 
-  void _showSettingsDialog() {
-    final TextEditingController apiController = TextEditingController(
-      text: MistralService.apiKey ?? '',
-    );
-    bool obscureText = true;
+  /// Passe en mode code-barres (`true`) ou ticket (`false`)
+  void _setBarcodeMode(bool barcode) {
+    if (barcode == _isBarcodeMode) return;
+    setState(() {
+      _isBarcodeMode = barcode;
+      if (barcode) _ticketImage = null;
+    });
+    widget.onScanTypeChanged(barcode ? 'barcode' : 'ticket');
+    barcode ? _startScanner() : _stopScanner();
+  }
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              backgroundColor: AppTheme.surfaceDark,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Row(
-                children: [
-                  Icon(Icons.settings, color: AppTheme.primary),
-                  SizedBox(width: 10),
-                  Text(
-                    'Configuration API',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Clé API Mistral AI :',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: apiController,
-                    obscureText: obscureText,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Entrez votre clé API Mistral...',
-                      filled: true,
-                      fillColor: AppTheme.surfaceLight,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscureText ? Icons.visibility : Icons.visibility_off,
-                          color: AppTheme.textSecondary,
-                        ),
-                        onPressed: () {
-                          setStateDialog(() {
-                            obscureText = !obscureText;
-                          });
-                        },
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    apiController.text.trim().isEmpty
-                        ? '⚠️ Mode Démo actif (sans clé API). L\'analyse des tickets de caisse utilisera des articles factices.'
-                        : '✅ Clé API configurée. L\'analyse utilisera l\'API Mistral Vision réelle (modèle mistral-small-latest).',
-                    style: TextStyle(
-                      color: apiController.text.trim().isEmpty
-                          ? AppTheme.warning
-                          : AppTheme.accent,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text(
-                    'Annuler',
-                    style: TextStyle(color: AppTheme.textSecondary),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final key = apiController.text.trim();
-                    if (widget.repository != null) {
-                      await widget.repository!.saveMistralApiKey(key);
-                    }
-                    MistralService.apiKey = key.isNotEmpty ? key : null;
-                    if (mounted) {
-                      Navigator.of(dialogContext).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppTheme.primary,
-                          content: Text(
-                            key.isNotEmpty
-                                ? 'Clé API Mistral enregistrée avec succès'
-                                : 'Clé API Mistral supprimée (Mode Démo activé)',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                          ),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: AppTheme.backgroundDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Sauvegarder'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  /// Oublie la photo de ticket en cours
+  void _resetTicket() {
+    setState(() {
+      _ticketImage = null;
+      _originalSize = null;
+      _compressedSize = null;
+      _compressedImageBytes = null;
+      _compressionMessage = null;
+    });
   }
 
   // ==================== ÉTAPE 5C — MODE HORS-LIGNE ====================
 
   /// Stocke un scan pour traitement hors-ligne
-  Future<void> _storeForOfflineProcessing(String rawMistralJson, List<ExtractedArticle> articles) async {
+  /// L'extraction Mistral a déjà été persistée par [_processTicketImage] sous [scanId].
+  Future<void> _storeForOfflineProcessing(String scanId, String rawMistralJson) async {
     if (widget.repository == null || _compressedImageBytes == null) return;
-    
-    // Utiliser le même timestamp pour extractionId et scanId pour éviter les race conditions
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final extractionId = 'mistral_$timestamp';
-    final scanId = 'ticket_$timestamp';
-    
-    final mistralExtraction = StoredMistralExtraction(
-      id: extractionId,
-      scanId: scanId,
-      rawJson: rawMistralJson,
-      extractedAt: DateTime.now(),
-      imageBase64: base64Encode(_compressedImageBytes!),
-    );
-    
-    // Sauvegarder l'extraction Mistral
-    await widget.repository!.saveMistralExtraction(mistralExtraction);
-    
-    // Stocker dans les scans en attente
+
+    // Stocker dans les scans en attente (même scanId que l'extraction Mistral)
     await _connectivityService.storeForOfflineProcessing(
       scanId: scanId,
       imageBase64: base64Encode(_compressedImageBytes!),
       rawMistralJson: rawMistralJson,
       isMistralExtracted: true,
+      storeName: _selectedStore,
     );
     
     debugPrint('💾 [5c] Scan ticket stocké pour traitement hors-ligne');
@@ -379,6 +263,41 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  /// Restaure les magasins ajoutés et le dernier magasin choisi (persistés dans Hive)
+  Future<void> _loadSavedStores() async {
+    final repository = widget.repository;
+    if (repository == null) return;
+    await repository.ready;
+    if (!mounted) return;
+    final saved = repository.getSelectedStore();
+    setState(() {
+      repository.getCustomStores().forEach(_insertStore);
+      if (saved != null && _stores.contains(saved)) {
+        _selectedStore = saved;
+        _storeController.text = saved;
+      }
+    });
+  }
+
+  /// Insère un magasin dans la liste triée (sans doublon, casse ignorée)
+  void _insertStore(String store) {
+    if (_stores.any((s) => s.toLowerCase() == store.toLowerCase())) return;
+    final insertIndex = _stores.indexWhere((s) => s.toLowerCase().compareTo(store.toLowerCase()) > 0);
+    if (insertIndex == -1) {
+      _stores.add(store);
+    } else {
+      _stores.insert(insertIndex, store);
+    }
+  }
+
+  void _selectStore(String store) {
+    setState(() {
+      _selectedStore = store;
+      _storeController.text = store;
+    });
+    widget.repository?.saveSelectedStore(store);
+  }
+
   Future<void> _addStore() async {
     _newStoreController.clear();
     final result = await showDialog<String>(
@@ -397,11 +316,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -432,24 +351,15 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     if (result == null) return;
 
     final trimmed = result.trim();
-    final exists = _stores.any((s) => s.toLowerCase() == trimmed.toLowerCase());
-    if (exists) {
-      setState(() => _selectedStore = _stores.firstWhere(
-        (s) => s.toLowerCase() == trimmed.toLowerCase(),
-      ));
+    final existing = _stores.where((s) => s.toLowerCase() == trimmed.toLowerCase());
+    if (existing.isNotEmpty) {
+      _selectStore(existing.first);
       return;
     }
 
-    setState(() {
-      final insertIndex = _stores.indexWhere((s) => s.toLowerCase().compareTo(trimmed.toLowerCase()) > 0);
-      if (insertIndex == -1) {
-        _stores.add(trimmed);
-      } else {
-        _stores.insert(insertIndex, trimmed);
-      }
-      _selectedStore = trimmed;
-      _storeController.text = trimmed;
-    });
+    setState(() => _insertStore(trimmed));
+    _selectStore(trimmed);
+    await widget.repository?.addCustomStore(trimmed);
   }
 
   Future<void> _captureTicket(ImageSource source) async {
@@ -551,29 +461,46 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         await widget.repository!.saveMistralExtraction(mistralExtraction);
       }
 
-      // 2. Pour chaque article, rechercher sur Open Food Facts et récupérer le meilleur candidat + les autres candidats
-      final List<ExtractedTicketItem> confirmationItems = [];
-
       // Étape 5c — Vérifier la connectivité avant le matching OFF
       final connectivityResult = await Connectivity().checkConnectivity();
       final hasNetwork = connectivityResult.any((result) => result != ConnectivityResult.none);
-      
+
+      if (!hasNetwork) {
+        // Pas de réseau : mettre le ticket en attente UNE seule fois. Il sera rejoué
+        // automatiquement (matching OFF + sauvegarde) au retour de la connexion,
+        // donc pas de feuille de confirmation ici (elle créerait un doublon).
+        debugPrint('⚠️ [ScanScreen] Pas de réseau - stockage pour traitement hors-ligne');
+        await _storeForOfflineProcessing(
+          scanId ?? 'ticket_${DateTime.now().millisecondsSinceEpoch}',
+          extractionResult.rawJson,
+        );
+        if (mounted) {
+          // Vider la zone ticket pour éviter un second envoi du même ticket
+          setState(() {
+            _isLoadingProduct = false;
+            _ticketImage = null;
+            _originalSize = null;
+            _compressedSize = null;
+            _compressedImageBytes = null;
+            _compressionMessage = null;
+          });
+        }
+        return;
+      }
+
+      // 2. Pour chaque article, rechercher sur Open Food Facts et récupérer le meilleur candidat + les autres candidats
+      final List<ExtractedTicketItem> confirmationItems = [];
+
       for (var article in extractionResult.articles) {
         // Étape 4c — Stratégie deux passes : nom complet → nom nettoyé
         // Logique centralisée dans OpenFoodFactsService.searchByNameWithTwoPasses()
         List<OFFProduct> candidates = [];
-        
-        if (hasNetwork) {
-          try {
-            candidates = await _offService.searchByNameWithTwoPasses(article.name);
-          } catch (e) {
-            debugPrint('⚠️ [ScanScreen] Erreur matching OFF pour ${article.name}: $e');
-            // En cas d'erreur, on continue sans candidat
-          }
-        } else {
-          debugPrint('⚠️ [ScanScreen] Pas de réseau - stockage pour traitement hors-ligne');
-          // Stocker pour traitement ultérieur
-          await _storeForOfflineProcessing(extractionResult.rawJson, extractionResult.articles);
+
+        try {
+          candidates = await _offService.searchByNameWithTwoPasses(article.name);
+        } catch (e) {
+          debugPrint('⚠️ [ScanScreen] Erreur matching OFF pour ${article.name}: $e');
+          // En cas d'erreur, on continue sans candidat
         }
 
         confirmationItems.add(
@@ -634,6 +561,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             }
           }
 
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: AppTheme.secondary,
@@ -665,186 +593,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         });
       }
     }
-  }
-
-  Future<double?> _showPriceInputDialog(String barcode, OFFProduct? product) async {
-    final TextEditingController priceController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    return showModalBottomSheet<double>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          decoration: const BoxDecoration(
-            color: AppTheme.surfaceDark,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.textSecondary.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Saisir le prix',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                
-                // Card for product details if available, else fallback generic product layout
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceLight.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.05),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Product Image
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceDark,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: product?.imageUrl != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.network(
-                                  product!.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.shopping_bag_outlined,
-                                    color: AppTheme.textSecondary,
-                                    size: 24,
-                                  ),
-                                ),
-                              )
-                            : const Icon(
-                                Icons.shopping_bag_outlined,
-                                color: AppTheme.textSecondary,
-                                size: 24,
-                              ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product?.name ?? 'Produit inconnu',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              product?.brand ?? 'Marque inconnue',
-                              style: const TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 12,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (product?.nutriscore != null) ...[
-                              const SizedBox(height: 6),
-                              NutriScoreBadge(score: product!.nutriscore!),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 12),
-                Text(
-                  'Code-barres scanné : $barcode',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textMuted,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: priceController,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.accent,
-                  ),
-                  decoration: InputDecoration(
-                    suffixText: '€',
-                    suffixStyle: const TextStyle(fontSize: 24, color: AppTheme.accent),
-                    hintText: '0.00',
-                    hintStyle: TextStyle(color: AppTheme.textMuted.withOpacity(0.5)),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez saisir un prix';
-                    }
-                    final doubleValue = double.tryParse(value.replaceAll(',', '.'));
-                    if (doubleValue == null || doubleValue <= 0) {
-                      return 'Veuillez saisir un prix valide';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                MagicButton(
-                  text: 'VALIDER',
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      final price = double.parse(priceController.text.replaceAll(',', '.'));
-                      Navigator.of(context).pop(price);
-                    }
-                  },
-                  isPrimary: true,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _onBarcodeScanned(List<Barcode> barcodes) async {
@@ -883,8 +631,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         });
       }
       
+      // Écran fermé pendant la recherche : plus rien à demander
+      if (!mounted) return;
+
       // Demander le prix à l'utilisateur en passant le produit récupéré (ou null)
-      final double? price = await _showPriceInputDialog(barcodeValue, product);
+      final double? price = await showPriceInputSheet(context, barcodeValue, product);
       
       if (price != null) {
         // Traiter le code scanné
@@ -959,384 +710,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
 
 
-  Widget _buildModeSelector() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceDark,
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.2), width: 1),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  if (!_isBarcodeMode) {
-                    setState(() {
-                      _isBarcodeMode = true;
-                      _ticketImage = null;
-                    });
-                    widget.onScanTypeChanged('barcode');
-                    _startScanner();
-                  }
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _isBarcodeMode ? AppTheme.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'CODE-BARRES',
-                    style: TextStyle(
-                      color: _isBarcodeMode ? AppTheme.backgroundDark : AppTheme.textSecondary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  if (_isBarcodeMode) {
-                    setState(() {
-                      _isBarcodeMode = false;
-                    });
-                    widget.onScanTypeChanged('ticket');
-                    _stopScanner();
-                  }
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: !_isBarcodeMode ? AppTheme.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'TICKET',
-                    style: TextStyle(
-                      color: !_isBarcodeMode ? AppTheme.backgroundDark : AppTheme.textSecondary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTicketScanZone() {
-    return Stack(
-      children: [
-        Container(
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.1), width: 1.5),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: _ticketImage == null
-              ? _buildTicketPlaceholder()
-              : _buildTicketPreview(),
-        ),
-        // Bandeau d'erreur (visible aussi en mode ticket, pas seulement en mode code-barres)
-        if (_errorMessage != null)
-          Positioned(
-            top: 28,
-            left: 28,
-            right: 28,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        // Loader pendant l'analyse IA du ticket
-        if (_isLoadingProduct)
-          Positioned.fill(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 3.5),
-                    SizedBox(height: 16),
-                    Text(
-                      'Analyse du ticket par l\'IA...',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildTicketPlaceholder() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long,
-              size: 64,
-              color: AppTheme.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Photographier un ticket',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Prenez une photo de votre ticket pour extraire les prix des articles.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildCameraButton(
-                  icon: Icons.camera_alt,
-                  label: 'Appareil photo',
-                  onTap: () => _captureTicket(ImageSource.camera),
-                ),
-                const SizedBox(width: 12),
-                _buildCameraButton(
-                  icon: Icons.photo_library,
-                  label: 'Galerie',
-                  onTap: () => _captureTicket(ImageSource.gallery),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCameraButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        backgroundColor: AppTheme.surfaceLight,
-        foregroundColor: AppTheme.primary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppTheme.primary.withOpacity(0.3)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTicketPreview() {
-    final double? ratio = (_originalSize != null && _compressedSize != null)
-        ? (1.0 - (_compressedSize! / _originalSize!)) * 100
-        : null;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _compressedImageBytes != null
-              ? Image.memory(
-                  _compressedImageBytes!,
-                  fit: BoxFit.cover,
-                )
-              : Image.file(
-                  File(_ticketImage!.path),
-                  fit: BoxFit.cover,
-                ),
-        ),
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.85),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 20,
-          left: 20,
-          right: 20,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isCompressing)
-                const Center(
-                  child: Column(
-                    children: [
-                      CircularProgressIndicator(color: AppTheme.primary),
-                      SizedBox(height: 12),
-                      Text(
-                        'Compression en cours...',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                if (_compressedSize != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceDark.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.compress, color: AppTheme.accent, size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              'Optimisation Image (1024px, 80% JPEG)',
-                              style: TextStyle(
-                                color: AppTheme.accent,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (_compressionMessage != null && _compressionMessage!.isNotEmpty)
-                          Text(
-                            _compressionMessage!,
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        else ...[
-                          Text(
-                            'Taille originale : ${(_originalSize! / 1024).toStringAsFixed(1)} Ko',
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
-                          ),
-                          Text(
-                            'Taille compressée : ${(_compressedSize! / 1024).toStringAsFixed(1)} Ko',
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
-                          ),
-                          Text(
-                            'Gain : -${ratio!.toStringAsFixed(1)}% de bande passante',
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _ticketImage = null;
-                            _originalSize = null;
-                            _compressedSize = null;
-                            _compressedImageBytes = null;
-                            _compressionMessage = null;
-                          });
-                        },
-                        icon: const Icon(Icons.refresh, size: 18),
-                        label: const Text('Reprendre'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white54),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: MagicButton(
-                        text: _compressedSize != null ? 'ANALYSER (IA)' : 'OPTIMISER',
-                        icon: _compressedSize != null ? Icons.auto_awesome : Icons.bolt,
-                        onPressed: (_isCompressing || _isLoadingProduct)
-                            ? null
-                            : (_compressedSize != null ? _processTicketImage : _compressTicketImage),
-                        isLoading: _isCompressing || _isLoadingProduct,
-                        isPrimary: true,
-                        height: 48,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1346,7 +719,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: AppTheme.primary),
-            onPressed: _showSettingsDialog,
+            onPressed: () => showMistralSettingsDialog(context, repository: widget.repository),
             tooltip: 'Paramètres API',
           ),
           IconButton(
@@ -1374,77 +747,15 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       body: Column(
         children: [
           // Sélecteur de magasin
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Magasin',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownMenu<String>(
-                        initialSelection: _selectedStore,
-                        onSelected: (String? value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedStore = value;
-                              _storeController.text = value;
-                            });
-                          }
-                        },
-                        dropdownMenuEntries: _stores
-                            .map<DropdownMenuEntry<String>>((String value) {
-                          return DropdownMenuEntry<String>(
-                            value: value,
-                            label: value,
-                          );
-                        }).toList(),
-                        width: double.infinity,
-                        inputDecorationTheme: InputDecorationTheme(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          constraints: const BoxConstraints(minHeight: 48),
-                          isDense: true,
-                          filled: true,
-                          fillColor: AppTheme.surfaceLight,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-                          ),
-                        ),
-                        textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    _AddStoreButton(
-                      onAdd: _addStore,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          StoreSelector(
+            stores: _stores,
+            selectedStore: _selectedStore,
+            onSelected: _selectStore,
+            onAdd: _addStore,
           ),
           
           // Sélecteur de mode de scan
-          _buildModeSelector(),
+          ScanModeSelector(isBarcodeMode: _isBarcodeMode, onChanged: _setBarcodeMode),
           
           // Zone de scan (Code-barres ou Ticket)
           Expanded(
@@ -1490,7 +801,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                       // Loader de chargement API ("Recherche du produit...")
                       if (_isLoadingProduct)
                         Container(
-                          color: Colors.black.withOpacity(0.75),
+                          color: Colors.black.withValues(alpha: 0.75),
                           child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1520,7 +831,20 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                         ),
                     ],
                   )
-                : _buildTicketScanZone(),
+                : TicketScanZone(
+                    ticketImage: _ticketImage,
+                    originalSize: _originalSize,
+                    compressedSize: _compressedSize,
+                    compressedImageBytes: _compressedImageBytes,
+                    compressionMessage: _compressionMessage,
+                    isCompressing: _isCompressing,
+                    isProcessing: _isLoadingProduct,
+                    errorMessage: _errorMessage,
+                    onCapture: _captureTicket,
+                    onCompress: _compressTicketImage,
+                    onAnalyse: _processTicketImage,
+                    onReset: _resetTicket,
+                  ),
           ),
           
           // Bouton scanner magique (Uniquement en mode code-barres)
@@ -1542,571 +866,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                 isPrimary: true,
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AddStoreButton extends StatefulWidget {
-  final VoidCallback onAdd;
-  const _AddStoreButton({required this.onAdd});
-
-  @override
-  State<_AddStoreButton> createState() => _AddStoreButtonState();
-}
-
-class _AddStoreButtonState extends State<_AddStoreButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onAdd();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          decoration: BoxDecoration(
-            color: AppTheme.primary,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withOpacity(0.25),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Icon(Icons.add, color: Colors.white, size: 24),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Modèle pour confirmation du ticket
-class ExtractedTicketItem {
-  final String rawName;
-  final double price;
-  final double quantity;
-  OFFProduct? matchedProduct;
-  List<OFFProduct> candidates;
-  bool isSelected;
-
-  ExtractedTicketItem({
-    required this.rawName,
-    required this.price,
-    required this.quantity,
-    this.matchedProduct,
-    required this.candidates,
-    this.isSelected = true,
-  });
-}
-
-// Bottom Sheet de confirmation pour les articles du ticket
-class TicketConfirmationSheet extends StatefulWidget {
-  final List<ExtractedTicketItem> items;
-  final String storeName;
-  final OpenFoodFactsService offService;
-
-  const TicketConfirmationSheet({
-    super.key,
-    required this.items,
-    required this.storeName,
-    required this.offService,
-  });
-
-  @override
-  State<TicketConfirmationSheet> createState() => _TicketConfirmationSheetState();
-}
-
-class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
-  late List<ExtractedTicketItem> _items;
-
-  @override
-  void initState() {
-    super.initState();
-    _items = widget.items;
-  }
-
-  double get _totalAmount => _items
-      .where((item) => item.isSelected)
-      .fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-
-  int get _selectedCount => _items.where((item) => item.isSelected).length;
-
-  Color _getNutriScoreColor(String grade) {
-    switch (grade.trim().toLowerCase()) {
-      case 'a':
-        return const Color(0xFF038141);
-      case 'b':
-        return const Color(0xFF85BB2F);
-      case 'c':
-        return const Color(0xFFFECB02);
-      case 'd':
-        return const Color(0xFFEE8100);
-      case 'e':
-        return const Color(0xFFE63E11);
-      default:
-        return AppTheme.textMuted;
-    }
-  }
-
-  Future<void> _showAlternativeProductsDialog(ExtractedTicketItem item) async {
-    final searchController = TextEditingController(text: item.rawName);
-    List<OFFProduct> searchResults = List.from(item.candidates);
-    bool isSearching = false;
-
-    await showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: AppTheme.surfaceDark,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                'Associer un produit',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: MediaQuery.of(context).size.height * 0.5,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: searchController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Rechercher sur Open Food Facts...',
-                        suffixIcon: isSearching
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
-                              )
-                            : IconButton(
-                                icon: const Icon(Icons.search, color: AppTheme.primary),
-                                onPressed: () async {
-                                  setDialogState(() {
-                                    isSearching = true;
-                                  });
-                                  try {
-                                    final results = await widget.offService.searchByName(searchController.text);
-                                    setDialogState(() {
-                                      searchResults = results;
-                                      isSearching = false;
-                                    });
-                                  } catch (e) {
-                                    setDialogState(() {
-                                      isSearching = false;
-                                    });
-                                  }
-                                },
-                              ),
-                      ),
-                      onSubmitted: (_) async {
-                        setDialogState(() {
-                          isSearching = true;
-                        });
-                        try {
-                          final results = await widget.offService.searchByName(searchController.text);
-                          setDialogState(() {
-                            searchResults = results;
-                            isSearching = false;
-                          });
-                        } catch (e) {
-                          setDialogState(() {
-                            isSearching = false;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: searchResults.isEmpty
-                          ? Center(
-                              child: Text(
-                                isSearching ? 'Recherche en cours...' : 'Aucun produit trouvé.',
-                                style: const TextStyle(color: AppTheme.textSecondary),
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: searchResults.length,
-                              itemBuilder: (context, idx) {
-                                final prod = searchResults[idx];
-                                return ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                                  leading: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surfaceLight,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: prod.imageUrl != null
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(6),
-                                            child: Image.network(
-                                              prod.imageUrl!,
-                                              fit: BoxFit.cover,
-                                            ),
-                                          )
-                                        : const Icon(Icons.shopping_bag_outlined, color: AppTheme.textSecondary),
-                                  ),
-                                  title: Text(
-                                    prod.name,
-                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    prod.brand,
-                                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  trailing: prod.nutriscore != null
-                                      ? Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: _getNutriScoreColor(prod.nutriscore!),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            prod.nutriscore!.toUpperCase(),
-                                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                          ),
-                                        )
-                                      : null,
-                                  onTap: () {
-                                    setState(() {
-                                      item.matchedProduct = prod;
-                                    });
-                                    Navigator.of(dialogContext).pop();
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Fermer', style: TextStyle(color: AppTheme.textSecondary)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // En-tête
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.textSecondary.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Validation du Ticket',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppTheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Vérifiez la correspondance des produits pour ${widget.storeName}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          
-          // Liste des articles
-          Expanded(
-            child: _items.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucun article extrait.',
-                      style: TextStyle(color: AppTheme.textSecondary),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: item.isSelected 
-                              ? AppTheme.surfaceLight.withOpacity(0.3)
-                              : AppTheme.surfaceDark.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: item.isSelected 
-                                ? AppTheme.primary.withOpacity(0.2)
-                                : Colors.white.withOpacity(0.05),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Checkbox d'importation
-                            Checkbox(
-                              value: item.isSelected,
-                              activeColor: AppTheme.primary,
-                              onChanged: (val) {
-                                setState(() {
-                                  item.isSelected = val ?? false;
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 4),
-                            
-                            // Infos du produit matché ou brut
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Nom brut du ticket
-                                  Text(
-                                    item.rawName,
-                                    style: TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 11,
-                                      fontStyle: FontStyle.italic,
-                                      decoration: item.isSelected ? null : TextDecoration.lineThrough,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  
-                                  // Fiche Produit matchée
-                                  if (item.matchedProduct != null)
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 45,
-                                          height: 45,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.surfaceDark,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: item.matchedProduct!.imageUrl != null
-                                              ? ClipRRect(
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  child: Image.network(
-                                                    item.matchedProduct!.imageUrl!,
-                                                    fit: BoxFit.cover,
-                                                  ),
-                                                )
-                                              : const Icon(Icons.shopping_bag_outlined, color: AppTheme.textSecondary, size: 20),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                item.matchedProduct!.name,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                item.matchedProduct!.brand,
-                                                style: const TextStyle(
-                                                  color: AppTheme.textSecondary,
-                                                  fontSize: 11,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              if (item.matchedProduct!.nutriscore != null) ...[
-                                                const SizedBox(height: 4),
-                                                NutriScoreBadge(score: item.matchedProduct!.nutriscore!),
-                                              ]
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  else
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 45,
-                                          height: 45,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.surfaceDark,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(Icons.warning_amber_rounded, color: AppTheme.warning, size: 22),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        const Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Aucun produit associé',
-                                                style: TextStyle(
-                                                  color: AppTheme.warning,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                              Text(
-                                                'Le produit sera importé sans fiche OFF',
-                                                style: TextStyle(
-                                                  color: AppTheme.textMuted,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  const SizedBox(height: 8),
-                                  
-                                  // Lien de modification de correspondance
-                                  GestureDetector(
-                                    onTap: () => _showAlternativeProductsDialog(item),
-                                    child: Text(
-                                      item.matchedProduct != null ? 'Modifier la correspondance' : 'Associer un produit',
-                                      style: const TextStyle(
-                                        color: AppTheme.primary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Prix & Quantité
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${(item.price * item.quantity).toStringAsFixed(2)} €',
-                                    style: const TextStyle(
-                                      color: AppTheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${item.quantity.toInt()} x ${item.price.toStringAsFixed(2)} €',
-                                    style: const TextStyle(
-                                      color: AppTheme.textMuted,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Bouton d'importation
-          MagicButton(
-            text: 'IMPORTER $_selectedCount ARTICLES (${_totalAmount.toStringAsFixed(2)} €)',
-            onPressed: _selectedCount == 0
-                ? null 
-                : () {
-                    final List<ScannedItem> importedItems = [];
-                    for (var item in _items) {
-                      if (item.isSelected) {
-                        importedItems.add(
-                          ScannedItem(
-                            id: '${DateTime.now().millisecondsSinceEpoch}_${item.rawName.hashCode}',
-                            name: item.matchedProduct?.name ?? item.rawName,
-                            brand: item.matchedProduct?.brand ?? 'Marque inconnue',
-                            price: item.price,
-                            quantity: item.matchedProduct?.quantity ?? item.quantity,
-                            unit: item.matchedProduct?.unit ?? 'unité',
-                            scanDate: DateTime.now(),
-                            barcode: item.matchedProduct?.barcode,
-                            imageUrl: item.matchedProduct?.imageUrl ?? 'https://via.placeholder.com/150x150/CCCCCC/000000?text=📦',
-                            storeName: widget.storeName,
-                            nutriscore: item.matchedProduct?.nutriscore,
-                            categories: item.matchedProduct?.categories,
-                          ),
-                        );
-                      }
-                    }
-                    Navigator.of(context).pop(importedItems);
-                  },
-            isPrimary: true,
-          ),
         ],
       ),
     );

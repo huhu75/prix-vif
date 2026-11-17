@@ -70,7 +70,7 @@ class PriceCard extends StatelessWidget {
                       color: AppTheme.surfaceDark,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         width: 1,
                       ),
                     ),
@@ -182,6 +182,18 @@ class PriceCard extends StatelessWidget {
                           fontSize: 11,
                         ),
                       ),
+                      if (item.unitPrice != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            item.unitPrice!.format(),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.accent,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -334,7 +346,7 @@ class NutriScoreBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: badgeColor.withOpacity(0.2),
+            color: badgeColor.withValues(alpha: 0.2),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),

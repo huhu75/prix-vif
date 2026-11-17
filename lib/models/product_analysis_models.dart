@@ -3,6 +3,7 @@
 // ===================================================
 
 import 'package:flutter/material.dart';
+import '../utils/unit_price.dart';
 
 /// Point de prix pour l'historique d'un produit dans un magasin
 class PricePoint {
@@ -227,6 +228,8 @@ class SimilarProductInfo {
   final String? barcode;
   final String? storeName;
   final double price;
+  final double? quantity;
+  final String? unit;
   final DateTime scanDate;
   final String? nutriscore;
   final String? imageUrl;
@@ -239,11 +242,16 @@ class SimilarProductInfo {
     this.barcode,
     this.storeName,
     required this.price,
+    this.quantity,
+    this.unit,
     required this.scanDate,
     this.nutriscore,
     this.imageUrl,
     this.categories,
   });
+
+  /// Prix au kg / L / unité, `null` si la contenance est inconnue
+  UnitPrice? get unitPrice => UnitPrice.of(price, quantity, unit);
 
   @override
   String toString() => 'SimilarProductInfo(name: $productName, price: $price, store: $storeName)';
@@ -261,24 +269,33 @@ class SimilarProductsComparison {
     required this.similarProducts,
   });
 
-  /// Récupère le produit le moins cher
-  SimilarProductInfo? get cheapestProduct {
-    if (similarProducts.isEmpty) return null;
-    
-    SimilarProductInfo? cheapest;
+  /// Unité de comparaison : la plus fréquente parmi les produits de contenance connue
+  PriceUnit? get comparisonUnit {
+    final counts = <PriceUnit, int>{};
     for (final product in similarProducts) {
-      if (cheapest == null || product.price < cheapest.price) {
-        cheapest = product;
-      }
+      final unit = product.unitPrice?.unit;
+      if (unit != null) counts[unit] = (counts[unit] ?? 0) + 1;
     }
-    return cheapest;
+    if (counts.isEmpty) return null;
+    return counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
   }
 
-  /// Récupère les produits triés par prix croissant
+  /// Récupère le produit le moins cher (au kg / L / unité quand c'est possible)
+  SimilarProductInfo? get cheapestProduct {
+    final sorted = productsSortedByPrice;
+    return sorted.isEmpty ? null : sorted.first;
+  }
+
+  /// Produits triés du moins cher au plus cher : d'abord ceux comparables au
+  /// kg / L / unité (par prix normalisé), puis les autres par prix à l'article
   List<SimilarProductInfo> get productsSortedByPrice {
-    final list = List<SimilarProductInfo>.from(similarProducts)
+    final unit = comparisonUnit;
+    bool comparable(SimilarProductInfo p) => unit != null && p.unitPrice?.unit == unit;
+    final byUnit = similarProducts.where(comparable).toList()
+      ..sort((a, b) => a.unitPrice!.value.compareTo(b.unitPrice!.value));
+    final others = similarProducts.where((p) => !comparable(p)).toList()
       ..sort((a, b) => a.price.compareTo(b.price));
-    return list;
+    return [...byUnit, ...others];
   }
 
   @override
