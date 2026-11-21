@@ -123,6 +123,28 @@ Future<double?> showPriceInputSheet(BuildContext context, String barcode, OFFPro
                           if (product?.nutriscore != null) ...[
                             const SizedBox(height: 6),
                             NutriScoreBadge(score: product!.nutriscore!),
+                          ] else if (product != null &&
+                              product.source != 'Open Food Facts' &&
+                              product.source != 'Cache') ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: AppTheme.accent.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                product.source,
+                                style: const TextStyle(
+                                  color: AppTheme.accent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ],
                         ],
                       ),

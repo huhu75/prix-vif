@@ -3,7 +3,20 @@ import 'package:http/http.dart' as http;
 import '../models/hive_models.dart';
 import 'scan_repository.dart';
 
-/// Modèle interne pour un produit récupéré d'Open Food Facts
+/// Configuration d'un fournisseur Open Facts (Open Food Facts, Open Products Facts, etc.)
+class OFFProviderConfig {
+  final String name;
+  final String productBaseUrl;
+  final String searchBaseUrl;
+
+  const OFFProviderConfig({
+    required this.name,
+    required this.productBaseUrl,
+    required this.searchBaseUrl,
+  });
+}
+
+/// Modèle interne pour un produit récupéré d'Open Food / Products / Beauty Facts
 class OFFProduct {
   final String barcode;
   final String name;
@@ -19,6 +32,7 @@ class OFFProduct {
   final List<String> allergens;
   final Map<String, String> nutrientLevels;
   final Map<String, double> nutriments;
+  final String source;
 
   OFFProduct({
     required this.barcode,
@@ -35,13 +49,20 @@ class OFFProduct {
     required this.allergens,
     required this.nutrientLevels,
     required this.nutriments,
+    this.source = 'Open Food Facts',
   });
 
-  factory OFFProduct.fromJson(String barcode, Map<String, dynamic> json) {
-    final p = json['product'] as Map<String, dynamic>? ?? {};
+  factory OFFProduct.fromJson(String barcode, Map<String, dynamic> json, {String source = 'Open Food Facts'}) {
+    final p = json['product'] as Map<String, dynamic>? ?? json;
+
+    // Barcode fallback si absent
+    String resolvedBarcode = barcode.trim();
+    if (resolvedBarcode.isEmpty) {
+      resolvedBarcode = (p['code'] ?? p['_id'] ?? '').toString().trim();
+    }
 
     // Essayer de trouver le nom du produit (français d'abord, puis générique)
-    String name = p['product_name_fr'] ?? p['product_name'] ?? 'Produit inconnu';
+    String name = p['product_name_fr'] ?? p['product_name'] ?? p['product_name_en'] ?? p['name'] ?? 'Produit inconnu';
     name = name.trim();
     if (name.isEmpty) name = 'Produit inconnu';
 
@@ -143,7 +164,7 @@ class OFFProduct {
     }
 
     return OFFProduct(
-      barcode: barcode,
+      barcode: resolvedBarcode,
       name: name,
       brand: brand,
       nutriscore: nutriscore,
@@ -157,17 +178,45 @@ class OFFProduct {
       allergens: allergens,
       nutrientLevels: nutrientLevels,
       nutriments: nutriments,
+      source: source,
     );
   }
 }
 
-/// Service d'interaction avec l'API Open Food Facts
+/// Service d'interaction avec les APIs Open Food Facts et fallback
+/// (Open Products Facts et Open Beauty Facts pour les produits non-alimentaires).
 /// Supporte le cache via ScanRepository (étape 3c)
 class OpenFoodFactsService {
-  static const String _baseUrl = 'https://world.openfoodfacts.org/api/v2/product';
+  /// Fournisseurs interrogés dans l'ordre de priorité (fallback automatique)
+  static const List<OFFProviderConfig> defaultProviders = [
+    OFFProviderConfig(
+      name: 'Open Food Facts',
+      productBaseUrl: 'https://world.openfoodfacts.org/api/v2/product',
+      searchBaseUrl: 'https://world.openfoodfacts.org/cgi/search.pl',
+    ),
+    OFFProviderConfig(
+      name: 'Open Products Facts',
+      productBaseUrl: 'https://world.openproductsfacts.org/api/v2/product',
+      searchBaseUrl: 'https://world.openproductsfacts.org/cgi/search.pl',
+    ),
+    OFFProviderConfig(
+      name: 'Open Beauty Facts',
+      productBaseUrl: 'https://world.openbeautyfacts.org/api/v2/product',
+      searchBaseUrl: 'https://world.openbeautyfacts.org/cgi/search.pl',
+    ),
+  ];
+
+  final http.Client _client;
+  final List<OFFProviderConfig> providers;
 
   /// Repository optionnel pour le cache produits
   ScanRepository? _repository;
+
+  OpenFoodFactsService({
+    http.Client? httpClient,
+    List<OFFProviderConfig>? providers,
+  })  : _client = httpClient ?? http.Client(),
+        providers = providers ?? defaultProviders;
 
   /// Injecte le repository pour activer le cache OFF
   void setRepository(ScanRepository repository) {
@@ -175,7 +224,9 @@ class OpenFoodFactsService {
   }
 
   /// Recherche un produit par son code-barres (EAN)
-  /// Vérifie le cache d'abord si un repository est disponible
+  /// Vérifie le cache d'abord si un repository est disponible.
+  /// Si Open Food Facts ne trouve rien (status == 0), bascule automatiquement
+  /// sur Open Products Facts puis Open Beauty Facts.
   /// Retourne un objet [OFFProduct] si trouvé, sinon `null`
   Future<OFFProduct?> lookupBarcode(String barcode) async {
     final cleanBarcode = barcode.trim();
@@ -199,60 +250,64 @@ class OpenFoodFactsService {
           allergens: cached.allergens ?? [],
           nutrientLevels: cached.nutrientLevels ?? {},
           nutriments: cached.nutriments ?? {},
+          source: 'Cache',
         );
       }
     }
 
-    try {
-      final url = Uri.parse('$_baseUrl/$cleanBarcode');
-      final response = await http.get(
-        url,
-        headers: {
-          'User-Agent': 'PrixVif - Flutter Scan App - Version 1.0',
-        },
-      ).timeout(const Duration(seconds: 8));
+    // Essayer successivement chaque fournisseur configuré (OFF -> OPF -> OBF)
+    for (final provider in providers) {
+      try {
+        final url = Uri.parse('${provider.productBaseUrl}/$cleanBarcode');
+        final response = await _client.get(
+          url,
+          headers: {
+            'User-Agent': 'PrixVif - Flutter Scan App - Version 1.0',
+          },
+        ).timeout(const Duration(seconds: 8));
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        final status = data['status'];
-        
-        // status = 1 signifie produit trouvé dans l'API OFF
-        if (status == 1) {
-          final product = OFFProduct.fromJson(cleanBarcode, data);
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          final status = data['status'];
 
-          // Mettre en cache le produit trouvé
-          if (_repository != null) {
-            await _repository!.cacheProduct(CachedProduct(
-              ean: product.barcode,
-              productName: product.name,
-              brands: product.brand,
-              nutriscoreGrade: product.nutriscore,
-              imageUrl: product.imageUrl,
-              categories: product.categories,
-              cachedAt: DateTime.now(),
-              ecoscoreGrade: product.ecoscore,
-              novaGroup: product.novaGroup,
-              ingredients: product.ingredients,
-              allergens: product.allergens,
-              nutrientLevels: product.nutrientLevels,
-              nutriments: product.nutriments,
-            ));
-            print('Cache STORE pour EAN: $cleanBarcode');
+          // status = 1 signifie produit trouvé
+          if (status == 1 && data['product'] != null) {
+            final product = OFFProduct.fromJson(cleanBarcode, data, source: provider.name);
+
+            // Mettre en cache le produit trouvé
+            if (_repository != null) {
+              await _repository!.cacheProduct(CachedProduct(
+                ean: product.barcode,
+                productName: product.name,
+                brands: product.brand,
+                nutriscoreGrade: product.nutriscore,
+                imageUrl: product.imageUrl,
+                categories: product.categories,
+                cachedAt: DateTime.now(),
+                ecoscoreGrade: product.ecoscore,
+                novaGroup: product.novaGroup,
+                ingredients: product.ingredients,
+                allergens: product.allergens,
+                nutrientLevels: product.nutrientLevels,
+                nutriments: product.nutriments,
+              ));
+              print('Cache STORE pour EAN: $cleanBarcode (source: ${provider.name})');
+            }
+
+            return product;
           }
-
-          return product;
         }
+      } catch (e) {
+        // En cas d'erreur réseau ou timeout avec ce fournisseur, essayer le suivant
+        print('Erreur ${provider.name} lookup API: $e');
       }
-      return null;
-    } catch (e) {
-      // En cas d'erreur réseau, de timeout ou de décodage
-      print('Erreur Open Food Facts API: $e');
-      return null;
     }
+
+    return null;
   }
 
-  /// Recherche des produits par nom sur Open Food Facts
-  /// Vérifie d'abord le cache si un repository est disponible
+  /// Recherche des produits par nom (avec fallback sur Open Products Facts et Open Beauty Facts)
+  /// Vérifie d'abord le cache si un repository est disponible.
   /// Retourne une liste de [OFFProduct]
   Future<List<OFFProduct>> searchByName(String name) async {
     final cleanName = name.trim();
@@ -278,63 +333,70 @@ class OpenFoodFactsService {
             allergens: cached.allergens ?? [],
             nutrientLevels: cached.nutrientLevels ?? {},
             nutriments: cached.nutriments ?? {},
+            source: 'Cache',
           )
         ];
       }
     }
 
-    try {
-      final url = Uri.parse(
-          'https://world.openfoodfacts.org/cgi/search.pl?search_terms=${Uri.encodeComponent(cleanName)}&json=1&page_size=10');
-      final response = await http.get(
-        url,
-        headers: {
-          'User-Agent': 'PrixVif - Flutter Scan App - Version 1.0',
-        },
-      ).timeout(const Duration(seconds: 8));
+    // Essayer successivement chaque fournisseur configuré (OFF -> OPF -> OBF)
+    for (final provider in providers) {
+      try {
+        final url = Uri.parse(
+          '${provider.searchBaseUrl}?search_terms=${Uri.encodeComponent(cleanName)}&json=1&page_size=10',
+        );
+        final response = await _client.get(
+          url,
+          headers: {
+            'User-Agent': 'PrixVif - Flutter Scan App - Version 1.0',
+          },
+        ).timeout(const Duration(seconds: 8));
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        final List<dynamic>? productsJson = data['products'];
-        if (productsJson != null && productsJson.isNotEmpty) {
-          final List<OFFProduct> products = [];
-          for (var p in productsJson) {
-            final barcode = p['code']?.toString() ?? '';
-            if (barcode.isNotEmpty) {
-              products.add(OFFProduct.fromJson(barcode, {'product': p}));
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          final List<dynamic>? productsJson = data['products'];
+          if (productsJson != null && productsJson.isNotEmpty) {
+            final List<OFFProduct> products = [];
+            for (var p in productsJson) {
+              final barcode = (p['code'] ?? p['_id'])?.toString() ?? '';
+              if (barcode.isNotEmpty) {
+                products.add(OFFProduct.fromJson(barcode, {'product': p}, source: provider.name));
+              }
+            }
+
+            if (products.isNotEmpty) {
+              // Étape 4c — Mettre en cache le premier résultat sous la clé 'name:...'
+              if (_repository != null) {
+                final best = products.first;
+                final cacheKey = 'name:${cleanName.toLowerCase()}';
+                await _repository!.cacheProduct(CachedProduct(
+                  ean: cacheKey,
+                  productName: best.name,
+                  brands: best.brand,
+                  nutriscoreGrade: best.nutriscore,
+                  imageUrl: best.imageUrl,
+                  categories: best.categories,
+                  cachedAt: DateTime.now(),
+                  ecoscoreGrade: best.ecoscore,
+                  novaGroup: best.novaGroup,
+                  ingredients: best.ingredients,
+                  allergens: best.allergens,
+                  nutrientLevels: best.nutrientLevels,
+                  nutriments: best.nutriments,
+                ));
+                print('Cache STORE (nom) pour: $cleanName → ${best.name} (source: ${provider.name})');
+              }
+
+              return products;
             }
           }
-
-          // Étape 4c — Mettre en cache le premier résultat sous la clé 'name:...'
-          if (products.isNotEmpty && _repository != null) {
-            final best = products.first;
-            final cacheKey = 'name:${cleanName.toLowerCase()}';
-            await _repository!.cacheProduct(CachedProduct(
-              ean: cacheKey,
-              productName: best.name,
-              brands: best.brand,
-              nutriscoreGrade: best.nutriscore,
-              imageUrl: best.imageUrl,
-              categories: best.categories,
-              cachedAt: DateTime.now(),
-              ecoscoreGrade: best.ecoscore,
-              novaGroup: best.novaGroup,
-              ingredients: best.ingredients,
-              allergens: best.allergens,
-              nutrientLevels: best.nutrientLevels,
-              nutriments: best.nutriments,
-            ));
-            print('Cache STORE (nom) pour: $cleanName → ${best.name}');
-          }
-
-          return products;
         }
+      } catch (e) {
+        print('Erreur ${provider.name} search API: $e');
       }
-      return [];
-    } catch (e) {
-      print('Erreur Open Food Facts search API: $e');
-      return [];
     }
+
+    return [];
   }
 
   /// Stratégie de recherche en deux passes :

@@ -173,12 +173,35 @@ class _OffMatchSheetState extends State<_OffMatchSheet> {
           ),
           title: Text(product.name, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
           subtitle: Text(details, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-          trailing: product.nutriscore != null
-              ? Text(
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (product.source != 'Open Food Facts' && product.source != 'Cache')
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      product.source,
+                      style: const TextStyle(
+                        color: AppTheme.accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              if (product.nutriscore != null)
+                Text(
                   product.nutriscore!.toUpperCase(),
                   style: const TextStyle(color: AppTheme.accent, fontWeight: FontWeight.w800),
-                )
-              : null,
+                ),
+            ],
+          ),
           onTap: () => Navigator.of(context).pop(product),
         );
       },

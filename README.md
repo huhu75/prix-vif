@@ -8,6 +8,15 @@
 
 ## 📋 Historique des versions
 
+### v1.11.0 — 2026-11-21 — Fallback automatique Open Products Facts et Open Beauty Facts
+
+- **Ajouté** : support transparent des produits non alimentaires (papeterie, entretien, bricolage, hygiène, cosmétiques) via un fallback automatique multi-fournisseurs : si Open Food Facts ne détecte pas le produit (`status == 0`), l'application interroge automatiquement **Open Products Facts** (`world.openproductsfacts.org`), puis **Open Beauty Facts** (`world.openbeautyfacts.org`)
+- **Ajouté** : architecture modulaire des fournisseurs `OFFProviderConfig` dans `OpenFoodFactsService`, supportant l'injection de client HTTP (`http.Client`) et de configuration de fournisseurs pour des tests 100% isolés et sans réseau
+- **Ajouté** : fallback automatique à la fois sur la recherche par code-barres (`lookupBarcode`), la recherche textuelle (`searchByName` et `searchByNameWithTwoPasses`) et la recherche combinée (`searchProducts`)
+- **Ajouté** : affichage de la source de données (badge `Open Products Facts` / `Open Beauty Facts`) dans la feuille de saisie du prix (`showPriceInputSheet`) et la feuille de correction de produit (`showOffMatchSheet`)
+- **Ajouté** : mise en cache locale transparente dans Hive (`produits`) quelle que soit la source du produit (OFF, OPF ou OBF)
+- **Ajouté** : suite de tests unitaires dédiée `test/services/open_food_facts_service_test.dart` (lookup barcode avec bascule OFF -> OPF -> OBF, mise en cache, recherche textuelle deux passes et détection barcode/texte)
+
 ### v1.10.0 — 2026-11-17 — Supprimer ou corriger un produit depuis sa fiche
 
 - **Ajouté** : sur la fiche d'un produit (Dashboard > Analyser un produit > produit), bouton **Supprimer** (onglet Fiche et menu ⋮) : tous les scans du produit sont retirés après confirmation, les sessions vidées disparaissent, la liste des produits et le Dashboard se mettent à jour
@@ -536,7 +545,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 17 Novembre 2026 (v1.10.0 — voir Historique des versions)*
+*Dernière mise à jour : 21 Novembre 2026 (v1.11.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
+*Statut : ✅ Fallback Open Products / Beauty Facts, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
