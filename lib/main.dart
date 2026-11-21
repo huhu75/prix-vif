@@ -131,6 +131,17 @@ class _MainScreenState extends State<MainScreen> {
     await _reloadSessions();
   }
 
+  Future<void> _handleItemUpdated(ScannedItem updated) async {
+    setState(() {
+      final index = _currentScannedItems.indexWhere((i) => i.id == updated.id);
+      if (index >= 0) {
+        _currentScannedItems[index] = updated;
+      }
+    });
+    await _repository.updateArticle(updated);
+    await _reloadSessions();
+  }
+
   Future<void> _clearAllItems() async {
     final ids = _currentScannedItems.map((i) => i.id).toList();
     setState(() {
@@ -302,6 +313,7 @@ class _MainScreenState extends State<MainScreen> {
         onItemRemoved: _handleItemRemoved,
         onClearAll: _clearAllItems,
         onSaveSession: _saveSession,
+        onItemUpdated: _handleItemUpdated,
       ),
       // Page Tableau de bord (Étape 5b)
       DashboardScreen(

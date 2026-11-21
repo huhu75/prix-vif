@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models.dart';
+import '../widgets/article_edit_dialog.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/magic_title.dart';
@@ -11,6 +12,7 @@ class ResultsScreen extends StatefulWidget {
   final Function(ScannedItem) onItemRemoved;
   final Future<void> Function() onClearAll;
   final VoidCallback onSaveSession;
+  final Function(ScannedItem)? onItemUpdated;
 
   const ResultsScreen({
     super.key,
@@ -19,6 +21,7 @@ class ResultsScreen extends StatefulWidget {
     required this.onItemRemoved,
     required this.onClearAll,
     required this.onSaveSession,
+    this.onItemUpdated,
   });
 
   @override
@@ -62,6 +65,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
       }
     }
     _clearSelection();
+  }
+
+  Future<void> _editItem(ScannedItem item) async {
+    final result = await showArticleEditDialog(context, item);
+    if (result == null || !mounted) return;
+    if (result is ArticleUpdated) {
+      widget.onItemUpdated?.call(result.item);
+    } else if (result is ArticleDeleted) {
+      widget.onItemRemoved(item);
+    }
   }
 
   @override
@@ -175,6 +188,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         isSelected: isSelected,
                         onTap: () => _toggleSelection(item.id),
                         onLongPress: () => _toggleSelection(item.id),
+                        onEdit: widget.onItemUpdated != null ? () => _editItem(item) : null,
                       );
                     },
                   ),
@@ -262,12 +276,14 @@ class _SelectablePriceCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onEdit;
 
   const _SelectablePriceCard({
     required this.item,
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
+    this.onEdit,
   });
 
   @override
@@ -322,6 +338,17 @@ class _SelectablePriceCard extends StatelessWidget {
                     color: Colors.white,
                     size: 16,
                   ),
+                ),
+              )
+            else if (onEdit != null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  key: ValueKey('edit_result_${item.id}'),
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.accent),
+                  onPressed: onEdit,
+                  tooltip: 'Corriger prix ou magasin',
                 ),
               ),
           ],

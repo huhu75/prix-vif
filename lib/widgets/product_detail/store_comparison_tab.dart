@@ -12,11 +12,13 @@ import '../../models/product_analysis_models.dart';
 class StoreComparisonTab extends StatelessWidget {
   final ProductAnalysisResult analysis;
   final Function(String) onStoreDeleted;
+  final Function(String)? onStoreEdit;
 
   const StoreComparisonTab({
     super.key,
     required this.analysis,
     required this.onStoreDeleted,
+    this.onStoreEdit,
   });
 
   @override
@@ -154,6 +156,7 @@ class StoreComparisonTab extends StatelessWidget {
                 key: ValueKey('store_${entry.key}'),
                 storeInfo: storeInfo,
                 isCheapest: isCheapest,
+                onEdit: onStoreEdit != null ? () => onStoreEdit!(storeInfo.storeName) : null,
                 onDelete: () => onStoreDeleted(storeInfo.storeName),
               );
             }),
@@ -271,12 +274,14 @@ class _StorePriceBarChart extends StatelessWidget {
 class _StorePriceCard extends StatelessWidget {
   final StorePriceInfo storeInfo;
   final bool isCheapest;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _StorePriceCard({
     super.key,
     required this.storeInfo,
     this.isCheapest = false,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -349,9 +354,20 @@ class _StorePriceCard extends StatelessWidget {
               ),
             ],
           ),
+          // Bouton de modification (changer le magasin ou corriger le prix)
+          if (onEdit != null) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              key: ValueKey('edit_store_btn_${storeInfo.storeName}'),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              color: AppTheme.accent,
+              tooltip: 'Modifier ce magasin ou corriger le prix',
+              onPressed: onEdit,
+            ),
+          ],
           // Bouton de suppression
           if (onDelete != null) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.delete_forever, size: 18),
               color: Colors.red.withValues(alpha: 0.7),

@@ -11,8 +11,13 @@ import '../../models/product_analysis_models.dart';
 
 class PriceEvolutionTab extends StatelessWidget {
   final ProductAnalysisResult analysis;
+  final Function(PricePoint)? onEditPricePoint;
 
-  const PriceEvolutionTab({super.key, required this.analysis});
+  const PriceEvolutionTab({
+    super.key,
+    required this.analysis,
+    this.onEditPricePoint,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +27,7 @@ class PriceEvolutionTab extends StatelessWidget {
     if (analysis.priceHistoryByStore.length == 1) {
       final storeName = analysis.priceHistoryByStore.keys.first;
       final history = analysis.priceHistoryByStore[storeName]!;
-      return _SingleStorePriceHistory(history: history);
+      return _SingleStorePriceHistory(history: history, onEditPricePoint: onEditPricePoint);
     }
     
     // Sinon, proposer de sélectionner un magasin et montrer un graphique combiné
@@ -61,6 +66,7 @@ class PriceEvolutionTab extends StatelessWidget {
             final storeName = entry.key;
             final history = entry.value;
             return _StoreSelectionCard(
+              key: ValueKey('store_selection_$storeName'),
               storeName: storeName,
               history: history,
               onTap: () {
@@ -78,7 +84,10 @@ class PriceEvolutionTab extends StatelessWidget {
                     expand: false,
                     builder: (context, scrollController) => SingleChildScrollView(
                       controller: scrollController,
-                      child: _SingleStorePriceHistory(history: history),
+                      child: _SingleStorePriceHistory(
+                        history: history,
+                        onEditPricePoint: onEditPricePoint,
+                      ),
                     ),
                   ),
                 );
@@ -287,8 +296,12 @@ class _TrendStatCard extends StatelessWidget {
 
 class _SingleStorePriceHistory extends StatelessWidget {
   final ProductPriceHistory history;
+  final Function(PricePoint)? onEditPricePoint;
 
-  const _SingleStorePriceHistory({required this.history});
+  const _SingleStorePriceHistory({
+    required this.history,
+    this.onEditPricePoint,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -443,12 +456,26 @@ class _SingleStorePriceHistory extends StatelessWidget {
           ],
           
           // Tableau des prix
-          Text(
-            'Historique des prix',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Historique des prix',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (onEditPricePoint != null)
+                Text(
+                  'Touchez pour modifier',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
           Container(
@@ -491,6 +518,7 @@ class _SingleStorePriceHistory extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (onEditPricePoint != null) const SizedBox(width: 24),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -498,40 +526,56 @@ class _SingleStorePriceHistory extends StatelessWidget {
                 const SizedBox(height: 8),
                 // Lignes du tableau
                 ...sortedHistory.pricePoints.map((point) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          '${point.date.day}/${point.date.month}/${point.date.year}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textPrimary,
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: InkWell(
+                    key: ValueKey('price_point_${point.articleId}'),
+                    onTap: onEditPricePoint != null ? () => onEditPricePoint!(point) : null,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              '${point.date.day}/${point.date.month}/${point.date.year}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          '${point.price.toStringAsFixed(2)} €',
-                          textAlign: TextAlign.right,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.w600,
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              '${point.price.toStringAsFixed(2)} €',
+                              textAlign: TextAlign.right,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          point.quantity != null ? '${point.quantity} ${point.unit ?? ''}' : '-',
-                          textAlign: TextAlign.right,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              point.quantity != null ? '${point.quantity} ${point.unit ?? ''}' : '-',
+                              textAlign: TextAlign.right,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (onEditPricePoint != null) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.edit_outlined,
+                              size: 16,
+                              color: AppTheme.accent,
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 )),
               ],
@@ -579,6 +623,7 @@ class _StoreSelectionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _StoreSelectionCard({
+    super.key,
     required this.storeName,
     required this.history,
     required this.onTap,
