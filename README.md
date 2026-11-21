@@ -8,6 +8,17 @@
 
 ## 📋 Historique des versions
 
+### v1.12.0 — 2026-11-21 — Corriger un prix ou un magasin depuis la fiche produit
+
+- **Ajouté** : depuis la fiche d'un produit (menu ⋮), bouton **Corriger un prix / scan** : ouvre la liste de tous les scans du produit ; toucher un scan ouvre la fenêtre de modification (prix, contenance, magasin)
+- **Ajouté** : depuis la fiche d'un produit (menu ⋮), bouton **Changer de magasin** : dialogue pour remplacer un magasin (ou tous) par un nouveau nom, avec suggestions (`ActionChip`)
+- **Ajouté** : dans l'onglet **Évolution des prix**, chaque ligne de l'historique est maintenant tappable avec une icône ✏️ pour corriger directement ce scan (prix, quantité, magasin)
+- **Ajouté** : dans l'onglet **Magasins**, chaque carte magasin a un bouton ✏️ pour choisir « Changer le magasin » ou « Modifier le dernier prix »
+- **Ajouté** : dans l'écran **Résultats** (session de scan en cours), bouton ✏️ sur chaque carte article pour corriger prix ou magasin avant d'enregistrer
+- **Ajouté** : `ScanRepository.getScannedItem`, `getArticlesForProduct`, `changeStoreForProduct`, `getAllKnownStores` ; `updateArticle` synchronise aussi le montant total et le magasin de la session parente
+- **Ajouté** : `showArticleEditDialog` accepte `knownStores` pour afficher des `ActionChip` de suggestion de magasins
+- **Ajouté** : tests `test/screens/price_and_store_corrections_test.dart` (12 cas : repo unitaire, dialog édition, ResultsScreen)
+
 ### v1.11.0 — 2026-11-21 — Fallback automatique Open Products Facts et Open Beauty Facts
 
 - **Ajouté** : support transparent des produits non alimentaires (papeterie, entretien, bricolage, hygiène, cosmétiques) via un fallback automatique multi-fournisseurs : si Open Food Facts ne détecte pas le produit (`status == 0`), l'application interroge automatiquement **Open Products Facts** (`world.openproductsfacts.org`), puis **Open Beauty Facts** (`world.openbeautyfacts.org`)
@@ -545,7 +556,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 21 Novembre 2026 (v1.11.0 — voir Historique des versions)*
+*Dernière mise à jour : 21 Novembre 2026 (v1.12.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Fallback Open Products / Beauty Facts, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
+*Statut : ✅ Fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*

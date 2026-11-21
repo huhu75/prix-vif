@@ -24,17 +24,22 @@ double? _parseNumber(String text) => double.tryParse(text.trim().replaceAll(',',
 
 /// Ouvre la fenêtre de modification d'un article déjà enregistré.
 /// Retourne `null` si l'utilisateur annule.
-Future<ArticleEditResult?> showArticleEditDialog(BuildContext context, ScannedItem item) {
+Future<ArticleEditResult?> showArticleEditDialog(
+  BuildContext context,
+  ScannedItem item, {
+  List<String>? knownStores,
+}) {
   return showDialog<ArticleEditResult>(
     context: context,
-    builder: (_) => _ArticleEditDialog(item: item),
+    builder: (_) => _ArticleEditDialog(item: item, knownStores: knownStores),
   );
 }
 
 class _ArticleEditDialog extends StatefulWidget {
   final ScannedItem item;
+  final List<String>? knownStores;
 
-  const _ArticleEditDialog({required this.item});
+  const _ArticleEditDialog({required this.item, this.knownStores});
 
   @override
   State<_ArticleEditDialog> createState() => _ArticleEditDialogState();
@@ -183,6 +188,36 @@ class _ArticleEditDialogState extends State<_ArticleEditDialog> {
                 key: const ValueKey('edit_store'),
                 controller: _store,
                 decoration: _decoration('Magasin'),
+              ),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final store in (widget.knownStores ??
+                        ['Leclerc', 'Carrefour', 'Intermarché', 'Auchan', 'Lidl', 'Monoprix', 'Aldi', 'Super U']))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ActionChip(
+                          label: Text(store, style: const TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setState(() {
+                              _store.text = store;
+                            });
+                          },
+                          backgroundColor: _store.text.toLowerCase() == store.toLowerCase()
+                              ? AppTheme.accent.withValues(alpha: 0.25)
+                              : AppTheme.surfaceLight,
+                          side: BorderSide(
+                            color: _store.text.toLowerCase() == store.toLowerCase()
+                                ? AppTheme.accent
+                                : Colors.transparent,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),

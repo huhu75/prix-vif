@@ -287,6 +287,135 @@ class ScanRepository {
     final scanId = _articlesBox.get(item.id)?['scanId'] as String?;
     if (scanId == null) return;
     await saveArticle(item, scanId);
+
+    // Mettre à jour le montant total et le magasin de la session si applicable
+    final scanMap = _scansBox.get(scanId);
+    if (scanMap != null) {
+      final sessionArticles = await getArticlesForScan(scanId);
+      final newTotal = sessionArticles.fold(0.0, (sum, a) => sum + a.price);
+      final updatedScanMap = Map<String, dynamic>.from(scanMap);
+      updatedScanMap['totalAmount'] = newTotal;
+      if (sessionArticles.length == 1 || scanMap['type'] == 'barcode') {
+        updatedScanMap['storeName'] = item.storeName;
+      }
+      await _scansBox.put(scanId, updatedScanMap);
+    }
+  }
+
+  /// Récupère un article scanné par son identifiant
+  ScannedItem? getScannedItem(String articleId) {
+    final articleMap = _articlesBox.get(articleId);
+    if (articleMap == null) return null;
+    final stored = StoredArticle.fromMap(articleMap);
+    return ScannedItem(
+      id: stored.id,
+      name: stored.name,
+      brand: stored.brand,
+      price: stored.price,
+      currency: stored.currency,
+      quantity: stored.quantity,
+      unit: stored.unit,
+      scanDate: stored.scanDate,
+      imageUrl: stored.imageUrl,
+      barcode: stored.barcode,
+      storeName: stored.storeName,
+      nutriscore: stored.nutriscore,
+      categories: stored.categories,
+    );
+  }
+
+  /// Récupère tous les articles scannés appartenant à un produit donné
+  List<ScannedItem> getArticlesForProduct(String productId) {
+    final items = <ScannedItem>[];
+    for (final key in _articlesBox.keys) {
+      final articleMap = _articlesBox.get(key);
+      if (articleMap == null) continue;
+      if (_matchesProduct(articleMap, productId)) {
+        final stored = StoredArticle.fromMap(articleMap);
+        items.add(ScannedItem(
+          id: stored.id,
+          name: stored.name,
+          brand: stored.brand,
+          price: stored.price,
+          currency: stored.currency,
+          quantity: stored.quantity,
+          unit: stored.unit,
+          scanDate: stored.scanDate,
+          imageUrl: stored.imageUrl,
+          barcode: stored.barcode,
+          storeName: stored.storeName,
+          nutriscore: stored.nutriscore,
+          categories: stored.categories,
+        ));
+      }
+    }
+    // Trier par date décroissante
+    items.sort((a, b) => b.scanDate.compareTo(a.scanDate));
+    return items;
+  }
+
+  /// Change le magasin de tous les scans d'un produit (ou ceux associés à un magasin particulier)
+  Future<int> changeStoreForProduct(String productId, String? oldStore, String newStore) async {
+    final cleanNewStore = newStore.trim();
+    if (cleanNewStore.isEmpty) return 0;
+
+    final allArticles = getAllStoredArticles();
+    int count = 0;
+
+    for (final article in allArticles) {
+      if (_matchesProduct(article.toMap(), productId)) {
+        if (oldStore != null && oldStore.isNotEmpty && article.storeName != oldStore) {
+          continue;
+        }
+
+        final updatedArticle = StoredArticle(
+          id: article.id,
+          name: article.name,
+          brand: article.brand,
+          price: article.price,
+          currency: article.currency,
+          quantity: article.quantity,
+          unit: article.unit,
+          scanDate: article.scanDate,
+          imageUrl: article.imageUrl,
+          barcode: article.barcode,
+          storeName: cleanNewStore,
+          nutriscore: article.nutriscore,
+          categories: article.categories,
+          scanId: article.scanId,
+        );
+
+        await _articlesBox.put(article.id, updatedArticle.toMap());
+
+        // Synchroniser le magasin de la session parente si session barcode ou à magasin unique
+        final scanMap = _scansBox.get(article.scanId);
+        if (scanMap != null &&
+            (scanMap['type'] == 'barcode' || scanMap['storeName'] == oldStore || scanMap['storeName'] == null)) {
+          final updatedScanMap = Map<String, dynamic>.from(scanMap);
+          updatedScanMap['storeName'] = cleanNewStore;
+          await _scansBox.put(article.scanId, updatedScanMap);
+        }
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// Récupère la liste de tous les magasins connus (historique + personnalisés + courants)
+  List<String> getAllKnownStores() {
+    final stores = <String>{};
+    // Magasins courants
+    stores.addAll(['Leclerc', 'Carrefour', 'Intermarché', 'Auchan', 'Lidl', 'Monoprix', 'Aldi', 'Super U']);
+    // Magasins personnalisés
+    stores.addAll(getCustomStores());
+    // Magasins trouvés dans les articles enregistrés
+    for (final article in getAllStoredArticles()) {
+      if (article.storeName != null && article.storeName!.trim().isNotEmpty) {
+        stores.add(article.storeName!.trim());
+      }
+    }
+    final list = stores.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
   }
 
   /// Supprime un article ; sa session est supprimée si elle devient vide
