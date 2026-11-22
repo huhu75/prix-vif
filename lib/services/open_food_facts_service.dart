@@ -3,6 +3,21 @@ import 'package:http/http.dart' as http;
 import '../models/hive_models.dart';
 import 'scan_repository.dart';
 
+/// Recherche par nom impossible : aucun fournisseur n'a répondu (réseau coupé,
+/// ou Open Food Facts surchargé malgré les nouveaux essais) et rien en cache.
+class OFFSearchUnavailableException implements Exception {
+  /// Message affiché dans les écrans de recherche quand la recherche échoue
+  static const String userMessage =
+      'Recherche impossible pour le moment : pas de connexion, ou Open Food Facts est saturé. '
+      'Réessaie dans quelques secondes.';
+
+  final String query;
+  const OFFSearchUnavailableException(this.query);
+
+  @override
+  String toString() => 'OFFSearchUnavailableException: recherche « $query » impossible';
+}
+
 /// Configuration d'un fournisseur Open Facts (Open Food Facts, Open Products Facts, etc.)
 class OFFProviderConfig {
   final String name;
@@ -209,12 +224,17 @@ class OpenFoodFactsService {
   final http.Client _client;
   final List<OFFProviderConfig> providers;
 
+  /// Attentes entre les nouveaux essais d'une recherche refusée pour surcharge
+  /// (HTTP 503 / 429). Une liste vide désactive les nouveaux essais (tests).
+  final List<Duration> retryDelays;
+
   /// Repository optionnel pour le cache produits
   ScanRepository? _repository;
 
   OpenFoodFactsService({
     http.Client? httpClient,
     List<OFFProviderConfig>? providers,
+    this.retryDelays = const [Duration(milliseconds: 1500), Duration(seconds: 3)],
   })  : _client = httpClient ?? http.Client(),
         providers = providers ?? defaultProviders;
 
@@ -306,53 +326,88 @@ class OpenFoodFactsService {
     return null;
   }
 
+  /// Produit mis en cache pour une recherche par nom (un seul résultat est gardé).
+  /// Son `ean` est la clé de cache « name:... ». Le matching des tickets la garde
+  /// comme code-barres (les articles déjà enregistrés sont regroupés ainsi) ;
+  /// [blankCacheKey] la retire pour la recherche manuelle, où elle remplacerait
+  /// le code-barres du produit corrigé.
+  OFFProduct? _cachedNameResult(String cleanName, {bool blankCacheKey = false}) {
+    final cached = _repository?.getCachedProduct('name:${cleanName.toLowerCase()}');
+    if (cached == null) return null;
+    return OFFProduct(
+      barcode: blankCacheKey && cached.ean.startsWith('name:') ? '' : cached.ean,
+      name: cached.productName,
+      brand: cached.brands ?? 'Marque inconnue',
+      nutriscore: cached.nutriscoreGrade,
+      categories: cached.categories ?? [],
+      imageUrl: cached.imageUrl,
+      ecoscore: cached.ecoscoreGrade,
+      novaGroup: cached.novaGroup,
+      ingredients: cached.ingredients,
+      allergens: cached.allergens ?? [],
+      nutrientLevels: cached.nutrientLevels ?? {},
+      nutriments: cached.nutriments ?? {},
+      source: 'Cache',
+    );
+  }
+
+  /// GET avec nouvelles tentatives quand le serveur refuse pour surcharge
+  /// (503 / 429 : la recherche Open Food Facts est limitée à ~10 appels par minute).
+  Future<http.Response> _getWithRetry(Uri url) async {
+    var attempt = 0;
+    while (true) {
+      final response = await _client.get(
+        url,
+        headers: {
+          'User-Agent': 'PrixVif - Flutter Scan App - Version 1.0',
+        },
+      ).timeout(const Duration(seconds: 8));
+      final overloaded = response.statusCode == 503 || response.statusCode == 429;
+      if (!overloaded || attempt >= retryDelays.length) return response;
+      print('${url.host} surchargé (HTTP ${response.statusCode}), nouvel essai dans ${retryDelays[attempt].inMilliseconds} ms');
+      await Future<void>.delayed(retryDelays[attempt]);
+      attempt++;
+    }
+  }
+
   /// Recherche des produits par nom (avec fallback sur Open Products Facts et Open Beauty Facts)
-  /// Vérifie d'abord le cache si un repository est disponible.
-  /// Retourne une liste de [OFFProduct]
-  Future<List<OFFProduct>> searchByName(String name) async {
+  ///
+  /// [cacheFirst] = `true` (matching automatique des tickets) : le cache est lu
+  /// avant le réseau, ce qui évite des appels pour les articles déjà vus mais ne
+  /// renvoie alors qu'un seul produit.
+  /// [cacheFirst] = `false` (recherche tapée par l'utilisateur) : le réseau est
+  /// interrogé d'abord pour avoir tous les résultats ; le cache ne sert que si
+  /// aucun fournisseur ne répond, et s'il est vide une [OFFSearchUnavailableException]
+  /// est levée (pour afficher « recherche impossible » plutôt que « aucun produit »).
+  Future<List<OFFProduct>> searchByName(String name, {bool cacheFirst = true}) async {
     final cleanName = name.trim();
     if (cleanName.isEmpty) return [];
 
     // Étape 4c — Vérifier le cache avant l'appel réseau (clé = nom normalisé)
-    if (_repository != null) {
-      final cacheKey = 'name:${cleanName.toLowerCase()}';
-      final cached = _repository!.getCachedProduct(cacheKey);
+    if (cacheFirst) {
+      final cached = _cachedNameResult(cleanName);
       if (cached != null) {
         print('Cache HIT (nom) pour: $cleanName');
-        return [
-          OFFProduct(
-            barcode: cached.ean,
-            name: cached.productName,
-            brand: cached.brands ?? 'Marque inconnue',
-            nutriscore: cached.nutriscoreGrade,
-            categories: cached.categories ?? [],
-            imageUrl: cached.imageUrl,
-            ecoscore: cached.ecoscoreGrade,
-            novaGroup: cached.novaGroup,
-            ingredients: cached.ingredients,
-            allergens: cached.allergens ?? [],
-            nutrientLevels: cached.nutrientLevels ?? {},
-            nutriments: cached.nutriments ?? {},
-            source: 'Cache',
-          )
-        ];
+        return [cached];
       }
     }
+
+    // Un fournisseur en erreur (surcharge, réseau) : les résultats des suivants
+    // ne sont pas mis en cache, ils ne remplacent pas forcément le bon produit
+    var hadError = false;
 
     // Essayer successivement chaque fournisseur configuré (OFF -> OPF -> OBF)
     for (final provider in providers) {
       try {
         final url = Uri.parse(
-          '${provider.searchBaseUrl}?search_terms=${Uri.encodeComponent(cleanName)}&json=1&page_size=10',
+          '${provider.searchBaseUrl}?search_terms=${Uri.encodeComponent(cleanName)}&json=1&page_size=20',
         );
-        final response = await _client.get(
-          url,
-          headers: {
-            'User-Agent': 'PrixVif - Flutter Scan App - Version 1.0',
-          },
-        ).timeout(const Duration(seconds: 8));
+        final response = await _getWithRetry(url);
 
-        if (response.statusCode == 200) {
+        if (response.statusCode != 200) {
+          hadError = true;
+          print('Erreur ${provider.name} search API: HTTP ${response.statusCode}');
+        } else {
           final Map<String, dynamic> data = jsonDecode(response.body);
           final List<dynamic>? productsJson = data['products'];
           if (productsJson != null && productsJson.isNotEmpty) {
@@ -366,7 +421,7 @@ class OpenFoodFactsService {
 
             if (products.isNotEmpty) {
               // Étape 4c — Mettre en cache le premier résultat sous la clé 'name:...'
-              if (_repository != null) {
+              if (_repository != null && !hadError) {
                 final best = products.first;
                 final cacheKey = 'name:${cleanName.toLowerCase()}';
                 await _repository!.cacheProduct(CachedProduct(
@@ -392,35 +447,60 @@ class OpenFoodFactsService {
           }
         }
       } catch (e) {
+        hadError = true;
         print('Erreur ${provider.name} search API: $e');
       }
+    }
+
+    if (!cacheFirst && hadError) {
+      // Recherche manuelle sans réponse exploitable : dernier résultat connu, sinon erreur
+      final cached = _cachedNameResult(cleanName, blankCacheKey: true);
+      if (cached != null) return [cached];
+      throw OFFSearchUnavailableException(cleanName);
     }
 
     return [];
   }
 
-  /// Stratégie de recherche en deux passes :
+  /// Stratégie de recherche par nom :
   /// 1. Nom complet → premier résultat si pertinent
-  /// 2. Si vide : nom nettoyé des mots génériques → réessayer
-  /// Retourne la liste des candidats (peut être vide)
-  Future<List<OFFProduct>> searchByNameWithTwoPasses(String rawName) async {
+  /// 2. Si vide : nom nettoyé (contenances, mots génériques retirés, abréviations
+  ///    du ticket développées) → réessayer
+  /// 3. Si toujours vide : nom nettoyé avec un puis deux mots en moins à la fin
+  ///    (la recherche exige que tous les mots correspondent : un seul mot abrégé
+  ///    ou mal lu suffit à tout faire échouer)
+  /// Retourne la liste des candidats (peut être vide). [cacheFirst] : voir [searchByName].
+  Future<List<OFFProduct>> searchByNameWithTwoPasses(String rawName, {bool cacheFirst = true}) async {
     // Première passe : nom complet
-    List<OFFProduct> candidates = await searchByName(rawName);
+    List<OFFProduct> candidates = await searchByName(rawName, cacheFirst: cacheFirst);
+    if (candidates.isNotEmpty) return candidates;
 
     // Deuxième passe : nom nettoyé si pas de résultats
-    if (candidates.isEmpty) {
-      final cleaned = cleanProductName(rawName);
-      if (cleaned.isNotEmpty && cleaned != rawName.toLowerCase().trim()) {
-        print('OFF search — 2ème passe avec nom nettoyé: "$cleaned"');
-        candidates = await searchByName(cleaned);
-      }
+    final cleaned = cleanProductName(rawName);
+    if (cleaned.isNotEmpty && cleaned != rawName.toLowerCase().trim()) {
+      print('OFF search — 2ème passe avec nom nettoyé: "$cleaned"');
+      candidates = await searchByName(cleaned, cacheFirst: cacheFirst);
+      if (candidates.isNotEmpty) return candidates;
+    }
+
+    // Troisième passe : retirer les derniers mots, en gardant au moins 2 mots
+    // et au plus 2 essais (la recherche OFF limite le nombre d'appels par minute)
+    final words = cleaned.split(' ').where((w) => w.isNotEmpty).toList();
+    for (var n = words.length - 1; n >= 2 && n >= words.length - 2; n--) {
+      final shorter = words.take(n).join(' ');
+      print('OFF search — 3ème passe avec moins de mots: "$shorter"');
+      candidates = await searchByName(shorter, cacheFirst: cacheFirst);
+      if (candidates.isNotEmpty) return candidates;
     }
 
     return candidates;
   }
 
-  /// Recherche libre : un code-barres (8 à 14 chiffres) est cherché tel quel,
-  /// tout autre texte est cherché par nom (deux passes)
+  /// Recherche tapée par l'utilisateur (correction d'une fiche, recherche dans
+  /// la confirmation du ticket) : un code-barres (8 à 14 chiffres) est cherché
+  /// tel quel, tout autre texte est cherché par nom, réseau d'abord (tous les
+  /// résultats, pas le seul produit gardé en cache).
+  /// Lève [OFFSearchUnavailableException] si la recherche n'a pas pu se faire.
   Future<List<OFFProduct>> searchProducts(String query) async {
     final text = query.trim();
     if (text.isEmpty) return [];
@@ -428,29 +508,70 @@ class OpenFoodFactsService {
       final product = await lookupBarcode(text);
       return product == null ? [] : [product];
     }
-    return searchByNameWithTwoPasses(text);
+    return searchByNameWithTwoPasses(text, cacheFirst: false);
   }
 
-  /// Nettoie un nom de produit en retirant les mots génériques courants sur les tickets
+  /// Termes génériques des tickets de caisse, retirés avant la recherche
+  static const Set<String> _genericTicketTerms = {
+    'bio', 'promo', 'art', 'lot', 'offert', 'remise', 'reduc', 'solde',
+    'pack', 'bte', 'bt', 'x', 'le', 'la', 'les', 'de', 'du', 'en',
+  };
+
+  /// Abréviations fréquentes des tickets de caisse → mot complet.
+  /// Seules les abréviations sans ambiguïté sont listées (pas « rav » : raviveur
+  /// ou ravioli ; pas « conf » : confiture ou confit). La recherche OFF ignore
+  /// les accents, les mots sont donc écrits sans accent.
+  static const Map<String, String> ticketAbbreviations = {
+    // Entretien et hygiène
+    'less': 'lessive',
+    'liq': 'liquide',
+    'coul': 'couleur',
+    'vaiss': 'vaisselle',
+    'vsl': 'vaisselle',
+    'adouc': 'adoucissant',
+    'assoupl': 'assouplissant',
+    'nett': 'nettoyant',
+    'desinf': 'desinfectant',
+    'shamp': 'shampooing',
+    'shp': 'shampooing',
+    'dche': 'douche',
+    'deo': 'deodorant',
+    'pap': 'papier',
+    'toil': 'toilette',
+    // Alimentaire
+    'choc': 'chocolat',
+    'from': 'fromage',
+    'jamb': 'jambon',
+    'ecr': 'ecreme',
+    'boiss': 'boisson',
+    'cpte': 'compote',
+    'ptes': 'pates',
+  };
+
+  /// Nettoie un libellé de ticket pour la recherche : retire les contenances
+  /// (1.35L, 400 g, 6x33cl, x2, 70 %), la ponctuation, les nombres isolés et les
+  /// termes génériques, puis développe les abréviations connues.
+  /// Ex : « LESS LIQ MIR COUL 1.35L » → « lessive liquide mir couleur »
   String cleanProductName(String name) {
     var cleaned = name.toLowerCase();
-    
-    // Retirer les unités de poids/volume : g, kg, l, ml, cl, x2, %, etc.
-    final weightRegExp = RegExp(r'\b\d+(?:\s*(?:g|kg|l|ml|cl|x|%|pcs|pieces))\b', caseSensitive: false);
-    cleaned = cleaned.replaceAll(weightRegExp, '');
-    
-    // Retirer les termes génériques courants sur les tickets de caisse
-    final genericTerms = [
-      'bio', 'promo', 'art', 'lot', 'offert', 'remise', 'reduc', 'solde',
-      'pack', 'bte', 'bt', 'x', 'le', 'la', 'les', 'de', 'du', 'en'
-    ];
-    for (var term in genericTerms) {
-      cleaned = cleaned.replaceAll(RegExp('\\b$term\\b', caseSensitive: false), '');
-    }
-    
-    // Nettoyer les espaces superflus et ponctuation
+
+    // Contenances et multipacks (avant la ponctuation, pour garder « 1.35 » entier)
+    cleaned = cleaned
+        .replaceAll(RegExp(r'\b\d+\s*x\s*\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|l)?\b'), ' ')
+        .replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|l|x|pcs|pieces)\b'), ' ')
+        .replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*%'), ' ')
+        .replaceAll(RegExp(r'\bx\s*\d+\b'), ' ');
+
+    // Ponctuation → espaces (les points d'abréviation « LESS. » disparaissent)
     cleaned = cleaned.replaceAll(RegExp(r'[^\w\sàâäéèêëïîôöùûüç]'), ' ');
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return cleaned;
+
+    final words = <String>[];
+    for (final word in cleaned.split(RegExp(r'\s+'))) {
+      if (word.isEmpty) continue;
+      if (RegExp(r'^\d+$').hasMatch(word)) continue; // reste de quantité ou code interne
+      if (_genericTicketTerms.contains(word)) continue;
+      words.add(ticketAbbreviations[word] ?? word);
+    }
+    return words.join(' ');
   }
 }

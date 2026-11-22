@@ -8,6 +8,28 @@
 
 ## 📋 Historique des versions
 
+### v1.12.3 — 2026-11-21 — Recherche par nom fiable pour corriger un produit
+
+- **Corrigé** : dans « Corriger le produit Open Food Facts » (fiche produit), relancer une recherche déjà faite (dont celle qui s'ouvre avec le nom du produit) n'affichait qu'**un seul** résultat, celui gardé en cache, souvent la fiche à corriger. La recherche tapée interroge maintenant le réseau d'abord et affiche tous les résultats (20 au lieu de 10). Le cache ne sert plus qu'hors-ligne
+- **Corrigé** : la recherche d'Open Food Facts refuse souvent les appels en rafale (HTTP 503, ~10 recherches/min). L'app passait alors en silence à Open Products Facts / Open Beauty Facts, qui ne contiennent pas d'alimentaire, et gardait ce mauvais résultat en cache. Elle refait maintenant l'appel après 1,5 s puis 3 s, et ne met plus en cache un résultat obtenu alors qu'Open Food Facts était en erreur
+- **Corrigé** : quand la recherche est impossible (pas de réseau, Open Food Facts saturé), les écrans de recherche affichent un message d'erreur au lieu de « Aucun produit trouvé »
+- **Modifié** : le bouton « Associer un produit » de la confirmation du ticket utilise la même recherche que la fiche produit (réseau d'abord, code-barres accepté, nom nettoyé et abréviations développées)
+- **Ajouté** : `OFFSearchUnavailableException`, paramètre `cacheFirst` de `searchByName` / `searchByNameWithTwoPasses`, `retryDelays` dans `OpenFoodFactsService` ; 5 tests dans `test/services/open_food_facts_service_test.dart`
+
+### v1.12.2 — 2026-11-21 — Articles de ticket abrégés retrouvés (ex. lessive MIR)
+
+- **Corrigé** : un article de ticket au libellé abrégé (ex. « LESS LIQ MIR COUL 1.35L ») n'était pas trouvé. La recherche Open Food Facts exige que tous les mots correspondent, et un seul mot abrégé faisait tout échouer
+- **Ajouté** : `cleanProductName` développe les abréviations courantes des tickets (`less` → lessive, `liq` → liquide, `vaiss` → vaisselle, `choc` → chocolat…, liste `ticketAbbreviations`). Les abréviations ambiguës (`rav`, `conf`) sont laissées telles quelles
+- **Ajouté** : 3ème passe de recherche par nom. Si le nom nettoyé ne donne rien, l'app réessaie avec un puis deux mots en moins à la fin (au moins 2 mots gardés, au plus 2 essais pour respecter la limite d'appels d'Open Food Facts)
+- **Corrigé** : les contenances décimales (`1.35L`, `1,5 l`), les multipacks (`6x33cl`, `x2`) et les pourcentages sont retirés en entier, au lieu de laisser un « 1 » isolé dans la recherche
+- **Modifié** : le prompt Mistral demande aussi les produits d'entretien, d'hygiène et de beauté (avant : « aliments, boissons, etc. »), et d'écrire les abréviations du ticket en toutes lettres en gardant la marque
+- **Ajouté** : 4 tests dans `test/services/open_food_facts_service_test.dart` (nettoyage des libellés, abréviations, 3ème passe et sa limite)
+
+### v1.12.1 — 2026-11-21 — Clé API Mistral via un fichier `.env` local
+
+- **Ajouté** : fichier `.env` local (déjà ignoré par git) qui contient `MISTRAL_API_KEY`, chargé avec `flutter run --dart-define-from-file=.env`. Plus besoin de retaper la clé à chaque lancement
+- **Modifié** : section « Configurer la clé API Mistral » du README : lancement sur Chrome, configuration PyCharm (« Additional run args ») et explication de la clé saisie dans l'app sur le web (profil Chrome temporaire)
+
 ### v1.12.0 — 2026-11-21 — Corriger un prix ou un magasin depuis la fiche produit
 
 - **Ajouté** : depuis la fiche d'un produit (menu ⋮), bouton **Corriger un prix / scan** : ouvre la liste de tous les scans du produit ; toucher un scan ouvre la fenêtre de modification (prix, contenance, magasin)
@@ -329,17 +351,36 @@ flutter build appbundle --release
 
 ### 4. Configurer la clé API Mistral (hors dépôt)
 
-L'analyse des tickets de caisse utilise l'API Mistral. La clé ne doit **jamais** être écrite dans le code du dépôt : passe-la à la compilation avec `--dart-define` (elle est alors embarquée dans le binaire uniquement) :
+L'analyse des tickets de caisse utilise l'API Mistral. La clé ne doit **jamais** être écrite dans le code du dépôt. Elle est passée à la compilation et se retrouve seulement dans l'app compilée.
 
-```bash
-# Développement
-flutter run --dart-define=MISTRAL_API_KEY=sk-...
+**Méthode recommandée : le fichier `.env`**
 
-# Build release
-flutter build apk --release --dart-define=MISTRAL_API_KEY=sk-...
+Le fichier `.env` à la racine du projet est ignoré par git (voir `.gitignore`). Mets-y ta clé :
+
+```
+MISTRAL_API_KEY=ta_cle_ici
 ```
 
-Sans clé, l'application reste en **mode démo** (articles factices). Alternative : saisir la clé dans l'app (icône engrenage de l'onglet Scanner) — elle est alors stockée localement dans Hive, jamais dans le dépôt.
+Puis lance l'app en chargeant ce fichier :
+
+```bash
+# Sur Chrome
+flutter run -d chrome --dart-define-from-file=.env
+
+# Sur un téléphone ou un émulateur
+flutter run --dart-define-from-file=.env
+
+# Build release
+flutter build apk --release --dart-define-from-file=.env
+```
+
+Les lignes qui commencent par `#` sont des commentaires. Si `MISTRAL_API_KEY=` est vide, l'app reste en mode démo. Si tu clones le dépôt ailleurs, crée ce fichier à la main : il n'est pas versionné.
+
+**Depuis PyCharm / Android Studio** : Run → Edit Configurations → `main.dart`, puis dans « Additional run args » : `-d chrome --dart-define-from-file=.env` (retire `-d chrome` pour lancer sur un autre appareil). Le dossier `.idea/` est ignoré par git.
+
+**Sans fichier** : `flutter run --dart-define=MISTRAL_API_KEY=sk-...`
+
+Sans clé, l'application reste en **mode démo** (articles factices). Autre solution : saisir la clé dans l'app (icône engrenage de l'onglet Scanner). Elle est alors stockée localement dans Hive, jamais dans le dépôt. La clé passée à la compilation reste prioritaire. ⚠️ Sur Chrome, `flutter run` ouvre un profil de navigateur temporaire : une clé saisie dans l'app peut disparaître d'un lancement à l'autre. Utilise plutôt le `.env`.
 
 ---
 
@@ -458,7 +499,7 @@ prix_vif/
 4. **Compression automatique** : L'image est réduite à max 1024px, JPEG 80%
 5. Les gains de compression s'affichent (ex: 5 Mo → 500 Ko)
 6. **Extraction Mistral AI** : Les articles sont extraits via l'API de vision
-7. **Matching Open Food Facts** : Chaque article est associé à un produit OFF (avec confirmation utilisateur)
+7. **Matching Open Food Facts** : Chaque article est associé à un produit OFF (avec confirmation utilisateur). La recherche se fait en 3 passes : nom complet, puis nom nettoyé avec les abréviations du ticket développées (LESS → lessive), puis avec un ou deux mots en moins
 8. **Persistance automatique** : La session complète est sauvegardée en base
 
 ### 📊 Consulter le Tableau de Bord
@@ -491,7 +532,7 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 ✅ **Base de données (Hive NoSQL)** - Persistance locale complète avec 6 boxes
 ✅ **Synchronisation automatique** - Rechargement des données après chaque modification
 ✅ **Sauvegarde automatique** - Chaque article scanné est immédiatement persisté
-✅ **Extraction Mistral AI** - Analyse des tickets via API vision (`mistral-small-latest`, Mistral Small 4) — clé fournie via `--dart-define=MISTRAL_API_KEY=...` ou dans les réglages de l'app
+✅ **Extraction Mistral AI** - Analyse des tickets via API vision (`mistral-small-latest`, Mistral Small 4) — clé fournie via le fichier `.env` local (`--dart-define-from-file=.env`), `--dart-define=MISTRAL_API_KEY=...` ou dans les réglages de l'app
 ✅ **Mode hors-ligne** - Stockage des scans quand pas de réseau + traitement automatique au retour
 ✅ **Compression d'image** - Réduction à max 1024px, JPEG 80% avec affichage des gains
 ✅ **Tableau de bord** - Statistiques globales, répartition Nutri-Score, tendances temporelles
@@ -556,7 +597,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 21 Novembre 2026 (v1.12.0 — voir Historique des versions)*
+*Dernière mise à jour : 21 Novembre 2026 (v1.12.3 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
+*Statut : ✅ Recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*

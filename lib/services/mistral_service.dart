@@ -80,7 +80,7 @@ class MistralService {
                   'text': '''Analyse cette image de ticket de caisse et extrais UNIQUEMENT la liste des articles/produits achetés de manière individuelle.
 
 Directives STRICTES :
-1. Extrais SEULEMENT les articles/produits achetés (aliments, boissons, etc.).
+1. Extrais SEULEMENT les articles/produits achetés : aliments, boissons, mais aussi produits d'entretien (lessive, liquide vaisselle...), d'hygiène et de beauté.
 2. Ignore COMPLETEMENT :
    - Le nom, adresse et métadonnées du magasin.
    - Les totaux, sous-totaux, nets à payer, cumuls.
@@ -89,7 +89,7 @@ Directives STRICTES :
    - Les remises globales, bons d'achat, coupons (ex: BON D'ACHAT, REMISE -10%).
    - Les points de fidélité et messages promotionnels.
 3. Pour chaque article :
-   - "nom" : Nettoie le libellé pour qu'il soit propre et lisible (retire les préfixes type étoiles (*), les codes internes du magasin, les codes-barres écrits).
+   - "nom" : Nettoie le libellé pour qu'il soit propre et lisible (retire les préfixes type étoiles (*), les codes internes du magasin, les codes-barres écrits). Écris les abréviations du ticket en toutes lettres quand le sens est sûr (ex : "LESS LIQ" → "Lessive liquide", "VAISS" → "Vaisselle", "CHOC" → "Chocolat") et garde la marque telle quelle (ex : "MIR", "Ariel", "Nutella").
    - "prix" : Le prix total payé de la ligne pour cet article (après réductions spécifiques à cet article, le cas échéant), sous forme de nombre décimal (ex: 1.49).
    - "quantite" : Le nombre d'unités achetées (par défaut 1.0).
 

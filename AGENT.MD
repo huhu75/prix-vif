@@ -165,10 +165,14 @@ Appareil photo Flutter
 #### 4c. Matching Open Food Facts par nom
 
 - [x] Endpoint : `GET https://world.openfoodfacts.org/cgi/search.pl?search_terms={nom}&json=1`
-- [x] Vérifier d'abord le cache `produits` (étape 3b) avant tout appel réseau
-- [x] Stratégie en deux passes :
+- [x] Vérifier d'abord le cache `produits` (étape 3b) avant tout appel réseau, **pour le matching automatique seulement** (`searchByName(cacheFirst: true)`). Le cache ne garde que le premier résultat, sous la clé `name:<nom>`.
+- [x] Recherche tapée par l'utilisateur (fiche produit → « Corriger le produit », bouton « Associer un produit » de la confirmation du ticket) : `searchProducts` → `cacheFirst: false`. Le réseau est interrogé d'abord pour avoir tous les résultats (20 par page). Le cache ne sert que si aucun fournisseur ne répond, et sinon `OFFSearchUnavailableException` est levée : l'écran affiche « recherche impossible » au lieu de « aucun produit »
+- [x] La recherche `search.pl` d'Open Food Facts est limitée (~10 appels/min) et répond souvent HTTP 503 en rafale : `_getWithRetry` refait l'appel après 1,5 s puis 3 s (`retryDelays`, vide dans les tests). Si un fournisseur reste en erreur, les résultats des suivants (OPF/OBF) sont renvoyés mais **pas mis en cache**, pour ne pas remplacer durablement le bon produit par une fiche de repli
+- [x] Stratégie en trois passes (`OpenFoodFactsService.searchByNameWithTwoPasses`, le nom est historique). La recherche `search.pl` exige que **tous** les mots correspondent : un seul mot abrégé ou mal lu donne 0 résultat.
   1. Recherche avec le nom complet → prendre le premier résultat si pertinent
-  2. Si échec : retirer les mots génériques (kg, g, %, bio, x2…) et réessayer
+  2. Si échec : `cleanProductName` retire les contenances (`1.35L`, `6x33cl`, `x2`, `70%`), la ponctuation, les nombres isolés et les mots génériques (bio, promo, lot…), puis développe les abréviations de `ticketAbbreviations` (`less` → lessive, `liq` → liquide…). Il ne contient que des abréviations sans ambiguïté. Puis réessayer
+  3. Si échec : nom nettoyé avec un puis deux mots en moins à la fin (au moins 2 mots, au plus 2 essais : la recherche OFF limite le nombre d'appels par minute)
+- [x] Le prompt Mistral demande aussi les produits non alimentaires (entretien, hygiène, beauté) et d'écrire les abréviations du ticket en toutes lettres, en gardant la marque
 - [x] Toujours afficher les candidats dans une UI de confirmation — le matching par nom n'est pas parfait
 - [x] Persister les articles matchés via `ScanRepository.saveArticle()`
 
