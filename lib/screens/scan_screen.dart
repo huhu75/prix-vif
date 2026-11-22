@@ -16,6 +16,7 @@ import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 import '../services/camera_service.dart';
 import '../widgets/scan/mistral_settings_dialog.dart';
 import '../widgets/scan/price_input_sheet.dart';
@@ -33,6 +34,18 @@ class ScanScreen extends StatefulWidget {
   final Function(String) onScanTypeChanged;
   final Future<void> Function()? onScanSaved;
 
+  /// Bouton Retour de la barre d'app (onglet précédent) ; absent si `null`
+  final VoidCallback? onBack;
+
+  /// L'écran est affiché (onglet Scanner sélectionné) : la caméra ne tourne
+  /// que dans ce cas, et seulement en mode code-barres.
+  final bool isActive;
+
+  /// Mode demandé depuis l'accueil (`true` = code-barres, `false` = ticket),
+  /// appliqué à chaque nouvelle valeur de [modeRequestId].
+  final bool? requestedBarcodeMode;
+  final int modeRequestId;
+
   const ScanScreen({
     super.key,
     required this.scannedItems,
@@ -42,6 +55,10 @@ class ScanScreen extends StatefulWidget {
     this.repository,
     required this.onScanTypeChanged,
     this.onScanSaved,
+    this.onBack,
+    this.isActive = true,
+    this.requestedBarcodeMode,
+    this.modeRequestId = 0,
   });
 
   @override
@@ -86,6 +103,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _isBarcodeMode = widget.requestedBarcodeMode ?? true;
     _selectedStore = _stores.first;
     _storeController.text = _selectedStore;
     _loadSavedStores();
@@ -117,8 +135,25 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       widget.onScanTypeChanged(_isBarcodeMode ? 'barcode' : 'ticket');
     });
     
-    // Démarrer la caméra automatiquement
-    _startScanner();
+    // Démarrer la caméra si l'écran est affiché en mode code-barres
+    if (widget.isActive && _isBarcodeMode) _startScanner();
+  }
+
+  @override
+  void didUpdateWidget(covariant ScanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    var cameraNeedsSync = widget.isActive != oldWidget.isActive;
+
+    // Mode demandé depuis l'accueil. Le parent connaît déjà le type de scan :
+    // pas d'appel à onScanTypeChanged ici (il est en train de se reconstruire).
+    final requested = widget.requestedBarcodeMode;
+    if (widget.modeRequestId != oldWidget.modeRequestId && requested != null && requested != _isBarcodeMode) {
+      _isBarcodeMode = requested;
+      if (requested) _ticketImage = null;
+      cameraNeedsSync = true;
+    }
+
+    if (cameraNeedsSync) _syncCamera();
   }
 
   @override
@@ -128,7 +163,16 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       _stopScanner();
     } else if (state == AppLifecycleState.resumed) {
       // Redémarrer la caméra quand l'app revient au premier plan
+      _syncCamera();
+    }
+  }
+
+  /// Caméra allumée seulement si l'écran est affiché et en mode code-barres
+  void _syncCamera() {
+    if (widget.isActive && _isBarcodeMode) {
       _startScanner();
+    } else {
+      _stopScanner();
     }
   }
 
@@ -161,7 +205,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       if (barcode) _ticketImage = null;
     });
     widget.onScanTypeChanged(barcode ? 'barcode' : 'ticket');
-    barcode ? _startScanner() : _stopScanner();
+    _syncCamera();
   }
 
   /// Oublie la photo de ticket en cours
@@ -715,6 +759,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
+        leading: widget.onBack != null ? AppBackButton(onPressed: widget.onBack) : null,
         title: const NeonTitle(text: 'SCANNER', fontSize: 22),
         actions: [
           IconButton(

@@ -17,6 +17,7 @@ import '../widgets/dashboard/store_comparison_section.dart';
 import '../widgets/dashboard/time_trend_section.dart';
 import '../widgets/dashboard/shopping_basket_section.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 import 'product_detail_screen.dart';
 
 /// Écran de tableau de bord avec analyse nutritionnelle et tendances
@@ -27,6 +28,9 @@ class DashboardScreen extends StatelessWidget {
   final void Function(String productId, String productName, {int initialTabIndex})? onProductSelected;
   final ScanRepository? repository;
 
+  /// Bouton Retour de la barre d'app (onglet précédent) ; absent si `null`
+  final VoidCallback? onBack;
+
   const DashboardScreen({
     super.key,
     required this.sessions,
@@ -34,6 +38,7 @@ class DashboardScreen extends StatelessWidget {
     this.onProductAnalysisRequested,
     this.onProductSelected,
     this.repository,
+    this.onBack,
   });
 
   @override
@@ -45,6 +50,7 @@ class DashboardScreen extends StatelessWidget {
       key: const ValueKey('dashboard_scaffold'),
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
+        leading: onBack != null ? AppBackButton(onPressed: onBack) : null,
         title: const NeonTitle(text: 'TABLEAU DE BORD', fontSize: 20),
         actions: [
           if (onProductAnalysisRequested != null)

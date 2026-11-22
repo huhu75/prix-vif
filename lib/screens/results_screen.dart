@@ -5,10 +5,16 @@ import '../widgets/article_edit_dialog.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 
 class ResultsScreen extends StatefulWidget {
   final List<ScannedItem> scannedItems;
+
+  /// Bouton Retour de la barre d'app (onglet précédent)
   final VoidCallback onBack;
+
+  /// Bouton « Scanner » de l'écran vide ; par défaut, comme [onBack]
+  final VoidCallback? onScan;
   final Function(ScannedItem) onItemRemoved;
   final Future<void> Function() onClearAll;
   final VoidCallback onSaveSession;
@@ -18,6 +24,7 @@ class ResultsScreen extends StatefulWidget {
     super.key,
     required this.scannedItems,
     required this.onBack,
+    this.onScan,
     required this.onItemRemoved,
     required this.onClearAll,
     required this.onSaveSession,
@@ -86,8 +93,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           text: _isSelectionMode ? 'Sélection ($_selectedCount)' : 'RÉSULTATS',
           fontSize: 22,
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+        leading: AppBackButton(
           onPressed: () {
             _clearSelection();
             widget.onBack();
@@ -173,7 +179,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ? _EmptyState(
                     onScan: () {
                       _clearSelection();
-                      widget.onBack();
+                      (widget.onScan ?? widget.onBack)();
                     },
                   )
                 : ListView.builder(
@@ -409,7 +415,7 @@ class _EmptyState extends StatelessWidget {
             text: 'SCANNER MAINTENANT',
             icon: Icons.qr_code_scanner,
             onPressed: onScan,
-            width: 200,
+            width: 260,
           ),
         ],
       ),

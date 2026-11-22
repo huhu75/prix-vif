@@ -153,14 +153,21 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
                             ),
                           )
                         else
-                          Text(
-                            widget.text,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                              height: 1.2,
+                          // Texte réduit plutôt que de déborder d'un bouton étroit
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                widget.text,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                  height: 1.2,
+                                ),
+                              ),
                             ),
                           ),
                         if (widget.icon != null && !widget.isLoading)

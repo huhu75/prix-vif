@@ -8,6 +8,26 @@
 
 ## 📋 Historique des versions
 
+### v1.14.0 — 2026-11-22 — Boutons de navigation plus clairs (Retour, Accueil)
+
+- **Ajouté** : bouton **Retour** commun (`AppBackButton`, `lib/widgets/nav_buttons.dart`) : flèche bleue dans un rond teinté, infobulle « Retour ». Il est présent sur tous les écrans sauf l'accueil, y compris les onglets Scanner, Dashboard et Historique qui n'en avaient pas
+- **Ajouté** : vrai retour en arrière entre les onglets. Retour ramène à l'onglet précédent (ex. Résultats → Historique → Scanner → Accueil), et l'historique est remis à zéro à chaque passage par l'accueil. Avant, la flèche de Résultats renvoyait toujours au Scanner
+- **Ajouté** : le bouton retour d'Android suit le même historique. L'app ne se ferme plus que depuis l'accueil (avant : depuis n'importe quel onglet)
+- **Ajouté** : bouton **Accueil** (`AppHomeButton`) sur les écrans ouverts par-dessus les onglets (détails d'une session, sélection et fiche produit) : il ferme tous ces écrans et affiche l'accueil (`AppNavigation.goHome`)
+- **Modifié** : la sélection produit s'intitule **PRODUITS** (« SÉLECTION PRODUIT » était coupé avec les nouveaux boutons)
+- **Corrigé** : le titre de la fiche produit s'affichait en noir sur fond sombre (le style de titre du thème n'a pas de couleur)
+- **Corrigé** : le bouton « SCANNER MAINTENANT » de l'écran Résultats vide débordait de 33 px. `MagicButton` réduit maintenant son texte au lieu de déborder
+- **Ajouté** : tests `test/screens/navigation_test.dart` (7 cas : boutons Retour/Accueil, retour depuis le Scanner, remontée des onglets, bouton retour d'Android, Accueil depuis un écran ouvert par-dessus) et outils communs `test/helpers/app_test_helpers.dart`
+
+### v1.13.0 — 2026-11-22 — Page d'accueil avec les 3 actions principales
+
+- **Ajouté** : page d'accueil (`lib/screens/home_screen.dart`) affichée à l'ouverture de l'app, à la place du scanner. Elle propose 3 grandes cartes : **Scanner un code-barres**, **Scanner un ticket de caisse** et **Analyser les produits et magasins**, dans le style du tableau de bord (dégradé, bordure et icône teintés)
+- **Ajouté** : onglet **Accueil** en tête de la barre de navigation (5 onglets : Accueil, Scanner, Résultats, Dashboard, Historique)
+- **Modifié** : les cartes de scan ouvrent l'onglet Scanner directement dans le bon mode (code-barres ou ticket). La carte d'analyse ouvre le tableau de bord
+- **Modifié** : la caméra ne tourne plus que quand l'onglet Scanner est affiché en mode code-barres. Avant, elle démarrait au lancement et restait allumée sur les autres onglets. Au retour au premier plan, elle ne redémarre plus en mode ticket
+- **Corrigé** : un tap sur un onglet juste après le lancement, avant que la base Hive soit ouverte, change maintenant d'onglet au lieu d'échouer. L'onglet s'affiche tout de suite, puis les sessions se rechargent
+- **Ajouté** : tests `test/screens/home_screen_test.dart` (3 actions de l'accueil, ouverture sur l'accueil, Scanner ouvert dans le bon mode, tableau de bord)
+
 ### v1.12.3 — 2026-11-21 — Recherche par nom fiable pour corriger un produit
 
 - **Corrigé** : dans « Corriger le produit Open Food Facts » (fiche produit), relancer une recherche déjà faite (dont celle qui s'ouvre avec le nom du produit) n'affichait qu'**un seul** résultat, celui gardé en cache, souvent la fiche à corriger. La recherche tapée interroge maintenant le réseau d'abord et affiche tous les résultats (20 au lieu de 10). Le cache ne sert plus qu'hors-ligne
@@ -228,6 +248,11 @@
 
 ## ✨ Fonctionnalités
 
+### 🏠 Accueil
+- Écran d'ouverture de l'app, avec 3 actions : **Scanner un code-barres**, **Scanner un ticket de caisse**, **Analyser les produits et magasins**
+- Chaque scan ouvre le Scanner directement dans le bon mode ; l'analyse ouvre le tableau de bord
+- Accessible à tout moment par l'onglet **Accueil** de la barre du bas, ou par le bouton Accueil des écrans de détail
+
 ### 🎯 Scanner
 - **Caméra réelle** : Accès à la caméra du téléphone/tablette
 - Scan de codes-barres en temps réel
@@ -420,6 +445,7 @@ prix_vif/
 │   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
+│   │   ├── home_screen.dart          # Accueil : les 3 actions (code-barres, ticket, analyse)
 │   │   ├── scan_screen.dart          # Écran scanner : état et flux (code-barres, ticket, hors-ligne)
 │   │   ├── results_screen.dart       # Écran résultats
 │   │   ├── history_screen.dart       # Écran historique
@@ -434,6 +460,7 @@ prix_vif/
 │       ├── off_match_sheet.dart       # Choix d'une autre fiche Open Food Facts pour un produit
 │       ├── scanner_overlay.dart      # Overlay scanner
 │       ├── magic_button.dart         # Boutons animés
+│       ├── nav_buttons.dart          # Boutons Retour / Accueil des barres d'app (AppNavigation)
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       ├── logo.dart                  # Logo de l'application
@@ -459,7 +486,9 @@ prix_vif/
 - Passage de callbacks entre widgets
 
 ### Navigation
-- `BottomNavigationBar` pour la navigation principale (4 onglets)
+- `BottomNavigationBar` pour la navigation principale (5 onglets : Accueil, Scanner, Résultats, Dashboard, Historique), ouverture sur l'Accueil
+- Bouton **Retour** sur chaque écran sauf l'accueil (onglet précédent, ou écran précédent) ; le bouton retour d'Android fait de même
+- Bouton **Accueil** sur les écrans ouverts par-dessus les onglets (détails d'une session, sélection et fiche produit)
 - `MaterialPageRoute` pour les détails
 - `IndexedStack` pour conserver l'état
 - **Synchronisation automatique** entre onglets
@@ -483,9 +512,9 @@ prix_vif/
 ## 🎯 Utilisation
 
 ### 📱 Scanner un code-barres
-1. Lancez l'application sur votre appareil Android/iOS
-2. Autorisez l'accès à la caméra
-3. Sélectionnez le mode **CODE-BARRES** (bascule en haut de l'écran)
+1. Lancez l'application sur votre appareil Android/iOS : elle s'ouvre sur l'**accueil**
+2. Touchez **Scanner un code-barres** (ou, depuis le Scanner, sélectionnez le mode **CODE-BARRES**)
+3. Autorisez l'accès à la caméra
 4. Pointez la caméra vers un code-barres
 5. Le code est scanné automatiquement
 6. **Intégration Open Food Facts** : L'application récupère automatiquement les informations du produit (nom, marque, Nutri-Score, catégories, image)
@@ -493,7 +522,7 @@ prix_vif/
 8. **✅ Sauvegarde automatique** : L'article est immédiatement persisté en base et apparaît dans le Dashboard
 
 ### 📸 Capturer un ticket de caisse
-1. Sélectionnez le mode **TICKET** (bascule en haut de l'écran)
+1. Sur l'accueil, touchez **Scanner un ticket de caisse** (ou, depuis le Scanner, sélectionnez le mode **TICKET**)
 2. Appuyez sur le bouton "Photographier un ticket"
 3. Prenez une photo du ticket avec la caméra ou choisissez depuis la galerie
 4. **Compression automatique** : L'image est réduite à max 1024px, JPEG 80%
@@ -597,7 +626,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 21 Novembre 2026 (v1.12.3 — voir Historique des versions)*
+*Dernière mise à jour : 22 Novembre 2026 (v1.14.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
+*Statut : ✅ Page d'accueil (3 actions) et boutons Retour / Accueil, recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*

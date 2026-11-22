@@ -6,6 +6,7 @@ import '../services/scan_repository.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/product_analysis_service.dart';
 import '../widgets/article_edit_dialog.dart';
+import '../widgets/nav_buttons.dart';
 import '../widgets/off_match_sheet.dart';
 import '../widgets/product_detail/price_evolution_tab.dart';
 import '../widgets/product_detail/product_info_tab.dart';
@@ -541,9 +542,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Scaffold(
         backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: Text(
             _analysisResult!.productName.toUpperCase(),
-            style: const TextStyle(fontSize: 18),
+            // Couleur explicite : le style de titre du thème n'en a pas (texte noir)
+            style: const TextStyle(fontSize: 18, color: AppTheme.textPrimary),
             overflow: TextOverflow.ellipsis,
           ),
           bottom: const TabBar(
@@ -570,6 +573,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ],
           ),
           actions: [
+            const AppHomeButton(),
             // Bouton pour rafraîchir
             IconButton(
               icon: const Icon(Icons.refresh, color: AppTheme.textPrimary),
@@ -664,12 +668,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  /// Barre d'app des états chargement / erreur / vide : Retour et Accueil
+  PreferredSizeWidget _simpleAppBar() {
+    return AppBar(
+      leading: const AppBackButton(),
+      title: Text(
+        widget.productName.toUpperCase(),
+        style: const TextStyle(fontSize: 18, color: AppTheme.textPrimary),
+        overflow: TextOverflow.ellipsis,
+      ),
+      actions: const [AppHomeButton(), SizedBox(width: 8)],
+    );
+  }
+
   Widget _buildLoadingState() {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        title: Text(widget.productName.toUpperCase()),
-      ),
+      appBar: _simpleAppBar(),
       body: const Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
@@ -681,9 +696,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildErrorState(String error) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        title: Text(widget.productName.toUpperCase()),
-      ),
+      appBar: _simpleAppBar(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -740,9 +753,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildEmptyState() {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        title: Text(widget.productName.toUpperCase()),
-      ),
+      appBar: _simpleAppBar(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

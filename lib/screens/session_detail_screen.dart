@@ -5,6 +5,7 @@ import '../services/scan_repository.dart';
 import '../widgets/article_edit_dialog.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 
 /// Détail d'une session. Avec un [repository], chaque article peut être
 /// modifié ou supprimé (appui sur la carte) ; [onChanged] est appelé ensuite.
@@ -80,10 +81,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const NeonTitle(text: 'DÉTAILS', fontSize: 22),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-          onPressed: onBack,
-        ),
+        leading: AppBackButton(onPressed: onBack),
+        actions: const [AppHomeButton(), SizedBox(width: 8)],
       ),
       body: Column(
         children: [

@@ -4,6 +4,7 @@ import '../models/product_analysis_models.dart';
 import '../services/scan_repository.dart';
 import '../utils/product_type_utils.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 import 'product_detail_screen.dart';
 
 /// Écran de sélection de produit pour l'analyse
@@ -154,8 +155,11 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
-        title: const NeonTitle(text: 'SÉLECTION PRODUIT', fontSize: 18),
+        leading: const AppBackButton(),
+        // Titre court : Retour, Accueil et Tri partagent la barre
+        title: const NeonTitle(text: 'PRODUITS', fontSize: 20),
         actions: [
+          const AppHomeButton(),
           // Bouton de tri
           PopupMenuButton<SortOption>(
             icon: const Icon(Icons.sort, color: AppTheme.textPrimary),

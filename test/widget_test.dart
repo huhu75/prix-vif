@@ -16,7 +16,7 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const PrixVifApp());
 
-    // Vérifier que le titre du scanner s'affiche bien (via NeonTitle)
+    // L'app s'ouvre sur l'accueil, dont le titre utilise NeonTitle
     expect(find.byType(NeonTitle), findsWidgets);
   });
 }
