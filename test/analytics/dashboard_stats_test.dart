@@ -65,38 +65,79 @@ void main() {
     });
   });
 
-  group('DashboardStats.fromSessions', () {
+  group('ProductStorePrices (onglet Produits)', () {
+    final earlier = now.subtract(const Duration(days: 5));
     final sessions = [
-      ScanSession(id: 'recent', date: now.subtract(const Duration(days: 2)), items: [
-        _item('a', price: 2.0, date: now, store: 'Carrefour', categories: ['Milks'], nutriscore: 'A'),
-        _item('b', price: 3.0, date: now, store: 'Leclerc', categories: ['Milks'], nutriscore: 'a'),
-      ]),
-      ScanSession(id: 'old', date: now.subtract(const Duration(days: 20)), items: [
-        _item('c', price: 5.0, date: now, name: 'Pain', categories: ['Breads'], nutriscore: 'C'),
+      ScanSession(id: 's', date: now, items: [
+        // Lait : 1.10 puis 1.00 chez Carrefour (le dernier prix compte), 0.90 chez Leclerc, 1.30 chez Monoprix
+        _item('1', price: 1.10, date: earlier, barcode: 'lait', store: 'Carrefour'),
+        _item('2', price: 1.00, date: now, barcode: 'lait', store: 'Carrefour'),
+        _item('3', price: 0.90, date: now, barcode: 'lait', store: 'Leclerc'),
+        _item('4', price: 1.30, date: now, barcode: 'lait', store: 'Monoprix'),
+        // Pain : même prix dans deux magasins
+        _item('5', price: 2.00, date: now, barcode: 'pain', name: 'Pain', store: 'Carrefour'),
+        _item('6', price: 2.00, date: now, barcode: 'pain', name: 'Pain', store: 'Leclerc'),
+        // Beurre : un seul magasin ; Café : petit écart
+        _item('7', price: 3.00, date: now, barcode: 'beurre', name: 'Beurre', store: 'Leclerc'),
+        _item('8', price: 4.00, date: now, barcode: 'cafe', name: 'Café', store: 'Carrefour'),
+        _item('9', price: 3.90, date: now, barcode: 'cafe', name: 'Café', store: 'Monoprix'),
+        // Sans magasin : ignoré
+        _item('10', price: 0.50, date: now, barcode: 'chips', name: 'Chips'),
       ]),
     ];
 
-    test('totaux, moyenne et Nutri-Score', () {
-      final stats = DashboardStats.fromSessions(sessions, now: now);
-      expect(stats.totalScans, 2);
-      expect(stats.totalItems, 3);
-      expect(stats.totalAmount, 10.0);
-      expect(stats.averagePrice, closeTo(3.33, 0.01));
-      expect(stats.nutriScoreDistribution, {'a': 2, 'c': 1});
+    test('magasins du moins cher au plus cher, avec le dernier prix de chaque magasin', () {
+      final lait = ProductStorePrices.calculate(sessions).firstWhere((p) => p.productId == 'lait');
+      expect(lait.storePrices.map((s) => s.storeName), ['Leclerc', 'Carrefour', 'Monoprix']);
+      expect(lait.storePrices.map((s) => s.price), [0.90, 1.00, 1.30]);
+      expect(lait.cheapest.storeName, 'Leclerc');
+      expect(lait.priceDiff, closeTo(0.40, 0.001));
+      expect(lait.hasPriceDifference, isTrue);
     });
 
-    test('totaux sur 7 et 30 jours', () {
-      final stats = DashboardStats.fromSessions(sessions, now: now);
-      expect(stats.weeklyTotal, 5.0);
-      expect(stats.monthlyTotal, 10.0);
+    test('écarts de prix d\'abord (du plus gros au plus petit), puis les autres par nom', () {
+      expect(ProductStorePrices.calculate(sessions).map((p) => p.productId), ['lait', 'cafe', 'beurre', 'pain']);
+    });
+  });
+
+  group('DashboardStats.fromSessions', () {
+    test('ce que chaque magasin a de moins cher, magasins les mieux placés d\'abord', () {
+      final stats = DashboardStats.fromSessions([
+        ScanSession(id: 's', date: now, items: [
+          _item('1', price: 1.00, date: now, barcode: 'lait', store: 'Carrefour'),
+          _item('2', price: 0.90, date: now, barcode: 'lait', store: 'Leclerc'),
+          _item('3', price: 2.00, date: now, barcode: 'pain', name: 'Pain', store: 'Carrefour'),
+          _item('4', price: 2.20, date: now, barcode: 'pain', name: 'Pain', store: 'Leclerc'),
+          _item('5', price: 4.00, date: now, barcode: 'cafe', name: 'Café', store: 'Carrefour'),
+          _item('6', price: 4.50, date: now, barcode: 'cafe', name: 'Café', store: 'Leclerc'),
+          _item('7', price: 3.00, date: now, barcode: 'beurre', name: 'Beurre', store: 'Leclerc'),
+        ]),
+      ]);
+      expect(stats.comparedProducts.map((p) => p.productId).toSet(), {'lait', 'pain', 'cafe'});
+      final byStore = stats.cheapestByStore;
+      expect(byStore.keys, ['Carrefour', 'Leclerc']);
+      expect(byStore['Carrefour']!.map((p) => p.productId), ['cafe', 'pain']);
+      expect(byStore['Leclerc']!.map((p) => p.productId), ['lait']);
     });
 
-    test('statistiques par type et classement des magasins', () {
-      final milks = DashboardStats.fromSessions(sessions, now: now).productTypeStats['Milks']!;
-      expect(milks.itemCount, 2);
-      expect(milks.averagePrice, 2.5);
-      expect(milks.storesSortedByAveragePrice.map((s) => s.storeName), ['Carrefour', 'Leclerc']);
-      expect(milks.storePriceSpread, 1.0);
+    test('sépare hausses et baisses, des plus fortes aux plus faibles', () {
+      final before = now.subtract(const Duration(days: 7));
+      ScanSession trip(String id, DateTime date, double lait, double pain, double cafe) => ScanSession(
+            id: id,
+            date: date,
+            items: [
+              _item('${id}_l', price: lait, date: date, barcode: 'lait', store: 'Carrefour'),
+              _item('${id}_p', price: pain, date: date, barcode: 'pain', name: 'Pain', store: 'Carrefour'),
+              _item('${id}_c', price: cafe, date: date, barcode: 'cafe', name: 'Café', store: 'Carrefour'),
+            ],
+          );
+      final stats = DashboardStats.fromSessions([
+        trip('avant', before, 1.00, 2.00, 4.00),
+        trip('apres', now, 1.20, 1.80, 4.20),
+      ]);
+      // Lait +20 %, Café +5 %, Pain −10 %
+      expect(stats.increases.map((c) => c.productId), ['lait', 'cafe']);
+      expect(stats.decreases.map((c) => c.productId), ['pain']);
     });
   });
 }

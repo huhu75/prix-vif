@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:prix_vif/analytics/analytics.dart';
 import 'package:prix_vif/models.dart';
-import 'package:prix_vif/widgets/dashboard/price_alerts_section.dart';
-import 'package:prix_vif/widgets/dashboard/shopping_basket_section.dart';
+import 'package:prix_vif/widgets/dashboard/prices_tab.dart';
+import 'package:prix_vif/widgets/dashboard/stores_tab.dart';
 
 final _start = DateTime(2026, 11, 1);
 
@@ -77,78 +77,103 @@ void main() {
     });
   });
 
-  group('PriceAlert', () {
+  group('PriceChange', () {
     final sessions = [
-      _trip('t1', 0, [_buy('Lait', 1.00, 'Carrefour', 0), _buy('Pain', 2.00, 'Carrefour', 0)]),
+      _trip('t1', 0, [
+        _buy('Lait', 1.00, 'Carrefour', 0),
+        _buy('Pain', 2.00, 'Carrefour', 0),
+        _buy('Beurre', 3.00, 'Carrefour', 0),
+      ]),
       _trip('t2', 3, [_buy('Lait', 0.95, 'Leclerc', 3)]),
-      _trip('t3', 7, [_buy('Lait', 1.15, 'Carrefour', 7), _buy('Pain', 2.10, 'Carrefour', 7)]),
+      _trip('t3', 7, [
+        _buy('Lait', 1.15, 'Carrefour', 7),
+        _buy('Pain', 1.80, 'Carrefour', 7),
+        _buy('Beurre', 3.005, 'Carrefour', 7),
+      ]),
     ];
 
-    test('détecte une hausse au-delà du seuil dans le même magasin', () {
-      final alerts = PriceAlert.calculate(sessions, thresholdPercent: 10);
-      expect(alerts.length, 1);
-      final alert = alerts.single;
-      expect(alert.name, 'Lait');
-      expect(alert.storeName, 'Carrefour');
-      expect(alert.increasePercent, closeTo(15, 0.01));
-      expect(alert.cheaperStore, 'Leclerc');
-      expect(alert.cheaperPrice, 0.95);
+    test('hausses et baisses dans le même magasin, de la plus forte hausse à la plus forte baisse', () {
+      final changes = PriceChange.calculate(sessions);
+      expect(changes.map((c) => c.name), ['Lait', 'Pain']);
+
+      final lait = changes.first;
+      expect(lait.isIncrease, isTrue);
+      expect(lait.storeName, 'Carrefour');
+      expect(lait.percent, closeTo(15, 0.01));
+      expect(lait.cheaperStore, 'Leclerc');
+      expect(lait.cheaperPrice, 0.95);
+
+      final pain = changes.last;
+      expect(pain.isIncrease, isFalse);
+      expect(pain.percent, closeTo(-10, 0.01));
     });
 
-    test('le seuil filtre les petites hausses', () {
-      expect(PriceAlert.calculate(sessions, thresholdPercent: 6).map((a) => a.name), ['Lait']);
-      expect(PriceAlert.calculate(sessions, thresholdPercent: 4).map((a) => a.name), ['Lait', 'Pain']);
-      expect(PriceAlert.calculate(sessions, thresholdPercent: 20), isEmpty);
+    test('un écart d\'un centime ou moins n\'est pas un changement', () {
+      expect(PriceChange.calculate(sessions).any((c) => c.name == 'Beurre'), isFalse);
+    });
+
+    test('pas de changement entre deux magasins différents', () {
+      // Lait : 1.00 chez Carrefour puis 0.95 chez Leclerc, un seul achat dans chaque magasin
+      expect(PriceChange.calculate(sessions.take(2).toList()), isEmpty);
     });
   });
 
-  group('sections du Dashboard', () {
-    testWidgets('« Où faire mes courses ? » affiche le meilleur magasin et le panier combiné', (tester) async {
+  group('onglets du Dashboard', () {
+    testWidgets('« Où faire mes courses ? » affiche les magasins et le total en panachant', (tester) async {
       final basket = ShoppingBasketAnalysis.calculate([
         _trip('t1', 0, [_buy('Lait', 1.20, 'Carrefour', 0), _buy('Pain', 2.00, 'Carrefour', 0)]),
         _trip('t2', 1, [_buy('Lait', 1.00, 'Leclerc', 1), _buy('Pain', 2.20, 'Leclerc', 1)]),
       ]);
       await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: SingleChildScrollView(child: ShoppingBasketSection(analysis: basket))),
+        home: Scaffold(body: SingleChildScrollView(child: BasketCard(analysis: basket))),
       ));
 
       expect(find.text('Où faire mes courses ?'), findsOneWidget);
       expect(find.text('3.20 €'), findsWidgets);
-      expect(find.textContaining('En combinant les magasins : 3.00 €'), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('basket_optimal_toggle')));
-      await tester.pump();
-      expect(find.text('• Pain — 2.00 €'), findsOneWidget);
+      expect(find.text('2 prix relevés sur 2'), findsWidgets);
+      expect(
+        find.text('En achetant chaque produit là où il est le moins cher : 3.00 € (0.20 € de moins).'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('« Où faire mes courses ? » sans données explique quoi faire', (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: ShoppingBasketSection(analysis: null))));
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: BasketCard(analysis: null))));
       expect(find.textContaining('au moins deux magasins'), findsOneWidget);
     });
 
-    testWidgets('les alertes suivent le seuil choisi', (tester) async {
-      final sessions = [
-        _trip('t1', 0, [_buy('Lait', 1.00, 'Carrefour', 0)]),
-        _trip('t2', 7, [_buy('Lait', 1.07, 'Carrefour', 7)]),
-      ];
+    testWidgets('onglet Prix : hausse avec magasin moins cher, baisse, tap vers la fiche', (tester) async {
+      final changes = PriceChange.calculate([
+        _trip('t1', 0, [_buy('Lait', 1.00, 'Carrefour', 0), _buy('Pain', 2.00, 'Carrefour', 0)]),
+        _trip('t2', 3, [_buy('Lait', 0.95, 'Leclerc', 3)]),
+        _trip('t3', 7, [_buy('Lait', 1.07, 'Carrefour', 7), _buy('Pain', 1.80, 'Carrefour', 7)]),
+      ]);
       String? tapped;
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
-          body: SingleChildScrollView(
-            child: PriceAlertsSection(sessions: sessions, onProductTap: (id, _) => tapped = id),
+          body: PricesTab(
+            increases: changes.where((c) => c.isIncrease).toList(),
+            decreases: changes.where((c) => !c.isIncrease).toList(),
+            onProductTap: (id, _) => tapped = id,
           ),
         ),
       ));
 
-      // +7 % : rien au seuil par défaut de 10 %
-      expect(find.textContaining('Aucune hausse'), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('alert_threshold_5')));
-      await tester.pump();
       expect(find.text('+7 %'), findsOneWidget);
+      expect(find.text('1.07 € chez Carrefour (avant 1.00 €)'), findsOneWidget);
+      expect(find.text('Moins cher chez Leclerc : 0.95 €'), findsOneWidget);
+      expect(find.text('−10 %'), findsOneWidget);
 
       await tester.tap(find.text('Lait'));
       expect(tapped, 'ean_Lait');
+    });
+
+    testWidgets('onglet Prix vide', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: PricesTab(increases: const [], decreases: const [], onProductTap: (_, _) {})),
+      ));
+      expect(find.text('Aucune hausse depuis tes derniers achats.'), findsOneWidget);
+      expect(find.text('Aucune baisse depuis tes derniers achats.'), findsOneWidget);
     });
   });
 }

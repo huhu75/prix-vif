@@ -112,4 +112,35 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     expect(added, 1);
   });
+
+  testWidgets('bouton de gestion des magasins quand onManage est fourni', (tester) async {
+    var managed = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: StoreSelector(
+          stores: const ['Carrefour', 'Leclerc'],
+          selectedStore: null,
+          onSelected: (_) {},
+          onAdd: () {},
+          onManage: () => managed++,
+        ),
+      ),
+    ));
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    expect(managed, 1);
+  });
+
+  testWidgets('pas de bouton de gestion sans onManage', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: StoreSelector(
+          stores: const ['Carrefour'],
+          selectedStore: null,
+          onSelected: (_) {},
+          onAdd: () {},
+        ),
+      ),
+    ));
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+  });
 }

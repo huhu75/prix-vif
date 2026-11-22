@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:prix_vif/analytics/analytics.dart';
 import 'package:prix_vif/models.dart';
-import 'package:prix_vif/models/product_analysis_models.dart';
 import 'package:prix_vif/utils/unit_price.dart';
 
 void main() {
@@ -63,70 +61,6 @@ void main() {
     test('formattedQuantity sans « .0 » inutile', () {
       final item = ScannedItem(id: '1', name: 'Eau', price: 1, quantity: 6, unit: 'x 1.5L', scanDate: DateTime(2026));
       expect(item.formattedQuantity, '6 x 1.5L');
-    });
-  });
-
-  group('comparaisons au kg / L', () {
-    final now = DateTime(2026, 11, 17);
-    ScannedItem milk(String id, String name, double price, double qty, String unit, String store) =>
-        ScannedItem(
-          id: id,
-          name: name,
-          brand: 'Marque',
-          price: price,
-          quantity: qty,
-          unit: unit,
-          scanDate: now,
-          storeName: store,
-          categories: const ['Milks'],
-        );
-
-    test('le pack de 6 L n\'est plus vu comme 5 fois plus cher', () {
-      final sessions = [
-        ScanSession(id: 's', date: now, items: [
-          milk('a', 'Lait Bouteille', 1.20, 1, 'L', 'Carrefour'),
-          milk('b', 'Lait Pack', 6.00, 6, 'x 1L', 'Leclerc'),
-        ]),
-      ];
-
-      final stats = DashboardStats.fromSessions(sessions, now: now).productTypeStats['Milks']!;
-      expect(stats.comparisonUnit, PriceUnit.liter);
-      // Par article, Carrefour (1.20) battrait Leclerc (6.00) ; au litre, Leclerc (1.00) gagne.
-      expect(stats.storesSortedByAveragePrice.first.storeName, 'Leclerc');
-      expect(stats.formatStorePrice(stats.storeStats['Carrefour']!), '1.20 €/L');
-      expect(stats.storePriceSpread, closeTo(0.20, 0.001));
-
-      final rec = ProductRecommendationItem.calculate(sessions).single;
-      expect(rec.referenceProductName, 'Lait Bouteille');
-      expect(rec.alternativeProductName, 'Lait Pack');
-      expect(rec.comparesByUnit, isTrue);
-      // À quantité égale (1 L) : 1.20 € → 1.00 €
-      expect(rec.savingAmount, closeTo(0.20, 0.001));
-      expect(rec.savingPercent, closeTo(16.67, 0.01));
-    });
-
-    test('pas de recommandation entre un produit au litre et un produit sans contenance', () {
-      final sessions = [
-        ScanSession(id: 's', date: now, items: [
-          milk('a', 'Lait Bouteille', 1.20, 1, 'L', 'Carrefour'),
-          ScannedItem(id: 'b', name: 'Lait Vrac', price: 0.50, scanDate: now, storeName: 'Leclerc', categories: const ['Milks']),
-        ]),
-      ];
-      expect(ProductRecommendationItem.calculate(sessions), isEmpty);
-    });
-
-    test('produits similaires triés au litre', () {
-      final comparison = SimilarProductsComparison(
-        category: 'Milks',
-        referenceProductId: 'x',
-        similarProducts: [
-          SimilarProductInfo(productId: '1', productName: 'Bouteille', price: 1.20, quantity: 1, unit: 'L', scanDate: now),
-          SimilarProductInfo(productId: '2', productName: 'Pack', price: 6.00, quantity: 6, unit: 'x 1L', scanDate: now),
-          SimilarProductInfo(productId: '3', productName: 'Sans contenance', price: 0.80, scanDate: now),
-        ],
-      );
-      expect(comparison.productsSortedByPrice.map((p) => p.productName), ['Pack', 'Bouteille', 'Sans contenance']);
-      expect(comparison.cheapestProduct!.productName, 'Pack');
     });
   });
 }

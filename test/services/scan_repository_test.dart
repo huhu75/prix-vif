@@ -150,6 +150,42 @@ void main() {
       expect(reopened.getCustomStores(), ['Intermarché', 'Lidl']);
       expect(reopened.getSelectedStore(), 'Lidl');
     });
+
+    test('removeStore masque le magasin, oublie le choix et exclut des magasins connus', () async {
+      await repository.ready;
+      await repository.addCustomStore('Bio & Co');
+      await repository.saveSelectedStore('Bio & Co');
+      await repository.saveScan(_session('s1', [_item('a', store: 'Bio & Co')]));
+
+      await repository.removeStore('Bio & Co');
+      await repository.removeStore('Carrefour'); // magasin par défaut aussi masquable
+
+      expect(repository.getCustomStores(), isEmpty);
+      expect(repository.getHiddenStores(), containsAll(['Bio & Co', 'Carrefour']));
+      expect(repository.getSelectedStore(), isNull);
+      expect(repository.getAllKnownStores(), isNot(contains('Bio & Co')));
+      expect(repository.getAllKnownStores(), isNot(contains('Carrefour')));
+      // L'historique des prix n'est pas touché
+      expect(repository.getAllStoredArticles().single.storeName, 'Bio & Co');
+
+      final reopened = ScanRepository();
+      await reopened.init();
+      expect(reopened.getHiddenStores(), containsAll(['Bio & Co', 'Carrefour']));
+      expect(reopened.getAllKnownStores(), isNot(contains('Carrefour')));
+    });
+
+    test('ré-ajouter un magasin supprimé le rend à nouveau visible', () async {
+      await repository.ready;
+      await repository.addCustomStore('Lidl');
+      await repository.removeStore('Lidl');
+      expect(repository.getAllKnownStores(), isNot(contains('Lidl')));
+
+      await repository.addCustomStore('lidl');
+
+      expect(repository.getCustomStores(), ['lidl']);
+      expect(repository.getHiddenStores(), isEmpty);
+      expect(repository.getAllKnownStores(), contains('lidl'));
+    });
   });
 
   group('retrait des données de démo', () {

@@ -319,4 +319,199 @@ void main() {
       expect(emptyResults, isEmpty);
     });
   });
+
+  group('OpenFoodFactsService - Libellés de ticket abrégés', () {
+    final service = OpenFoodFactsService(httpClient: MockClient((_) async => http.Response('{}', 200)));
+
+    test('cleanProductName: développe les abréviations et retire les contenances', () {
+      expect(service.cleanProductName('LESS LIQ MIR COUL 1.35L'), 'lessive liquide mir couleur');
+      expect(service.cleanProductName('MIR LESSIVE LIQUIDE COULEUR 1,35L'), 'mir lessive liquide couleur');
+      expect(service.cleanProductName('MIR LESS. RAV. NOIR'), 'mir lessive rav noir');
+      expect(service.cleanProductName('Coca-Cola 6x33cl'), 'coca cola');
+      expect(service.cleanProductName('CHOC NOIR 70%'), 'chocolat noir');
+      expect(service.cleanProductName('stylo bic promo x2'), 'stylo bic');
+      expect(service.cleanProductName('LAIT 1/2 ECR 1L'), 'lait ecreme');
+    });
+
+    /// Client qui ne renvoie un produit que pour la requête [matchingQuery]
+    /// et note toutes les requêtes reçues dans [queries].
+    MockClient clientMatching(String matchingQuery, List<String> queries) {
+      return MockClient((request) async {
+        final query = request.url.queryParameters['search_terms'] ?? '';
+        queries.add(query);
+        if (request.url.host == 'world.openproductsfacts.org' && query == matchingQuery) {
+          return http.Response(
+            jsonEncode({
+              'products': [
+                {'code': '3178041363952', 'product_name': 'Mir couleur', 'brands': 'Mir'}
+              ]
+            }),
+            200,
+          );
+        }
+        return http.Response('{"products": []}', 200);
+      });
+    }
+
+    test('searchByNameWithTwoPasses: libellé abrégé trouvé grâce aux abréviations', () async {
+      final queries = <String>[];
+      final service = OpenFoodFactsService(
+        httpClient: clientMatching('lessive liquide mir couleur', queries),
+      );
+
+      final results = await service.searchByNameWithTwoPasses('LESS LIQ MIR COUL 1.35L');
+
+      expect(results.single.name, 'Mir couleur');
+      expect(results.single.source, 'Open Products Facts');
+      expect(queries.toSet(), {'LESS LIQ MIR COUL 1.35L', 'lessive liquide mir couleur'});
+    });
+
+    test('searchByNameWithTwoPasses: 3ème passe avec moins de mots si un mot bloque', () async {
+      final queries = <String>[];
+      final service = OpenFoodFactsService(httpClient: clientMatching('mir lessive', queries));
+
+      final results = await service.searchByNameWithTwoPasses('MIR LESS. RAV. NOIR');
+
+      expect(results.single.name, 'Mir couleur');
+      expect(queries.toSet(), {
+        'MIR LESS. RAV. NOIR',
+        'mir lessive rav noir',
+        'mir lessive rav',
+        'mir lessive',
+      });
+    });
+
+    test('searchByNameWithTwoPasses: 3ème passe limitée à 2 essais et 2 mots minimum', () async {
+      final queries = <String>[];
+      final service = OpenFoodFactsService(httpClient: clientMatching('introuvable', queries));
+
+      final results = await service.searchByNameWithTwoPasses('aaa bbb ccc ddd eee');
+
+      expect(results, isEmpty);
+      expect(queries.toSet(), {'aaa bbb ccc ddd eee', 'aaa bbb ccc ddd', 'aaa bbb ccc'});
+
+      // Deux mots : pas de 3ème passe (un seul mot serait trop vague)
+      queries.clear();
+      await service.searchByNameWithTwoPasses('aaa bbb');
+      expect(queries.toSet(), {'aaa bbb'});
+    });
+  });
+
+  group('OpenFoodFactsService - Recherche manuelle, cache et surcharge OFF', () {
+    late ScanRepository repository;
+
+    setUp(() async {
+      Hive.init(Directory.systemTemp.createTempSync('prix_vif_off_manual_test').path);
+      repository = ScanRepository();
+      await repository.init();
+    });
+
+    tearDown(() async {
+      await Hive.deleteFromDisk();
+    });
+
+    http.Response productsResponse(List<String> names) => http.Response(
+          jsonEncode({
+            'products': [
+              for (var i = 0; i < names.length; i++)
+                {'code': '30176204220${i.toString().padLeft(2, '0')}', 'product_name': names[i], 'brands': 'Ferrero'}
+            ]
+          }),
+          200,
+        );
+
+    test('searchProducts: réseau d\'abord, tous les résultats même si le nom est en cache', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'world.openfoodfacts.org') {
+          return productsResponse(['Nutella 400g', 'Nutella 750g', 'Nutella Biscuits']);
+        }
+        return http.Response('{"products": []}', 200);
+      });
+      final service = OpenFoodFactsService(httpClient: mockClient, retryDelays: const [])
+        ..setRepository(repository);
+
+      // Le matching du ticket met le premier résultat en cache
+      expect((await service.searchByName('Nutella')).length, 3);
+      // Matching automatique suivant : le cache suffit (un seul produit)
+      final cached = await service.searchByName('nutella');
+      expect(cached.single.source, 'Cache');
+
+      // Recherche tapée dans la fiche : tous les résultats du réseau
+      final manual = await service.searchProducts('nutella');
+      expect(manual.map((p) => p.name), ['Nutella 400g', 'Nutella 750g', 'Nutella Biscuits']);
+      expect(manual.first.source, 'Open Food Facts');
+    });
+
+    test('searchByName: nouvel essai quand Open Food Facts répond 503', () async {
+      var offCalls = 0;
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'world.openfoodfacts.org') {
+          offCalls++;
+          if (offCalls == 1) return http.Response('Service surchargé', 503);
+          return productsResponse(['Nutella 400g']);
+        }
+        return http.Response('{"products": []}', 200);
+      });
+      final service = OpenFoodFactsService(httpClient: mockClient, retryDelays: const [Duration.zero]);
+
+      final results = await service.searchByName('nutella');
+
+      expect(results.single.name, 'Nutella 400g');
+      expect(results.single.source, 'Open Food Facts');
+      expect(offCalls, 2);
+    });
+
+    test('searchByName: OFF indisponible → résultats de repli non mis en cache', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'world.openfoodfacts.org') return http.Response('Service surchargé', 503);
+        if (request.url.host == 'world.openproductsfacts.org') return productsResponse(['Nutella (fiche OPF)']);
+        return http.Response('{"products": []}', 200);
+      });
+      final service = OpenFoodFactsService(httpClient: mockClient, retryDelays: const [Duration.zero])
+        ..setRepository(repository);
+
+      final results = await service.searchByName('nutella');
+
+      expect(results.single.source, 'Open Products Facts');
+      expect(repository.getCachedProduct('name:nutella'), isNull);
+    });
+
+    test('searchProducts: aucun fournisseur ne répond → erreur, ou dernier résultat connu', () async {
+      var online = true;
+      final mockClient = MockClient((request) async {
+        if (!online) return http.Response('Service surchargé', 503);
+        if (request.url.host == 'world.openfoodfacts.org') return productsResponse(['Nutella 400g']);
+        return http.Response('{"products": []}', 200);
+      });
+      final service = OpenFoodFactsService(httpClient: mockClient, retryDelays: const [])
+        ..setRepository(repository);
+
+      // Rien en cache : erreur (l'écran affiche « recherche impossible », pas « aucun produit »)
+      online = false;
+      await expectLater(service.searchProducts('nutella'), throwsA(isA<OFFSearchUnavailableException>()));
+
+      // Une recherche réussie met le nom en cache…
+      online = true;
+      await service.searchByName('nutella');
+
+      // …et sert de repli hors-ligne, sans la clé « name:… » comme code-barres
+      online = false;
+      final fallback = await service.searchProducts('nutella');
+      expect(fallback.single.name, 'Nutella 400g');
+      expect(fallback.single.source, 'Cache');
+      expect(fallback.single.barcode, isEmpty);
+    });
+
+    test('searchProducts: OFF saturé et rien ailleurs → erreur plutôt que « aucun produit »', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'world.openfoodfacts.org') return http.Response('Service surchargé', 503);
+        return http.Response('{"products": []}', 200);
+      });
+      final service = OpenFoodFactsService(httpClient: mockClient, retryDelays: const []);
+
+      await expectLater(service.searchProducts('nutella'), throwsA(isA<OFFSearchUnavailableException>()));
+      // Le matching automatique des tickets, lui, ne lève pas d'erreur
+      expect(await service.searchByNameWithTwoPasses('nutella'), isEmpty);
+    });
+  });
 }

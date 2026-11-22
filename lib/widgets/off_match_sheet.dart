@@ -67,7 +67,7 @@ class _OffMatchSheetState extends State<_OffMatchSheet> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Recherche impossible. Vérifie ta connexion et réessaie.';
+        _error = OFFSearchUnavailableException.userMessage;
       });
     }
   }
@@ -128,7 +128,9 @@ class _OffMatchSheetState extends State<_OffMatchSheet> {
       return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
     }
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: AppTheme.error)));
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: AppTheme.error), textAlign: TextAlign.center),
+      );
     }
     final results = _results;
     if (results == null) return const SizedBox.shrink();

@@ -165,10 +165,14 @@ Appareil photo Flutter
 #### 4c. Matching Open Food Facts par nom
 
 - [x] Endpoint : `GET https://world.openfoodfacts.org/cgi/search.pl?search_terms={nom}&json=1`
-- [x] Vérifier d'abord le cache `produits` (étape 3b) avant tout appel réseau
-- [x] Stratégie en deux passes :
+- [x] Vérifier d'abord le cache `produits` (étape 3b) avant tout appel réseau, **pour le matching automatique seulement** (`searchByName(cacheFirst: true)`). Le cache ne garde que le premier résultat, sous la clé `name:<nom>`.
+- [x] Recherche tapée par l'utilisateur (fiche produit → « Corriger le produit », bouton « Associer un produit » de la confirmation du ticket) : `searchProducts` → `cacheFirst: false`. Le réseau est interrogé d'abord pour avoir tous les résultats (20 par page). Le cache ne sert que si aucun fournisseur ne répond, et sinon `OFFSearchUnavailableException` est levée : l'écran affiche « recherche impossible » au lieu de « aucun produit »
+- [x] La recherche `search.pl` d'Open Food Facts est limitée (~10 appels/min) et répond souvent HTTP 503 en rafale : `_getWithRetry` refait l'appel après 1,5 s puis 3 s (`retryDelays`, vide dans les tests). Si un fournisseur reste en erreur, les résultats des suivants (OPF/OBF) sont renvoyés mais **pas mis en cache**, pour ne pas remplacer durablement le bon produit par une fiche de repli
+- [x] Stratégie en trois passes (`OpenFoodFactsService.searchByNameWithTwoPasses`, le nom est historique). La recherche `search.pl` exige que **tous** les mots correspondent : un seul mot abrégé ou mal lu donne 0 résultat.
   1. Recherche avec le nom complet → prendre le premier résultat si pertinent
-  2. Si échec : retirer les mots génériques (kg, g, %, bio, x2…) et réessayer
+  2. Si échec : `cleanProductName` retire les contenances (`1.35L`, `6x33cl`, `x2`, `70%`), la ponctuation, les nombres isolés et les mots génériques (bio, promo, lot…), puis développe les abréviations de `ticketAbbreviations` (`less` → lessive, `liq` → liquide…). Il ne contient que des abréviations sans ambiguïté. Puis réessayer
+  3. Si échec : nom nettoyé avec un puis deux mots en moins à la fin (au moins 2 mots, au plus 2 essais : la recherche OFF limite le nombre d'appels par minute)
+- [x] Le prompt Mistral demande aussi les produits non alimentaires (entretien, hygiène, beauté) et d'écrire les abréviations du ticket en toutes lettres, en gardant la marque
 - [x] Toujours afficher les candidats dans une UI de confirmation — le matching par nom n'est pas parfait
 - [x] Persister les articles matchés via `ScanRepository.saveArticle()`
 
@@ -376,8 +380,10 @@ Appareil photo Flutter
 Les calculs du tableau de bord ne sont plus dans `dashboard_screen.dart` : ils sont dans `lib/analytics/`, sans widget, et testés seuls (`test/analytics/`).
 
 - `product_observation.dart` : `ProductObservation` = un `ScannedItem` + sa clé produit (`productKeyOf` : `bc_<EAN>` sinon `name_<nom>_<marque>`), son identifiant de fiche (`productIdOf` : EAN, sinon nom, sinon id) et son magasin résolu (article, sinon session). `groupByProduct` et `latestByStore` sont les briques réutilisées par tous les calculs.
-- `dashboard_stats.dart` : `DashboardStats.fromSessions(sessions, {now})` agrège tout ce qu'affiche le Dashboard (totaux, Nutri-Score, `ProductTypeStats` par type OFF et par magasin, `PeriodStats` par semaine/mois, totaux 7/30 jours).
-- `price_evolution.dart`, `store_comparison.dart`, `recommendations.dart` : `ProductPriceEvolutionItem`, `ProductStoreComparisonItem`, `ProductRecommendationItem` (méthodes statiques `calculate(sessions)`).
+- `dashboard_stats.dart` (v1.17.0) : `DashboardStats.fromSessions(sessions)` regroupe les données des trois onglets : `productPrices`, `shoppingBasket`, `priceChanges`, avec les getters `comparedProducts` (produits avec un écart de prix), `cheapestByStore` (magasin → produits qui y sont le moins chers, magasins les mieux placés d'abord) et `increases` / `decreases`.
+- `store_comparison.dart` (v1.17.0) : `ProductStorePrices.calculate(sessions)` — pour **chaque** produit vu en magasin, le dernier prix dans chaque magasin (`StorePrice`), trié du moins cher au plus cher. Ordre de la liste : produits avec un écart (`hasPriceDifference`, ≥ 2 magasins et plus d'un centime) du plus gros au plus petit, puis les autres par nom. Remplace `ProductStoreComparisonItem`, qui ignorait les produits vus dans un seul magasin.
+- Onglet Dépenses (`spending.dart`, `SpendingSummary`) : ajouté en v1.16.0, supprimé en v1.17.0 (les dépenses ne sont pas l'objectif de l'app).
+- Supprimés en v1.16.0 avec les sections correspondantes : `price_evolution.dart` (comparait le dernier prix au précédent tous magasins confondus), `recommendations.dart` (« Alternatives moins chères », qui rapprochait des produits sans rapport) et `ProductTypeStats`.
 
 - Prix normalisé (v1.6.0) : `lib/utils/unit_price.dart` convertit `quantity` + `unit` (ou la chaîne OFF brute) en `PackageSize` (kg, L ou unités) puis en `UnitPrice`. `ProductObservation.unitPrice` le porte dans tous les calculs. Règles de comparaison :
   - entre produits **différents** (alternatives, similaires, classement des enseignes par type) : au kg / L / unité dès que les contenances sont connues et de même nature ; par article seulement si aucune contenance n'est connue ; jamais en mélangeant les deux ;
@@ -385,7 +391,7 @@ Les calculs du tableau de bord ne sont plus dans `dashboard_screen.dart` : ils s
   - Lignes de ticket : `ticketLineQuantity` transforme « N articles de X » en pack `N x X` car le prix d'une ligne est un total.
 
 - `shopping_basket.dart` (v1.8.0) : `ShoppingBasketAnalysis.calculate` — panier = produits achetés ≥ 2 fois (sinon tous ceux vus en magasin si moins de 3), un de chaque ; coût par magasin avec les derniers prix connus, prix manquants estimés au prix moyen observé ailleurs (couverture exposée par `pricedCount`) ; panier optimal = chaque produit dans son magasin le moins cher. Calculé dans `DashboardStats.shoppingBasket` (`null` s'il y a moins de 2 magasins).
-- `price_alerts.dart` (v1.8.0) : `PriceAlert.calculate(sessions, thresholdPercent:)` — dernier prix vs scan précédent **dans le même magasin**, seuil mémorisé dans la box `settings` (`price_alert_threshold`).
+- `price_changes.dart` (v1.16.0, ex-`price_alerts.dart`) : `PriceChange.calculate(sessions)` — dernier prix vs achat précédent **dans le même magasin**, hausses et baisses de plus d'un centime, triées de la plus forte hausse à la plus forte baisse, avec le magasin où le produit est moins cher (`cheaperStore`). Le seuil 5/10/20 % et sa sauvegarde dans `settings` ont disparu.
 - Les sections d'UI nouvelles vont dans `lib/widgets/dashboard/` (pas dans `dashboard_screen.dart`).
 
 Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ; les écrans ne font qu'afficher.
@@ -394,10 +400,19 @@ Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ;
 
 ## Découpage des écrans (v1.9.1 – v1.9.3)
 
-- Dashboard : `dashboard_screen.dart` calcule `DashboardStats` et empile les sections ; chaque section est un widget de `lib/widgets/dashboard/` qui ne reçoit que ses données et ses callbacks.
+- Dashboard (v1.17.0) : `dashboard_screen.dart` calcule `DashboardStats` et l'affiche en trois onglets (`DefaultTabController`), centrés sur le prix des produits : `ProductsTab` (ouvert par défaut : `productPrices`, recherche locale sur nom + marque, produits comparés puis « Vus dans un seul magasin »), `StoresTab` (`ShoppingBasketAnalysis` via `BasketCard`, puis `cheapestByStore`) et `PricesTab`, intitulé « Évolution » (`increases` / `decreases`, des `PriceChange` entre les deux derniers achats d'un produit dans un même magasin). Les onglets sont dans `lib/widgets/dashboard/`, avec les briques communes dans `dashboard_card.dart` (`DashboardCard`, `ExpandableList` qui montre 5 lignes puis « Voir les N autres », formats `formatEuros`…). Ils ne reçoivent que leurs données et un callback `onProductTap` : la fiche produit s'ouvre sur l'onglet Magasins (2) ou Évolution (1). Le bouton « Tous mes produits » (`AppNavActionButton`) appelle `onProductAnalysisRequested`.
 - Fiche produit : `product_detail_screen.dart` ne fait que charger (`ProductAnalysisService.load`) et afficher la barre d'onglets ; les onglets sont dans `lib/widgets/product_detail/`. `ProductAnalysisService` accepte un `lookupBarcode` de remplacement pour les tests (pas de réseau).
 - Corrections au niveau d'un produit (v1.10.0) : `ScanRepository.deleteProduct` / `rematchProduct` / `countProductArticles` utilisent `_matchesProduct` (id, code-barres ou nom), la même règle que `getPriceHistoryByStore` : ce qui est affiché sur la fiche est exactement ce qui est supprimé ou corrigé. Les écrans qui ouvrent une fiche lui passent le code-barres, sinon le nom (jamais l'id d'un article).
 - Scanner : `scan_screen.dart` garde l'état (caméra, mode, magasin, image du ticket) et les flux métier (`_onBarcodeScanned`, `_processTicketImage`, hors-ligne) ; les composants d'interface sont dans `lib/widgets/scan/` et ne reçoivent que des valeurs et des callbacks.
+
+## Navigation et accueil (v1.13.0)
+
+- `MainScreen` (`main.dart`) : `IndexedStack` de 5 onglets, indexés par des constantes (`_homeTab` 0, `_scanTab` 1, `_resultsTab` 2, `_dashboardTab` 3, `_historyTab` 4). L'app s'ouvre sur `_homeTab`. `_goToTab` affiche l'onglet tout de suite, puis recharge les sessions pour le Dashboard et l'Historique (une erreur de rechargement, par exemple Hive pas encore ouvert, n'empêche pas le changement d'onglet).
+- Accueil : `home_screen.dart` (`HomeScreen` + `HomeActionCard`) ne reçoit que 3 callbacks. `_openScanner(barcode:)` passe au Scanner en fixant `_requestedBarcodeMode` et en incrémentant `_modeRequestId`. `ScanScreen.didUpdateWidget` applique le mode demandé à chaque nouvel identifiant, même si on redemande le même mode après l'avoir changé à la main. Il n'appelle pas `onScanTypeChanged` à ce moment-là (le parent est en train de se reconstruire et connaît déjà le type).
+- Retour entre onglets (v1.14.0) : `_tabHistory` garde les onglets quittés (`_recordTabChange`, 20 au plus) et se vide à chaque passage par l'accueil, la racine. `_goBack` affiche le dernier onglet de l'historique, sinon l'accueil. Il sert au bouton Retour des onglets (`onBack` de `ScanScreen`, `ResultsScreen`, `DashboardScreen`, `HistoryScreen`) et au bouton retour d'Android via le `PopScope` de `MainScreen` (`canPop` seulement sur l'accueil). Le bouton « Scanner maintenant » de Résultats vide utilise `onScan`, qui ouvre toujours le Scanner.
+- Boutons de navigation : `lib/widgets/nav_buttons.dart`. `AppBackButton` ferme l'écran courant (`maybePop`) ou appelle son `onPressed`. `AppHomeButton` appelle `AppNavigation.goHome` : `popUntil(isFirst)` puis incrément de `AppNavigation.homeRequests`, un `ValueNotifier` que `MainScreen` écoute pour afficher l'accueil. Les écrans poussés par `Navigator` ne sont pas sous `MainScreen` dans l'arbre et ne peuvent pas l'appeler directement.
+- Caméra (v1.15.0) : tous les onglets de l'`IndexedStack` sont construits au lancement. La caméra ne démarre **jamais** toute seule : seulement au tap sur SCANNER (`_startScanner`, qui refuse sans magasin), et au retour au premier plan si elle tournait avant (`_resumeScanOnForeground`). `_syncCamera` ne fait que l'arrêter quand l'onglet est caché (`isActive` faux), en mode ticket ou sans magasin.
+- Magasin, étape 1 obligatoire (v1.15.0) : `_selectedStore` vaut `null` au début de chaque séance. `MainScreen._scanSessionId` est incrémenté à chaque arrivée sur le Scanner depuis l'accueil (carte ou onglet), et `ScanScreen.didUpdateWidget` remet alors le magasin et le ticket à zéro. Sans magasin : SCANNER grisé (`MagicButton` sans `onPressed`), `TicketScanZone(canCapture: false)` grise Appareil photo / Galerie, et la zone code-barres affiche `ScanIdlePanel`. Le dernier magasin (`getSelectedStore`, box `settings`) devient `_lastStore`, proposé par le raccourci « Dernier : … » de `StoreSelector`. Il n'est plus présélectionné. `_processTicketImage` fige le magasin au début de l'analyse.
 
 ---
 

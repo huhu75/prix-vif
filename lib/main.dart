@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'theme.dart';
 import 'models.dart';
+import 'screens/home_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/history_screen.dart';
@@ -12,6 +13,9 @@ import 'screens/product_selection_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'services/scan_repository.dart';
 import 'services/mistral_service.dart';
+import 'services/category_service.dart';
+import 'models/product_category.dart';
+import 'widgets/nav_buttons.dart';
 
 // Point d'entree de l'application
 void main() async {
@@ -50,22 +54,70 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  // Onglets de la barre de navigation (dans l'ordre d'affichage)
+  static const int _homeTab = 0;
+  static const int _scanTab = 1;
+  static const int _resultsTab = 2;
+  static const int _dashboardTab = 3;
+  static const int _historyTab = 4;
+
+  int _currentIndex = _homeTab;
+
+  // Onglets visités avant l'onglet courant, pour le bouton Retour
+  // (vidé à chaque passage par l'accueil, qui est la racine)
+  final List<int> _tabHistory = [];
+  static const int _maxTabHistory = 20;
 
   // Etat de l'application
   final List<ScannedItem> _currentScannedItems = [];
   List<ScanSession> _sessions = [];  // Non-final pour permettre le remplacement complet
   String _currentScanType = 'barcode'; // 'barcode' ou 'ticket'
 
+  // Mode de scan demandé depuis l'accueil, transmis au Scanner à chaque demande
+  bool? _requestedBarcodeMode;
+  int _modeRequestId = 0;
+
+  // Séance de scan : une nouvelle à chaque arrivée sur le Scanner depuis
+  // l'accueil (le magasin est alors à choisir de nouveau)
+  int _scanSessionId = 0;
+
+  // « Où acheter un produit ? » : chaque demande ouvre la recherche du Dashboard
+  int _dashboardSearchRequest = 0;
+
   // Repository pour la persistance
   final ScanRepository _repository = ScanRepository();
+
+  // Catégorie de chaque produit (clé produit → catégorie), complétée depuis
+  // Open Food Facts au lancement et après chaque scan
+  late final CategoryService _categoryService = CategoryService(_repository);
+  Map<String, ProductCategory> _categories = {};
 
   @override
   void initState() {
     super.initState();
 
+    // Bouton « Accueil » des écrans ouverts par-dessus les onglets
+    AppNavigation.homeRequests.addListener(_showHome);
+
     // Étape 3a — Initialisation du repository et chargement des données persistées
     _initRepository();
+  }
+
+  @override
+  void dispose() {
+    AppNavigation.homeRequests.removeListener(_showHome);
+    super.dispose();
+  }
+
+  /// Cherche sur Open Food Facts la catégorie des produits qui n'en ont pas
+  /// encore (en arrière-plan), puis rafraîchit les écrans s'il en a trouvé
+  Future<void> _fillCategories() async {
+    try {
+      final found = await _categoryService.fillMissing();
+      if (found > 0 && mounted) await _reloadSessions();
+    } catch (e) {
+      debugPrint('MainScreen: catégories non complétées ($e)');
+    }
   }
 
   /// Met à jour le type de scan actuel
@@ -73,6 +125,67 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _currentScanType = type;
     });
+  }
+
+  /// Accueil → onglet Scanner, directement en mode code-barres ou ticket
+  void _openScanner({required bool barcode}) {
+    setState(() {
+      _requestedBarcodeMode = barcode;
+      _modeRequestId++;
+      _currentScanType = barcode ? 'barcode' : 'ticket';
+      _recordTabChange(_scanTab);
+      _currentIndex = _scanTab;
+    });
+  }
+
+  /// Note l'onglet quitté dans l'historique (l'accueil, racine, le vide)
+  void _recordTabChange(int index) {
+    if (index == _currentIndex) return;
+    if (_currentIndex == _homeTab && index == _scanTab) _scanSessionId++;
+    if (index == _homeTab) {
+      _tabHistory.clear();
+      return;
+    }
+    _tabHistory.add(_currentIndex);
+    if (_tabHistory.length > _maxTabHistory) _tabHistory.removeAt(0);
+  }
+
+  /// Change d'onglet tout de suite ; le Dashboard et l'Historique rechargent
+  /// ensuite les sessions. Un tap juste après le lancement (base Hive pas
+  /// encore ouverte) change quand même d'onglet.
+  Future<void> _goToTab(int index) async {
+    setState(() {
+      _recordTabChange(index);
+      _currentIndex = index;
+    });
+    await _reloadForTab(index);
+  }
+
+  /// Bouton Retour des onglets (et bouton retour d'Android) : onglet
+  /// précédent, sinon l'accueil
+  Future<void> _goBack() async {
+    final target = _tabHistory.isNotEmpty ? _tabHistory.removeLast() : _homeTab;
+    if (target == _homeTab) _tabHistory.clear();
+    setState(() => _currentIndex = target);
+    await _reloadForTab(target);
+  }
+
+  /// Bouton Accueil des écrans ouverts par-dessus les onglets
+  void _showHome() {
+    if (!mounted) return;
+    setState(() {
+      _tabHistory.clear();
+      _currentIndex = _homeTab;
+    });
+  }
+
+  Future<void> _reloadForTab(int index) async {
+    if (index != _dashboardTab && index != _historyTab) return;
+    try {
+      await _reloadSessions();
+    } catch (e) {
+      debugPrint('MainScreen: rechargement des sessions impossible ($e)');
+    }
   }
 
   /// Initialise le repository et charge les sessions persistées
@@ -103,7 +216,9 @@ class _MainScreenState extends State<MainScreen> {
       final savedSessions = await _repository.getAllScans();
       setState(() {
         _sessions = List<ScanSession>.from(savedSessions);
+        _categories = _repository.getAllProductCategories();
       });
+      _fillCategories();
     } catch (e) {
       print('Erreur initialisation repository: $e');
       setState(() {
@@ -180,6 +295,7 @@ class _MainScreenState extends State<MainScreen> {
     if (!mounted) return;
     setState(() {
       _sessions = List<ScanSession>.from(allSessions);
+      _categories = _repository.getAllProductCategories();
       final current = _currentScannedItems
           .where((i) => storedById.containsKey(i.id))
           .map((i) => storedById[i.id]!)
@@ -223,7 +339,7 @@ class _MainScreenState extends State<MainScreen> {
       MaterialPageRoute(
         builder: (context) => SessionDetailScreen(
           session: session,
-          onBack: () => Navigator.of(context).pop(),
+          onBack: () => Navigator.of(context).maybePop(),
           repository: _repository,
           onChanged: _reloadSessions,
         ),
@@ -291,25 +407,42 @@ class _MainScreenState extends State<MainScreen> {
     // Les pages sont construites dynamiquement pour toujours refléter
     // l'état courant de _sessions et _currentScannedItems.
     final pages = [
+      // Page d'accueil : les 3 actions principales
+      HomeScreen(
+        key: const ValueKey('home_screen'),
+        onScanBarcode: () => _openScanner(barcode: true),
+        onScanTicket: () => _openScanner(barcode: false),
+        onOpenAnalysis: () => _goToTab(_dashboardTab),
+        onFindWhereToBuy: () {
+          setState(() => _dashboardSearchRequest++);
+          _goToTab(_dashboardTab);
+        },
+      ),
       // Page Scanner
       ScanScreen(
         key: const ValueKey('scan_screen'),
         scannedItems: _currentScannedItems,
         onItemScanned: _handleItemScanned,
-        onViewResults: () => setState(() => _currentIndex = 1),
-        onViewHistory: () async {
-          await _reloadSessions();
-          setState(() => _currentIndex = 3);
-        },
+        onViewResults: () => _goToTab(_resultsTab),
+        onViewHistory: () => _goToTab(_historyTab),
+        onBack: _goBack,
         repository: _repository,
         onScanTypeChanged: _handleScanTypeChanged,
-        onScanSaved: _reloadSessions,
+        onScanSaved: () async {
+          await _reloadSessions();
+          _fillCategories();
+        },
+        isActive: _currentIndex == _scanTab,
+        requestedBarcodeMode: _requestedBarcodeMode,
+        modeRequestId: _modeRequestId,
+        scanSessionId: _scanSessionId,
       ),
       // Page Resultats
       ResultsScreen(
         key: const ValueKey('results_screen'),
         scannedItems: _currentScannedItems,
-        onBack: () => setState(() => _currentIndex = 0),
+        onBack: _goBack,
+        onScan: () => _goToTab(_scanTab),
         onItemRemoved: _handleItemRemoved,
         onClearAll: _clearAllItems,
         onSaveSession: _saveSession,
@@ -319,10 +452,12 @@ class _MainScreenState extends State<MainScreen> {
       DashboardScreen(
         key: const ValueKey('dashboard_screen'),
         sessions: _sessions,
+        categories: _categories,
+        searchRequestId: _dashboardSearchRequest,
         repository: _repository,
-        onSessionSelected: _handleSessionSelected,
         onProductAnalysisRequested: _openProductSelection,
         onProductSelected: _openProductDetail,
+        onBack: _goBack,
       ),
       // Page Historique
       HistoryScreen(
@@ -332,30 +467,36 @@ class _MainScreenState extends State<MainScreen> {
         onSessionDeleted: _handleSessionDeleted,
         onClearAll: _clearAllSessions,
         onRemoveDemoData: _removeDemoData,
+        onBack: _goBack,
       ),
     ];
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
+    // Bouton retour d'Android : onglet précédent ; l'app ne se ferme que
+    // depuis l'accueil
+    return PopScope(
+      canPop: _currentIndex == _homeTab,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: _buildBottomNavigationBar(),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
   Widget _buildBottomNavigationBar() {
     return BottomNavigationBar(
       currentIndex: _currentIndex,
-      onTap: (index) async {
-        // Recharger les sessions si on va vers Dashboard (2) ou Historique (3)
-        if (index == 2 || index == 3) {
-          print('DEBUG MainScreen: Navigation vers onglet $index, rechargement des sessions...');
-          await _reloadSessions();
-        }
-        setState(() => _currentIndex = index);
-      },
+      onTap: _goToTab,
       items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Accueil',
+        ),
         BottomNavigationBarItem(
           icon: Icon(Icons.qr_code_scanner),
           label: 'Scanner',

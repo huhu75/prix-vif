@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../models/product_analysis_models.dart';
+import '../services/category_service.dart';
 import '../services/scan_repository.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/product_analysis_service.dart';
 import '../widgets/article_edit_dialog.dart';
+import '../widgets/category_picker_sheet.dart';
+import '../widgets/nav_buttons.dart';
 import '../widgets/off_match_sheet.dart';
+import '../widgets/product_detail/category_tab.dart';
 import '../widgets/product_detail/price_evolution_tab.dart';
 import '../widgets/product_detail/product_info_tab.dart';
-import '../widgets/product_detail/similar_products_tab.dart';
 import '../widgets/product_detail/store_comparison_tab.dart';
 
 /// Écran de détails d'un produit avec analyse complète
-/// Contient 3 onglets : Évolution des prix, Comparaison magasins, Produits similaires
+/// Contient 4 onglets : Fiche, Évolution des prix, Magasins (avec conseil
+/// d'achat) et Catégorie (les autres marques, au kg / L)
 class ProductDetailScreen extends StatefulWidget {
   final ScanRepository repository;
   final String productId;
@@ -47,8 +51,41 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ProductAnalysisResult? _analysisResult;
   OFFProduct? _offProduct;
+
+  /// Catégorie, produits de la catégorie et conseils d'achat
+  ProductAnalysisData? _data;
   bool _isLoading = true;
   String? _error;
+
+  /// Choisit (ou change) la catégorie du produit
+  Future<void> _chooseCategory() async {
+    final data = _data;
+    if (data == null) return;
+    final chosen = await showCategoryPickerSheet(
+      context,
+      known: widget.repository.getKnownCategories(),
+      current: data.category,
+    );
+    if (chosen == null || !mounted) return;
+    await widget.repository.setProductCategory(data.productKey, chosen);
+    await widget.onChanged?.call();
+    await _loadAnalysis();
+  }
+
+  /// Ouvre la fiche d'un autre produit (depuis l'onglet Catégorie)
+  void _openProduct(String productId, String productName) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ProductDetailScreen(
+        repository: widget.repository,
+        productId: productId,
+        productName: productName,
+        initialTabIndex: 2,
+        analysisService: widget.analysisService,
+        offSearch: widget.offSearch,
+        onChanged: widget.onChanged,
+      ),
+    ));
+  }
 
   @override
   void initState() {
@@ -69,6 +106,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       setState(() {
         _offProduct = data.offProduct;
         _analysisResult = data.analysis;
+        _data = data;
         _isLoading = false;
       });
     } catch (e) {
@@ -169,6 +207,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       packQuantity: chosen.quantity,
       packUnit: chosen.unit,
     );
+    // Catégorie Open Food Facts de la nouvelle fiche
+    if (chosen.barcode.isNotEmpty && chosen.categoryId != null) {
+      try {
+        await CategoryService(widget.repository)
+            .applyFromProduct(chosen.barcode, chosen)
+            .timeout(const Duration(seconds: 4));
+      } catch (_) {
+        // Taxonomie indisponible : la catégorie sera complétée plus tard
+      }
+    }
     await widget.onChanged?.call();
 
     // L'identifiant du produit a changé (nouveau code-barres) : rouvrir sa fiche
@@ -541,9 +589,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Scaffold(
         backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: Text(
             _analysisResult!.productName.toUpperCase(),
-            style: const TextStyle(fontSize: 18),
+            // Couleur explicite : le style de titre du thème n'en a pas (texte noir)
+            style: const TextStyle(fontSize: 18, color: AppTheme.textPrimary),
             overflow: TextOverflow.ellipsis,
           ),
           bottom: const TabBar(
@@ -564,12 +614,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 text: 'Magasins',
               ),
               Tab(
-                icon: Icon(Icons.compare),
-                text: 'Similaires',
+                icon: Icon(Icons.category_outlined),
+                text: 'Catégorie',
               ),
             ],
           ),
           actions: [
+            const AppHomeButton(),
             // Bouton pour rafraîchir
             IconButton(
               icon: const Icon(Icons.refresh, color: AppTheme.textPrimary),
@@ -637,6 +688,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               analysis: _analysisResult!,
               onRematch: _rematchProduct,
               onDelete: _deleteProduct,
+              category: _data?.category,
+              onChooseCategory: _chooseCategory,
             ),
 
             // Onglet 1 : Évolution des prix
@@ -650,13 +703,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               analysis: _analysisResult!,
               onStoreDeleted: _handleStoreDeleted,
               onStoreEdit: _handleStoreCardEdit,
+              adviceByStore: _data?.adviceByStore ?? const {},
             ),
-            
-            // Onglet 3 : Produits similaires
-            SimilarProductsTab(
-              analysis: _analysisResult!,
-              repository: widget.repository,
-              onChanged: widget.onChanged,
+
+            // Onglet 3 : les autres produits de sa catégorie, au kg / L
+            CategoryTab(
+              category: _data?.category,
+              group: _data?.categoryGroup,
+              productKey: _data?.productKey ?? '',
+              onChooseCategory: _chooseCategory,
+              onOpenProduct: _openProduct,
             ),
           ],
         ),
@@ -664,12 +720,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  /// Barre d'app des états chargement / erreur / vide : Retour et Accueil
+  PreferredSizeWidget _simpleAppBar() {
+    return AppBar(
+      leading: const AppBackButton(),
+      title: Text(
+        widget.productName.toUpperCase(),
+        style: const TextStyle(fontSize: 18, color: AppTheme.textPrimary),
+        overflow: TextOverflow.ellipsis,
+      ),
+      actions: const [AppHomeButton(), SizedBox(width: 8)],
+    );
+  }
+
   Widget _buildLoadingState() {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        title: Text(widget.productName.toUpperCase()),
-      ),
+      appBar: _simpleAppBar(),
       body: const Center(
         child: CircularProgressIndicator(
           valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
@@ -681,9 +748,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildErrorState(String error) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        title: Text(widget.productName.toUpperCase()),
-      ),
+      appBar: _simpleAppBar(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -740,9 +805,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildEmptyState() {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
-      appBar: AppBar(
-        title: Text(widget.productName.toUpperCase()),
-      ),
+      appBar: _simpleAppBar(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

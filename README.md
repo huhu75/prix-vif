@@ -8,6 +8,78 @@
 
 ## 📋 Historique des versions
 
+### v1.17.0 — 2026-11-22 — Tableau de bord centré sur le prix des produits
+
+- **Ajouté** : onglet **Produits**, ouvert par défaut (`ProductsTab`, calcul `ProductStorePrices`) : pour chaque produit, le magasin le moins cher (en vert) et son prix dans les autres magasins avec l'écart (« Carrefour 1.49 € (+0.14 €) »). Les plus gros écarts viennent en premier, puis les produits « Vus dans un seul magasin ». Une recherche permet de retrouver un produit, et toucher un produit ouvre sa fiche sur l'onglet Magasins
+- **Modifié** : onglet **Magasins** : « Où faire mes courses ? » puis **Ce que chaque magasin a de moins cher** (pour chaque magasin, les produits qui y sont le moins chers). « Moins cher ailleurs » est intégré à l'onglet Produits, et le détail dépliable du panier panaché est remplacé par une phrase
+- **Modifié** : l'onglet **Prix** devient **Évolution** (hausses et baisses, contenu inchangé)
+- **Supprimé** : onglet **Dépenses** et son calcul (`SpendingSummary`) : les dépenses n'étaient pas l'objectif
+- **Modifié** : `ProductStoreComparisonItem` est remplacé par `ProductStorePrices`, qui couvre aussi les produits vus dans un seul magasin
+- **Modifié** : tests mis à jour (`dashboard_screen_test.dart`, `analytics/dashboard_stats_test.dart`, `analytics/basket_and_price_changes_test.dart`)
+
+### v1.16.0 — 2026-11-22 — Tableau de bord en trois onglets
+
+- **Modifié** : le tableau de bord passe de 12 sections empilées (environ 15 écrans de défilement) à trois onglets, un par question : **Dépenses**, **Magasins**, **Prix**
+- **Ajouté** : onglet **Dépenses** (`SpendingTab`, calcul `SpendingSummary`) : mois et semaine en cours (calendaires), comparés au mois et à la semaine précédents, et graphique des 6 dernières semaines en euros. Il remplace les tuiles « Statistiques globales », « Évolution dans le temps » et « Totaux par période »
+- **Modifié** : onglet **Magasins** (`StoresTab`) : « Où faire mes courses ? » réécrit en clair (« Tes N produits habituels coûteraient… », « 4 prix relevés sur 10 », « En panachant les magasins… »), et **Moins cher ailleurs** (ex-« Comparateur multi-magasins ») : le même produit vu moins cher dans un autre magasin
+- **Ajouté** : onglet **Prix** (`PricesTab`, calcul `PriceChange`) : **Ce qui a augmenté** et **Ce qui a baissé** depuis l'achat précédent du même produit dans le même magasin, avec le magasin où il est moins cher. Il remplace « Alertes prix » (le seuil 5/10/20 % disparaît) et « Évolution des prix des produits », qui comparait des prix de magasins différents
+- **Modifié** : le gros bouton « Analyser un produit » et son icône en double sont remplacés par une seule icône **Tous mes produits** dans la barre du haut
+- **Supprimé** : « Alternatives moins chères » (elle proposait des échanges absurdes, comme du pain de mie au lieu du jambon), « Comparaison par type de produit » (catégories en anglais, jargon), « Répartition Nutri-Score » (toujours visible sur chaque fiche produit), « Derniers scans » (déjà dans l'Historique), ainsi que les calculs devenus inutiles (`recommendations.dart`, `price_evolution.dart`, statistiques par type, seuil d'alerte enregistré dans `settings`)
+- **Corrigé** : les tuiles du haut du tableau de bord débordaient à la largeur d'un téléphone (elles sont supprimées)
+- **Modifié** : tests réécrits pour les trois onglets (`dashboard_screen_test.dart`, `analytics/dashboard_stats_test.dart`, `analytics/basket_and_price_changes_test.dart`)
+
+### v1.15.0 — 2026-11-22 — Scanner : d'abord le magasin, puis SCANNER
+
+- **Modifié** : la caméra ne démarre plus toute seule en arrivant sur le Scanner. Elle se lance seulement au tap sur **SCANNER** (et au retour au premier plan si elle tournait déjà)
+- **Modifié** : le magasin est l'étape 1, obligatoire. Chaque séance de scan (arrivée sur le Scanner depuis l'accueil, ou lancement de l'app) démarre sans magasin : **SCANNER** est grisé en mode code-barres, et **Appareil photo** / **Galerie** en mode ticket, tant qu'aucun magasin n'est choisi. Le magasin reste choisi pendant la séance (par exemple après un passage par Résultats)
+- **Ajouté** : raccourci **« Dernier : … »** sous la liste des magasins pour reprendre le dernier magasin d'un tap. Le dernier magasin est toujours mémorisé, mais il n'est plus présélectionné
+- **Ajouté** : en mode code-barres, tant que la caméra ne tourne pas, la zone de scan rappelle l'étape en cours (`ScanIdlePanel`) : « Choisis d'abord ton magasin », puis « Prêt à scanner chez … — Appuie sur SCANNER ». Avant, elle affichait « Caméra non disponible » en rouge
+- **Modifié** : `MagicButton` apparaît grisé quand il n'a pas d'action
+- **Corrigé** : choisir ou ajouter un magasin juste au lancement, avant l'ouverture de la base Hive, ne provoque plus d'erreur (enregistrement différé)
+- **Ajouté** : tests `test/screens/scanner_flow_test.dart` (5 cas : raccourci du dernier magasin, caméra éteinte sans magasin, caméra lancée seulement par SCANNER, magasin gardé pendant la séance et remis à zéro pour une nouvelle, mode ticket)
+
+### v1.14.0 — 2026-11-22 — Boutons de navigation plus clairs (Retour, Accueil)
+
+- **Ajouté** : bouton **Retour** commun (`AppBackButton`, `lib/widgets/nav_buttons.dart`) : flèche bleue dans un rond teinté, infobulle « Retour ». Il est présent sur tous les écrans sauf l'accueil, y compris les onglets Scanner, Dashboard et Historique qui n'en avaient pas
+- **Ajouté** : vrai retour en arrière entre les onglets. Retour ramène à l'onglet précédent (ex. Résultats → Historique → Scanner → Accueil), et l'historique est remis à zéro à chaque passage par l'accueil. Avant, la flèche de Résultats renvoyait toujours au Scanner
+- **Ajouté** : le bouton retour d'Android suit le même historique. L'app ne se ferme plus que depuis l'accueil (avant : depuis n'importe quel onglet)
+- **Ajouté** : bouton **Accueil** (`AppHomeButton`) sur les écrans ouverts par-dessus les onglets (détails d'une session, sélection et fiche produit) : il ferme tous ces écrans et affiche l'accueil (`AppNavigation.goHome`)
+- **Modifié** : la sélection produit s'intitule **PRODUITS** (« SÉLECTION PRODUIT » était coupé avec les nouveaux boutons)
+- **Corrigé** : le titre de la fiche produit s'affichait en noir sur fond sombre (le style de titre du thème n'a pas de couleur)
+- **Corrigé** : le bouton « SCANNER MAINTENANT » de l'écran Résultats vide débordait de 33 px. `MagicButton` réduit maintenant son texte au lieu de déborder
+- **Ajouté** : tests `test/screens/navigation_test.dart` (7 cas : boutons Retour/Accueil, retour depuis le Scanner, remontée des onglets, bouton retour d'Android, Accueil depuis un écran ouvert par-dessus) et outils communs `test/helpers/app_test_helpers.dart`
+
+### v1.13.0 — 2026-11-22 — Page d'accueil avec les 3 actions principales
+
+- **Ajouté** : page d'accueil (`lib/screens/home_screen.dart`) affichée à l'ouverture de l'app, à la place du scanner. Elle propose 3 grandes cartes : **Scanner un code-barres**, **Scanner un ticket de caisse** et **Analyser les produits et magasins**, dans le style du tableau de bord (dégradé, bordure et icône teintés)
+- **Ajouté** : onglet **Accueil** en tête de la barre de navigation (5 onglets : Accueil, Scanner, Résultats, Dashboard, Historique)
+- **Modifié** : les cartes de scan ouvrent l'onglet Scanner directement dans le bon mode (code-barres ou ticket). La carte d'analyse ouvre le tableau de bord
+- **Modifié** : la caméra ne tourne plus que quand l'onglet Scanner est affiché en mode code-barres. Avant, elle démarrait au lancement et restait allumée sur les autres onglets. Au retour au premier plan, elle ne redémarre plus en mode ticket
+- **Corrigé** : un tap sur un onglet juste après le lancement, avant que la base Hive soit ouverte, change maintenant d'onglet au lieu d'échouer. L'onglet s'affiche tout de suite, puis les sessions se rechargent
+- **Ajouté** : tests `test/screens/home_screen_test.dart` (3 actions de l'accueil, ouverture sur l'accueil, Scanner ouvert dans le bon mode, tableau de bord)
+
+### v1.12.3 — 2026-11-21 — Recherche par nom fiable pour corriger un produit
+
+- **Corrigé** : dans « Corriger le produit Open Food Facts » (fiche produit), relancer une recherche déjà faite (dont celle qui s'ouvre avec le nom du produit) n'affichait qu'**un seul** résultat, celui gardé en cache, souvent la fiche à corriger. La recherche tapée interroge maintenant le réseau d'abord et affiche tous les résultats (20 au lieu de 10). Le cache ne sert plus qu'hors-ligne
+- **Corrigé** : la recherche d'Open Food Facts refuse souvent les appels en rafale (HTTP 503, ~10 recherches/min). L'app passait alors en silence à Open Products Facts / Open Beauty Facts, qui ne contiennent pas d'alimentaire, et gardait ce mauvais résultat en cache. Elle refait maintenant l'appel après 1,5 s puis 3 s, et ne met plus en cache un résultat obtenu alors qu'Open Food Facts était en erreur
+- **Corrigé** : quand la recherche est impossible (pas de réseau, Open Food Facts saturé), les écrans de recherche affichent un message d'erreur au lieu de « Aucun produit trouvé »
+- **Modifié** : le bouton « Associer un produit » de la confirmation du ticket utilise la même recherche que la fiche produit (réseau d'abord, code-barres accepté, nom nettoyé et abréviations développées)
+- **Ajouté** : `OFFSearchUnavailableException`, paramètre `cacheFirst` de `searchByName` / `searchByNameWithTwoPasses`, `retryDelays` dans `OpenFoodFactsService` ; 5 tests dans `test/services/open_food_facts_service_test.dart`
+
+### v1.12.2 — 2026-11-21 — Articles de ticket abrégés retrouvés (ex. lessive MIR)
+
+- **Corrigé** : un article de ticket au libellé abrégé (ex. « LESS LIQ MIR COUL 1.35L ») n'était pas trouvé. La recherche Open Food Facts exige que tous les mots correspondent, et un seul mot abrégé faisait tout échouer
+- **Ajouté** : `cleanProductName` développe les abréviations courantes des tickets (`less` → lessive, `liq` → liquide, `vaiss` → vaisselle, `choc` → chocolat…, liste `ticketAbbreviations`). Les abréviations ambiguës (`rav`, `conf`) sont laissées telles quelles
+- **Ajouté** : 3ème passe de recherche par nom. Si le nom nettoyé ne donne rien, l'app réessaie avec un puis deux mots en moins à la fin (au moins 2 mots gardés, au plus 2 essais pour respecter la limite d'appels d'Open Food Facts)
+- **Corrigé** : les contenances décimales (`1.35L`, `1,5 l`), les multipacks (`6x33cl`, `x2`) et les pourcentages sont retirés en entier, au lieu de laisser un « 1 » isolé dans la recherche
+- **Modifié** : le prompt Mistral demande aussi les produits d'entretien, d'hygiène et de beauté (avant : « aliments, boissons, etc. »), et d'écrire les abréviations du ticket en toutes lettres en gardant la marque
+- **Ajouté** : 4 tests dans `test/services/open_food_facts_service_test.dart` (nettoyage des libellés, abréviations, 3ème passe et sa limite)
+
+### v1.12.1 — 2026-11-21 — Clé API Mistral via un fichier `.env` local
+
+- **Ajouté** : fichier `.env` local (déjà ignoré par git) qui contient `MISTRAL_API_KEY`, chargé avec `flutter run --dart-define-from-file=.env`. Plus besoin de retaper la clé à chaque lancement
+- **Modifié** : section « Configurer la clé API Mistral » du README : lancement sur Chrome, configuration PyCharm (« Additional run args ») et explication de la clé saisie dans l'app sur le web (profil Chrome temporaire)
+
 ### v1.12.0 — 2026-11-21 — Corriger un prix ou un magasin depuis la fiche produit
 
 - **Ajouté** : depuis la fiche d'un produit (menu ⋮), bouton **Corriger un prix / scan** : ouvre la liste de tous les scans du produit ; toucher un scan ouvre la fenêtre de modification (prix, contenance, magasin)
@@ -206,7 +278,13 @@
 
 ## ✨ Fonctionnalités
 
+### 🏠 Accueil
+- Écran d'ouverture de l'app, avec 3 actions : **Scanner un code-barres**, **Scanner un ticket de caisse**, **Analyser les produits et magasins**
+- Chaque scan ouvre le Scanner directement dans le bon mode ; l'analyse ouvre le tableau de bord
+- Accessible à tout moment par l'onglet **Accueil** de la barre du bas, ou par le bouton Accueil des écrans de détail
+
 ### 🎯 Scanner
+- **En deux étapes** : 1. choisir le magasin (obligatoire à chaque séance, le dernier est proposé en raccourci), 2. appuyer sur **SCANNER** pour lancer la caméra. Elle ne démarre jamais avant
 - **Caméra réelle** : Accès à la caméra du téléphone/tablette
 - Scan de codes-barres en temps réel
 - Contrôles de la caméra : flash
@@ -214,7 +292,7 @@
 - Interface intuitive avec animation de ligne de détection
 - **Mode bi-mode** : Bascule entre scan de code-barres et capture de ticket
 - **Saisie de prix** : Après scan d'un code-barres, dialogue modal pour entrer le prix réel
-- **Magasins mémorisés** : les magasins ajoutés et le dernier magasin choisi sont conservés entre deux lancements
+- **Magasins mémorisés** : les magasins ajoutés et le dernier magasin choisi sont conservés entre deux lancements (le dernier est proposé, pas présélectionné)
 - **Capture photo** : Photographier un ticket de caisse via la galerie ou la caméra
 - **Compression d'image** : Réduction automatique des images à 1024px max, JPEG 80% avec affichage des gains de taille
 
@@ -227,19 +305,13 @@
 - **Sauvegarde automatique après chaque scan**
 
 ### 📈 Tableau de Bord (Dashboard)
-- **Statistiques globales** : nombre total de scans, articles, montant total, moyenne par article
-- **Où faire mes courses ?** : coût de ton panier habituel dans chaque magasin, meilleur magasin, économie possible et panier optimal en combinant les magasins
-- **Alertes prix** : hausses d'au moins 5 / 10 / 20 % (seuil réglable) depuis le scan précédent dans le même magasin, avec le magasin où le produit est moins cher
-- **Évolution des prix des produits** : suivi des variations (hausses, baisses, stabilités) avec accès direct à la courbe détaillée
-- **Comparateur multi-magasins** : identification des écarts de prix inter-enseignes et calcul des économies potentielles par produit
-- **Alternatives moins chères** : suggestions proactives de produits équivalents plus économiques repérés dans d'autres enseignes, avec calcul des gains à quantité égale (au kg / L) quand les contenances sont connues
-- **Comparaison par type de produit & enseignes** : prix moyen par catégorie OFF, classement des magasins par rayon au kg / L / unité et vue par enseigne mettant en valeur les forces de chaque magasin
-- **Fiche produit** (bouton « Analyser un produit ») : évolution, magasins, produits similaires, fiche Open Food Facts ; boutons **Pas le bon produit ?** (choisir la bonne fiche Open Food Facts par nom ou code-barres) et **Supprimer** (retire tous les scans du produit)
-- **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`), utilisé pour toutes les comparaisons entre produits différents
-- **Répartition Nutri-Score** : graphique à barres horizontales avec pourcentages A/B/C/D/E
-- **Évolution temporelle** : graphiques hebdomadaires et mensuels des dépenses
-- **Totaux par période** : cumul semaine et mois en cours
-- **Derniers scans** : aperçu rapide avec navigation vers le détail
+Trois onglets, centrés sur une question : où chaque produit est-il le moins cher ?
+- **Produits** (ouvert par défaut) : pour chaque produit, le magasin le moins cher et son prix dans les autres magasins avec l'écart, les plus gros écarts en premier, puis les produits vus dans un seul magasin. Une recherche permet de retrouver un produit
+- **Magasins** : **Où faire mes courses ?**, le coût de ton panier habituel dans chaque magasin (avec le nombre de prix relevés et le total en achetant chaque produit là où il est le moins cher) ; **Ce que chaque magasin a de moins cher**, la liste des produits qui sont le moins chers dans chaque magasin
+- **Évolution** : **Ce qui a augmenté** et **Ce qui a baissé** depuis ton achat précédent du même produit dans le même magasin, avec le magasin où il est moins cher
+- **Tous mes produits** (icône de la barre du haut) : liste des produits scannés, puis la **fiche produit** (évolution, magasins, produits similaires, fiche Open Food Facts) avec **Pas le bon produit ?** (choisir la bonne fiche Open Food Facts) et **Supprimer**
+- Toucher un produit dans un onglet ouvre directement sa fiche (onglet Magasins ou Évolution)
+- **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`) sur les cartes et dans la fiche produit
 
 ### 🕒 Historique
 - Liste des sessions de scan précédentes
@@ -329,17 +401,36 @@ flutter build appbundle --release
 
 ### 4. Configurer la clé API Mistral (hors dépôt)
 
-L'analyse des tickets de caisse utilise l'API Mistral. La clé ne doit **jamais** être écrite dans le code du dépôt : passe-la à la compilation avec `--dart-define` (elle est alors embarquée dans le binaire uniquement) :
+L'analyse des tickets de caisse utilise l'API Mistral. La clé ne doit **jamais** être écrite dans le code du dépôt. Elle est passée à la compilation et se retrouve seulement dans l'app compilée.
 
-```bash
-# Développement
-flutter run --dart-define=MISTRAL_API_KEY=sk-...
+**Méthode recommandée : le fichier `.env`**
 
-# Build release
-flutter build apk --release --dart-define=MISTRAL_API_KEY=sk-...
+Le fichier `.env` à la racine du projet est ignoré par git (voir `.gitignore`). Mets-y ta clé :
+
+```
+MISTRAL_API_KEY=ta_cle_ici
 ```
 
-Sans clé, l'application reste en **mode démo** (articles factices). Alternative : saisir la clé dans l'app (icône engrenage de l'onglet Scanner) — elle est alors stockée localement dans Hive, jamais dans le dépôt.
+Puis lance l'app en chargeant ce fichier :
+
+```bash
+# Sur Chrome
+flutter run -d chrome --dart-define-from-file=.env
+
+# Sur un téléphone ou un émulateur
+flutter run --dart-define-from-file=.env
+
+# Build release
+flutter build apk --release --dart-define-from-file=.env
+```
+
+Les lignes qui commencent par `#` sont des commentaires. Si `MISTRAL_API_KEY=` est vide, l'app reste en mode démo. Si tu clones le dépôt ailleurs, crée ce fichier à la main : il n'est pas versionné.
+
+**Depuis PyCharm / Android Studio** : Run → Edit Configurations → `main.dart`, puis dans « Additional run args » : `-d chrome --dart-define-from-file=.env` (retire `-d chrome` pour lancer sur un autre appareil). Le dossier `.idea/` est ignoré par git.
+
+**Sans fichier** : `flutter run --dart-define=MISTRAL_API_KEY=sk-...`
+
+Sans clé, l'application reste en **mode démo** (articles factices). Autre solution : saisir la clé dans l'app (icône engrenage de l'onglet Scanner). Elle est alors stockée localement dans Hive, jamais dans le dépôt. La clé passée à la compilation reste prioritaire. ⚠️ Sur Chrome, `flutter run` ouvre un profil de navigateur temporaire : une clé saisie dans l'app peut disparaître d'un lancement à l'autre. Utilise plutôt le `.env`.
 
 ---
 
@@ -379,6 +470,7 @@ prix_vif/
 │   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
+│   │   ├── home_screen.dart          # Accueil : les 3 actions (code-barres, ticket, analyse)
 │   │   ├── scan_screen.dart          # Écran scanner : état et flux (code-barres, ticket, hors-ligne)
 │   │   ├── results_screen.dart       # Écran résultats
 │   │   ├── history_screen.dart       # Écran historique
@@ -393,12 +485,13 @@ prix_vif/
 │       ├── off_match_sheet.dart       # Choix d'une autre fiche Open Food Facts pour un produit
 │       ├── scanner_overlay.dart      # Overlay scanner
 │       ├── magic_button.dart         # Boutons animés
+│       ├── nav_buttons.dart          # Boutons Retour / Accueil des barres d'app (AppNavigation)
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       ├── logo.dart                  # Logo de l'application
-│       ├── dashboard/                 # Une section du Dashboard par fichier (stats, panier, alertes, comparateurs, tendances…)
+│       ├── dashboard/                 # Onglets du Dashboard (Produits, Magasins, Évolution) et briques communes
 │       ├── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
-│       └── scan/                      # Composants du scanner (mode, magasin, zone ticket, prix, confirmation, clé Mistral)
+│       └── scan/                      # Composants du scanner (magasin, mode, attente avant caméra, zone ticket, prix, confirmation, clé Mistral)
 │
 ├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
 ├── pubspec.yaml                    # Dépendances Flutter
@@ -411,14 +504,16 @@ prix_vif/
 ## 🛠️ Architecture
 
 ### Couche d'analyse
-- Les calculs (statistiques, comparaisons, recommandations) vivent dans `lib/analytics/`, sans dépendance à Flutter UI : les écrans ne font qu'afficher leurs résultats
+- Les calculs (prix par magasin, panier par magasin, changements de prix) vivent dans `lib/analytics/`, sans dépendance à Flutter UI : les écrans ne font qu'afficher leurs résultats
 
 ### Gestion d'État
 - État local avec `setState`
 - Passage de callbacks entre widgets
 
 ### Navigation
-- `BottomNavigationBar` pour la navigation principale (4 onglets)
+- `BottomNavigationBar` pour la navigation principale (5 onglets : Accueil, Scanner, Résultats, Dashboard, Historique), ouverture sur l'Accueil
+- Bouton **Retour** sur chaque écran sauf l'accueil (onglet précédent, ou écran précédent) ; le bouton retour d'Android fait de même
+- Bouton **Accueil** sur les écrans ouverts par-dessus les onglets (détails d'une session, sélection et fiche produit)
 - `MaterialPageRoute` pour les détails
 - `IndexedStack` pour conserver l'état
 - **Synchronisation automatique** entre onglets
@@ -442,32 +537,32 @@ prix_vif/
 ## 🎯 Utilisation
 
 ### 📱 Scanner un code-barres
-1. Lancez l'application sur votre appareil Android/iOS
-2. Autorisez l'accès à la caméra
-3. Sélectionnez le mode **CODE-BARRES** (bascule en haut de l'écran)
-4. Pointez la caméra vers un code-barres
-5. Le code est scanné automatiquement
-6. **Intégration Open Food Facts** : L'application récupère automatiquement les informations du produit (nom, marque, Nutri-Score, catégories, image)
-7. Un dialogue s'ouvre : entrez le **prix réel** du produit
-8. **✅ Sauvegarde automatique** : L'article est immédiatement persisté en base et apparaît dans le Dashboard
+1. Lancez l'application sur votre appareil Android/iOS : elle s'ouvre sur l'**accueil**
+2. Touchez **Scanner un code-barres** (ou, depuis le Scanner, sélectionnez le mode **CODE-BARRES**)
+3. **Choisissez le magasin** dans la liste (ou touchez le raccourci « Dernier : … »)
+4. Appuyez sur **SCANNER** : la caméra se lance (autorisez l'accès la première fois)
+5. Pointez la caméra vers un code-barres
+6. Le code est scanné automatiquement
+7. **Intégration Open Food Facts** : L'application récupère automatiquement les informations du produit (nom, marque, Nutri-Score, catégories, image)
+8. Un dialogue s'ouvre : entrez le **prix réel** du produit
+9. **✅ Sauvegarde automatique** : L'article est immédiatement persisté en base et apparaît dans le Dashboard
 
 ### 📸 Capturer un ticket de caisse
-1. Sélectionnez le mode **TICKET** (bascule en haut de l'écran)
-2. Appuyez sur le bouton "Photographier un ticket"
+1. Sur l'accueil, touchez **Scanner un ticket de caisse** (ou, depuis le Scanner, sélectionnez le mode **TICKET**)
+2. **Choisissez le magasin** : les boutons Appareil photo / Galerie restent grisés avant
 3. Prenez une photo du ticket avec la caméra ou choisissez depuis la galerie
 4. **Compression automatique** : L'image est réduite à max 1024px, JPEG 80%
 5. Les gains de compression s'affichent (ex: 5 Mo → 500 Ko)
 6. **Extraction Mistral AI** : Les articles sont extraits via l'API de vision
-7. **Matching Open Food Facts** : Chaque article est associé à un produit OFF (avec confirmation utilisateur)
+7. **Matching Open Food Facts** : Chaque article est associé à un produit OFF (avec confirmation utilisateur). La recherche se fait en 3 passes : nom complet, puis nom nettoyé avec les abréviations du ticket développées (LESS → lessive), puis avec un ou deux mots en moins
 8. **Persistance automatique** : La session complète est sauvegardée en base
 
 ### 📊 Consulter le Tableau de Bord
-- **Icône 📈 (3ème onglet)** : Accès au Dashboard
-- **Statistiques globales** : Voir le nombre total de scans, articles, montant dépensé
-- **Répartition Nutri-Score** : Visualiser la qualité nutritionnelle de vos achats
-- **Évolution temporelle** : Analyser vos dépenses par semaine/mois
-- **Totaux par période** : Suivre vos dépenses hebdomadaires et mensuelles
-- **Derniers scans** : Accès rapide à vos sessions récentes
+- Accès : carte **Analyser les produits et magasins** de l'accueil, ou onglet **Dashboard** de la barre du bas
+- **Produits** : où chaque produit est le moins cher, et combien il coûte ailleurs ; utilise la recherche pour retrouver un produit
+- **Magasins** : le magasin le moins cher pour ton panier habituel, et ce que chaque magasin a de moins cher
+- **Évolution** : ce qui a augmenté ou baissé depuis ton dernier achat ; touche un produit pour voir sa fiche
+- **Tous mes produits** (icône en haut à droite) : la liste complète des produits scannés
 
 ### 📜 Consulter les résultats
 - **Icône 🧾 (2ème onglet)** : Affiche la liste des articles scannés dans la session courante
@@ -491,10 +586,10 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 ✅ **Base de données (Hive NoSQL)** - Persistance locale complète avec 6 boxes
 ✅ **Synchronisation automatique** - Rechargement des données après chaque modification
 ✅ **Sauvegarde automatique** - Chaque article scanné est immédiatement persisté
-✅ **Extraction Mistral AI** - Analyse des tickets via API vision (`mistral-small-latest`, Mistral Small 4) — clé fournie via `--dart-define=MISTRAL_API_KEY=...` ou dans les réglages de l'app
+✅ **Extraction Mistral AI** - Analyse des tickets via API vision (`mistral-small-latest`, Mistral Small 4) — clé fournie via le fichier `.env` local (`--dart-define-from-file=.env`), `--dart-define=MISTRAL_API_KEY=...` ou dans les réglages de l'app
 ✅ **Mode hors-ligne** - Stockage des scans quand pas de réseau + traitement automatique au retour
 ✅ **Compression d'image** - Réduction à max 1024px, JPEG 80% avec affichage des gains
-✅ **Tableau de bord** - Statistiques globales, répartition Nutri-Score, tendances temporelles
+✅ **Tableau de bord** - Trois onglets : produits (où chacun est le moins cher), magasins (où faire ses courses, ce que chaque magasin a de moins cher), évolution (hausses et baisses)
 ✅ **Cache OFF** - Mise en cache des produits pour éviter les appels réseau répétés
 
 ## 🐛 Dernières Corrections
@@ -556,7 +651,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 21 Novembre 2026 (v1.12.0 — voir Historique des versions)*
+*Dernière mise à jour : 22 Novembre 2026 (v1.17.0 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables, « Où faire mes courses ? », alertes prix et export CSV*
+*Statut : ✅ Tableau de bord centré sur le prix des produits (Produits, Magasins, Évolution), scanner en deux étapes (magasin puis SCANNER), page d'accueil (3 actions) et boutons Retour / Accueil, recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables et export CSV*

@@ -79,12 +79,35 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
     final searchController = TextEditingController(text: item.rawName);
     List<OFFProduct> searchResults = List.from(item.candidates);
     bool isSearching = false;
+    String? searchError;
 
     await showDialog(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            // Recherche tapée : réseau d'abord (tous les résultats, pas le seul
+            // produit en cache), code-barres accepté
+            Future<void> runSearch() async {
+              setDialogState(() {
+                isSearching = true;
+                searchError = null;
+              });
+              try {
+                final results = await widget.offService.searchProducts(searchController.text);
+                setDialogState(() {
+                  searchResults = results;
+                  isSearching = false;
+                });
+              } catch (e) {
+                setDialogState(() {
+                  searchResults = [];
+                  isSearching = false;
+                  searchError = OFFSearchUnavailableException.userMessage;
+                });
+              }
+            }
+
             return AlertDialog(
               backgroundColor: AppTheme.surfaceDark,
               shape: RoundedRectangleBorder(
@@ -119,48 +142,19 @@ class _TicketConfirmationSheetState extends State<TicketConfirmationSheet> {
                               )
                             : IconButton(
                                 icon: const Icon(Icons.search, color: AppTheme.primary),
-                                onPressed: () async {
-                                  setDialogState(() {
-                                    isSearching = true;
-                                  });
-                                  try {
-                                    final results = await widget.offService.searchByName(searchController.text);
-                                    setDialogState(() {
-                                      searchResults = results;
-                                      isSearching = false;
-                                    });
-                                  } catch (e) {
-                                    setDialogState(() {
-                                      isSearching = false;
-                                    });
-                                  }
-                                },
+                                onPressed: runSearch,
                               ),
                       ),
-                      onSubmitted: (_) async {
-                        setDialogState(() {
-                          isSearching = true;
-                        });
-                        try {
-                          final results = await widget.offService.searchByName(searchController.text);
-                          setDialogState(() {
-                            searchResults = results;
-                            isSearching = false;
-                          });
-                        } catch (e) {
-                          setDialogState(() {
-                            isSearching = false;
-                          });
-                        }
-                      },
+                      onSubmitted: (_) => runSearch(),
                     ),
                     const SizedBox(height: 16),
                     Expanded(
                       child: searchResults.isEmpty
                           ? Center(
                               child: Text(
-                                isSearching ? 'Recherche en cours...' : 'Aucun produit trouvé.',
-                                style: const TextStyle(color: AppTheme.textSecondary),
+                                isSearching ? 'Recherche en cours...' : (searchError ?? 'Aucun produit trouvé.'),
+                                style: TextStyle(color: searchError != null ? AppTheme.error : AppTheme.textSecondary),
+                                textAlign: TextAlign.center,
                               ),
                             )
                           : ListView.builder(

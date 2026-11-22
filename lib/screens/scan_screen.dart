@@ -7,6 +7,9 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../theme.dart';
 import '../models.dart';
 import '../models/hive_models.dart';
+import '../models/product_category.dart';
+import '../analytics/analytics.dart';
+import '../services/category_service.dart';
 import '../utils/image_utils.dart';
 import '../services/open_food_facts_service.dart';
 import '../services/mistral_service.dart';
@@ -16,11 +19,14 @@ import '../widgets/scanner_overlay.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/ai_scan_effect.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 import '../services/camera_service.dart';
 import '../widgets/scan/mistral_settings_dialog.dart';
 import '../widgets/scan/price_input_sheet.dart';
+import '../widgets/scan/scan_idle_panel.dart';
 import '../widgets/scan/scan_mode_selector.dart';
 import '../widgets/scan/store_selector.dart';
+import '../widgets/scan/store_management_dialog.dart';
 import '../widgets/scan/ticket_confirmation_sheet.dart';
 import '../widgets/scan/ticket_scan_zone.dart';
 
@@ -33,6 +39,22 @@ class ScanScreen extends StatefulWidget {
   final Function(String) onScanTypeChanged;
   final Future<void> Function()? onScanSaved;
 
+  /// Bouton Retour de la barre d'app (onglet précédent) ; absent si `null`
+  final VoidCallback? onBack;
+
+  /// L'écran est affiché (onglet Scanner sélectionné) : la caméra ne tourne
+  /// que dans ce cas, en mode code-barres, après un tap sur SCANNER.
+  final bool isActive;
+
+  /// Mode demandé depuis l'accueil (`true` = code-barres, `false` = ticket),
+  /// appliqué à chaque nouvelle valeur de [modeRequestId].
+  final bool? requestedBarcodeMode;
+  final int modeRequestId;
+
+  /// Nouvelle séance de scan (arrivée depuis l'accueil) à chaque nouvelle
+  /// valeur : le magasin est à choisir de nouveau avant de scanner.
+  final int scanSessionId;
+
   const ScanScreen({
     super.key,
     required this.scannedItems,
@@ -42,6 +64,11 @@ class ScanScreen extends StatefulWidget {
     this.repository,
     required this.onScanTypeChanged,
     this.onScanSaved,
+    this.onBack,
+    this.isActive = true,
+    this.requestedBarcodeMode,
+    this.modeRequestId = 0,
+    this.scanSessionId = 0,
   });
 
   @override
@@ -59,7 +86,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     'Franprix',
     'Biocoop',
   ];
-  late String _selectedStore;
+  // Magasin de la séance : `null` tant qu'il n'est pas choisi (rien ne se
+  // scanne avant). Le dernier magasin choisi est proposé en raccourci.
+  String? _selectedStore;
+  String? _lastStore;
+
+  // La caméra tournait avant que l'app passe en arrière-plan : la relancer au retour
+  bool _resumeScanOnForeground = false;
   bool _isProcessingScan = false;
   bool _isBarcodeMode = true;
   XFile? _ticketImage;
@@ -86,8 +119,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _selectedStore = _stores.first;
-    _storeController.text = _selectedStore;
+    _isBarcodeMode = widget.requestedBarcodeMode ?? true;
     _loadSavedStores();
     _buttonController = AnimationController(
       vsync: this,
@@ -117,22 +149,63 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       widget.onScanTypeChanged(_isBarcodeMode ? 'barcode' : 'ticket');
     });
     
-    // Démarrer la caméra automatiquement
-    _startScanner();
+    // La caméra ne démarre pas ici : seulement au tap sur SCANNER, une fois
+    // le magasin choisi
+  }
+
+  @override
+  void didUpdateWidget(covariant ScanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    var cameraNeedsSync = widget.isActive != oldWidget.isActive;
+
+    // Nouvelle séance (arrivée depuis l'accueil) : magasin et ticket à refaire
+    if (widget.scanSessionId != oldWidget.scanSessionId) {
+      _selectedStore = null;
+      _storeController.clear();
+      _ticketImage = null;
+      _originalSize = null;
+      _compressedSize = null;
+      _compressedImageBytes = null;
+      _compressionMessage = null;
+      cameraNeedsSync = true;
+    }
+
+    // Mode demandé depuis l'accueil. Le parent connaît déjà le type de scan :
+    // pas d'appel à onScanTypeChanged ici (il est en train de se reconstruire).
+    final requested = widget.requestedBarcodeMode;
+    if (widget.modeRequestId != oldWidget.modeRequestId && requested != null && requested != _isBarcodeMode) {
+      _isBarcodeMode = requested;
+      if (requested) _ticketImage = null;
+      cameraNeedsSync = true;
+    }
+
+    if (cameraNeedsSync) _syncCamera();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Gérer le cycle de vie pour libérer/relancer la caméra
     if (state == AppLifecycleState.paused) {
+      _resumeScanOnForeground = _cameraService.isScanning;
       _stopScanner();
     } else if (state == AppLifecycleState.resumed) {
-      // Redémarrer la caméra quand l'app revient au premier plan
-      _startScanner();
+      // Relancer la caméra au retour au premier plan seulement si elle tournait
+      if (_resumeScanOnForeground && widget.isActive && _isBarcodeMode && _selectedStore != null) {
+        _startScanner();
+      }
+      _resumeScanOnForeground = false;
     }
   }
 
+  /// Arrête la caméra si l'écran est caché, en mode ticket ou sans magasin.
+  /// Elle ne démarre jamais toute seule : seulement au tap sur SCANNER.
+  void _syncCamera() {
+    if (!widget.isActive || !_isBarcodeMode || _selectedStore == null) _stopScanner();
+  }
+
   Future<void> _startScanner() async {
+    // Étape 1 obligatoire : pas de scan sans magasin
+    if (_selectedStore == null) return;
     try {
       await _cameraService.start();
       setState(() {
@@ -161,7 +234,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       if (barcode) _ticketImage = null;
     });
     widget.onScanTypeChanged(barcode ? 'barcode' : 'ticket');
-    barcode ? _startScanner() : _stopScanner();
+    _syncCamera();
   }
 
   /// Oublie la photo de ticket en cours
@@ -263,19 +336,20 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  /// Restaure les magasins ajoutés et le dernier magasin choisi (persistés dans Hive)
+  /// Restaure les magasins ajoutés et le dernier magasin choisi (persistés dans
+  /// Hive), hors magasins supprimés. Le dernier magasin n'est que proposé :
+  /// la séance démarre sans magasin.
   Future<void> _loadSavedStores() async {
     final repository = widget.repository;
     if (repository == null) return;
     await repository.ready;
     if (!mounted) return;
     final saved = repository.getSelectedStore();
+    final hidden = repository.getHiddenStores().map((s) => s.toLowerCase()).toList();
     setState(() {
       repository.getCustomStores().forEach(_insertStore);
-      if (saved != null && _stores.contains(saved)) {
-        _selectedStore = saved;
-        _storeController.text = saved;
-      }
+      _stores.removeWhere((s) => hidden.contains(s.toLowerCase()));
+      if (saved != null && _stores.contains(saved)) _lastStore = saved;
     });
   }
 
@@ -293,9 +367,14 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   void _selectStore(String store) {
     setState(() {
       _selectedStore = store;
+      _lastStore = store;
       _storeController.text = store;
+      _errorMessage = null;
     });
-    widget.repository?.saveSelectedStore(store);
+    // Mémorisé une fois la base ouverte : un choix fait juste au lancement
+    // (Hive pas encore prêt) n'échoue pas
+    final repository = widget.repository;
+    repository?.ready.then((_) => repository.saveSelectedStore(store));
   }
 
   Future<void> _addStore() async {
@@ -359,7 +438,43 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
     setState(() => _insertStore(trimmed));
     _selectStore(trimmed);
-    await widget.repository?.addCustomStore(trimmed);
+    final repository = widget.repository;
+    if (repository != null) {
+      await repository.ready;
+      await repository.addCustomStore(trimmed);
+    }
+  }
+
+  /// Ouvre la liste des magasins proposés pour en supprimer
+  Future<void> _manageStores() async {
+    await showStoreManagementDialog(
+      context,
+      stores: List.of(_stores),
+      onRemove: _removeStore,
+    );
+  }
+
+  /// Supprime un magasin de la liste proposée (persisté) : s'il était choisi
+  /// pour la séance, le choix est annulé. Les prix relevés dans ce magasin
+  /// restent dans l'historique.
+  Future<void> _removeStore(String store) async {
+    final lower = store.toLowerCase();
+    final repository = widget.repository;
+    if (repository != null) {
+      await repository.ready;
+      await repository.removeStore(store);
+    }
+    if (!mounted) return;
+    setState(() {
+      _stores.removeWhere((s) => s.toLowerCase() == lower);
+      if (_selectedStore?.toLowerCase() == lower) {
+        _selectedStore = null;
+        _storeController.clear();
+      }
+      if (_lastStore?.toLowerCase() == lower) {
+        _lastStore = null;
+      }
+    });
   }
 
   Future<void> _captureTicket(ImageSource source) async {
@@ -430,7 +545,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _processTicketImage() async {
-    if (_compressedImageBytes == null || _isLoadingProduct) return;
+    // Magasin figé au début de l'analyse (le ticket est enregistré pour lui)
+    final store = _selectedStore;
+    if (_compressedImageBytes == null || _isLoadingProduct || store == null) return;
     setState(() {
       _isLoadingProduct = true;
       _errorMessage = null;
@@ -528,7 +645,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           builder: (context) {
             return TicketConfirmationSheet(
               items: confirmationItems,
-              storeName: _selectedStore,
+              storeName: store,
               offService: _offService,
             );
           },
@@ -548,7 +665,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               items: List<ScannedItem>.from(imported),
               date: DateTime.now(),
               endDate: DateTime.now(),
-              storeName: _selectedStore,
+              storeName: store,
               type: 'ticket',
             );
             try {
@@ -595,6 +712,45 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     }
   }
 
+  CategoryService? _categoryServiceInstance;
+  CategoryService get _categoryService => _categoryServiceInstance ??= CategoryService(widget.repository!);
+
+  /// Prépare le conseil d'achat de la feuille de prix : enregistre la catégorie
+  /// Open Food Facts du produit, puis compare avec les prix déjà relevés.
+  /// `null` sans dépôt ou sans magasin.
+  Future<PriceAdvice Function(double? price)?> _buildAdvisor(String barcode, OFFProduct? product) async {
+    final repository = widget.repository;
+    final store = _selectedStore;
+    if (repository == null || store == null) return null;
+    try {
+      ProductCategory? category;
+      if (product != null) {
+        try {
+          category = await _categoryService.applyFromProduct(barcode, product).timeout(const Duration(seconds: 3));
+        } catch (_) {
+          // Taxonomie lente ou hors-ligne : catégorie déjà connue, sinon aucune
+        }
+      }
+      category ??= repository.getProductCategory('bc_${barcode.trim()}');
+      final sessions = await repository.getAllScans();
+      final categories = repository.getAllProductCategories();
+      final key = productKeyFor(barcode: barcode, name: product?.name ?? barcode, brand: product?.brand);
+      return (price) => PriceAdvice.calculate(
+            sessions: sessions,
+            categories: categories,
+            productKey: key,
+            store: store,
+            price: price,
+            quantity: product?.quantity,
+            unit: product?.unit,
+            category: category,
+          );
+    } catch (e) {
+      debugPrint('Conseil d\'achat indisponible : $e');
+      return null;
+    }
+  }
+
   void _onBarcodeScanned(List<Barcode> barcodes) async {
     if (_isProcessingScan) return;
     if (_cameraService.isScanning && barcodes.isNotEmpty) {
@@ -634,8 +790,12 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       // Écran fermé pendant la recherche : plus rien à demander
       if (!mounted) return;
 
+      // Conseil d'achat (prix relevés de ce produit et de sa catégorie)
+      final advise = await _buildAdvisor(barcodeValue, product);
+      if (!mounted) return;
+
       // Demander le prix à l'utilisateur en passant le produit récupéré (ou null)
-      final double? price = await showPriceInputSheet(context, barcodeValue, product);
+      final double? price = await showPriceInputSheet(context, barcodeValue, product, advise: advise);
       
       if (price != null) {
         // Traiter le code scanné
@@ -715,6 +875,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
+        leading: widget.onBack != null ? AppBackButton(onPressed: widget.onBack) : null,
         title: const NeonTitle(text: 'SCANNER', fontSize: 22),
         actions: [
           IconButton(
@@ -746,20 +907,26 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       ),
       body: Column(
         children: [
-          // Sélecteur de magasin
+          // Étape 1 : le magasin (obligatoire avant de scanner)
           StoreSelector(
             stores: _stores,
             selectedStore: _selectedStore,
+            lastStore: _lastStore,
+            controller: _storeController,
             onSelected: _selectStore,
             onAdd: _addStore,
+            onManage: _manageStores,
           ),
-          
+
           // Sélecteur de mode de scan
           ScanModeSelector(isBarcodeMode: _isBarcodeMode, onChanged: _setBarcodeMode),
-          
-          // Zone de scan (Code-barres ou Ticket)
+
+          // Zone de scan (Code-barres ou Ticket). Tant que la caméra ne tourne
+          // pas (et hors traitement d'un code), rappel de l'étape en cours.
           Expanded(
-            child: _isBarcodeMode
+            child: _isBarcodeMode && !_cameraService.isScanning && !_isProcessingScan
+                ? ScanIdlePanel(store: _selectedStore, errorMessage: _errorMessage)
+                : _isBarcodeMode
                 ? Stack(
                     alignment: Alignment.center,
                     children: [
@@ -844,24 +1011,28 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     onCompress: _compressTicketImage,
                     onAnalyse: _processTicketImage,
                     onReset: _resetTicket,
+                    canCapture: _selectedStore != null,
                   ),
           ),
-          
-          // Bouton scanner magique (Uniquement en mode code-barres)
+
+          // Étape 2 : bouton SCANNER (mode code-barres), grisé sans magasin
           if (_isBarcodeMode)
             Padding(
               padding: const EdgeInsets.all(20),
               child: MagicButton(
+                key: const ValueKey('scan_start_button'),
                 text: _cameraService.isScanning ? 'ARRÊTER' : 'SCANNER',
                 icon: _cameraService.isScanning ? Icons.stop : Icons.qr_code_scanner,
-                onPressed: () async {
-                  _buttonController.forward().then((_) => _buttonController.reverse());
-                  if (_cameraService.isScanning) {
-                    await _stopScanner();
-                  } else {
-                    await _startScanner();
-                  }
-                },
+                onPressed: _cameraService.isScanning || _selectedStore != null
+                    ? () async {
+                        _buttonController.forward().then((_) => _buttonController.reverse());
+                        if (_cameraService.isScanning) {
+                          await _stopScanner();
+                        } else {
+                          await _startScanner();
+                        }
+                      }
+                    : null,
                 isLoading: false,
                 isPrimary: true,
               ),

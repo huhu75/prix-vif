@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:prix_vif/analytics/analytics.dart';
 import 'package:prix_vif/models.dart';
+import 'package:prix_vif/models/product_category.dart';
 import 'package:prix_vif/screens/product_detail_screen.dart';
 import 'package:prix_vif/services/product_analysis_service.dart';
 import 'package:prix_vif/services/scan_repository.dart';
@@ -51,14 +53,13 @@ void main() {
     await Hive.deleteFromDisk();
   });
 
-  test('analyse locale : historique, magasins, similaires', () {
+  test('analyse locale : historique et magasins', () {
     final analysis = service.buildAnalysis('lait', 'Lait');
 
     expect(analysis.priceHistoryByStore.keys.toSet(), {'Carrefour', 'Leclerc'});
     expect(analysis.priceHistoryByStore['Carrefour']!.pricePoints.map((p) => p.price), [1.20, 1.30]);
     expect(analysis.storeComparison.cheapestStore!.storeName, 'Leclerc');
     expect(analysis.storeComparison.storePrices['Carrefour']!.averagePrice, closeTo(1.25, 0.001));
-    expect(analysis.similarProducts!.similarProducts.map((p) => p.productName), contains('Lait Bio'));
   });
 
   test('sans Open Food Facts, la fiche est reconstituée depuis l\'article enregistré', () async {
@@ -67,8 +68,27 @@ void main() {
     expect(data.offProduct!.brand, 'Candia');
   });
 
-  testWidgets('la fiche produit affiche ses quatre onglets', (tester) async {
+  test('conseil d\'achat par magasin et produits de la même catégorie', () async {
+    const laits = ProductCategory(id: 'en:milks', label: 'Laits');
+    await repository.setProductCategory('bc_lait', laits);
+    await repository.setProductCategory('bc_bio', laits);
+
+    final data = await service.load('lait', 'Lait');
+    expect(data.productKey, 'bc_lait');
+    expect(data.category, laits);
+    // Lait : 1.30 € chez Carrefour, 1.10 € chez Leclerc
+    expect(data.adviceByStore['Leclerc']!.verdict, AdviceVerdict.recommended);
+    expect(data.adviceByStore['Carrefour']!.verdict, AdviceVerdict.discouraged);
+    expect(data.adviceByStore['Carrefour']!.cheaperElsewhere!.storeName, 'Leclerc');
+    expect(data.categoryGroup!.offers.map((o) => o.name).toSet(), {'Lait', 'Lait Bio'});
+    expect(data.categoryGroup!.cheapest!.storeName, 'Leclerc');
+  });
+
+  testWidgets('la fiche produit affiche ses quatre onglets et le conseil d\'achat', (tester) async {
     await tester.runAsync(() async {
+      // Vraies écritures Hive : hors de l'horloge simulée du test
+      await repository.setProductCategory('bc_lait', const ProductCategory(id: 'en:milks', label: 'Laits'));
+      await repository.setProductCategory('bc_bio', const ProductCategory(id: 'en:milks', label: 'Laits'));
       await tester.pumpWidget(MaterialApp(
         home: ProductDetailScreen(
           repository: repository,
@@ -83,14 +103,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LAIT'), findsOneWidget);
-    for (final tab in ['Fiche', 'Évolution', 'Magasins', 'Similaires']) {
+    for (final tab in ['Fiche', 'Évolution', 'Magasins', 'Catégorie']) {
       expect(find.text(tab), findsOneWidget);
     }
-    // Onglet Magasins ouvert d'emblée : les deux enseignes sont listées
-    expect(find.textContaining('Leclerc'), findsWidgets);
+    // Onglet Magasins ouvert d'emblée : où l'acheter, recommandé / trop cher
+    expect(find.text('Où l\'acheter : Leclerc'), findsOneWidget);
+    expect(find.text('Recommandé'), findsOneWidget);
+    expect(find.text('Trop cher : 0.20 € de moins chez Leclerc'), findsOneWidget);
 
-    await tester.tap(find.text('Similaires'));
+    // Onglet Catégorie : les autres laits, toutes marques
+    await tester.tap(find.text('Catégorie'));
     await tester.pumpAndSettle();
-    expect(find.text('Le moins cher'), findsOneWidget);
+    expect(find.text('Laits'), findsOneWidget);
+    expect(find.textContaining('Lait Bio'), findsOneWidget);
   });
 }

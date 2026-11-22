@@ -4,6 +4,7 @@ import '../models.dart';
 import '../widgets/price_card.dart';
 import '../widgets/magic_button.dart';
 import '../widgets/magic_title.dart';
+import '../widgets/nav_buttons.dart';
 import '../services/csv_export.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -13,6 +14,9 @@ class HistoryScreen extends StatefulWidget {
   final Future<void> Function() onClearAll;
   final Future<void> Function()? onRemoveDemoData;
 
+  /// Bouton Retour de la barre d'app (onglet précédent) ; absent si `null`
+  final VoidCallback? onBack;
+
   const HistoryScreen({
     super.key,
     required this.sessions,
@@ -20,6 +24,7 @@ class HistoryScreen extends StatefulWidget {
     required this.onSessionDeleted,
     required this.onClearAll,
     this.onRemoveDemoData,
+    this.onBack,
   });
 
   @override
@@ -78,6 +83,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
+        leading: widget.onBack != null ? AppBackButton(onPressed: widget.onBack) : null,
         title: NeonTitle(text: 'HISTORIQUE', fontSize: 22),
         actions: [
           if (widget.sessions.isNotEmpty)

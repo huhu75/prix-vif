@@ -23,6 +23,9 @@ class TicketScanZone extends StatelessWidget {
   final VoidCallback onAnalyse;
   final VoidCallback onReset;
 
+  /// Magasin choisi : sans lui, les boutons Appareil photo / Galerie sont grisés
+  final bool canCapture;
+
   const TicketScanZone({
     super.key,
     required this.ticketImage,
@@ -37,6 +40,7 @@ class TicketScanZone extends StatelessWidget {
     required this.onCompress,
     required this.onAnalyse,
     required this.onReset,
+    this.canCapture = true,
   });
 
   @override
@@ -131,9 +135,12 @@ class TicketScanZone extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Prenez une photo de votre ticket pour extraire les prix des articles.',
+              canCapture
+                  ? 'Prenez une photo de votre ticket pour extraire les prix des articles.'
+                  : 'Choisis d\'abord ton magasin : le ticket sera enregistré pour ce magasin.',
+              key: ValueKey(canCapture ? 'ticket_ready' : 'ticket_no_store'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: canCapture ? AppTheme.textSecondary : AppTheme.primary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -144,13 +151,13 @@ class TicketScanZone extends StatelessWidget {
                 _buildCameraButton(
                   icon: Icons.camera_alt,
                   label: 'Appareil photo',
-                  onTap: () => onCapture(ImageSource.camera),
+                  onTap: canCapture ? () => onCapture(ImageSource.camera) : null,
                 ),
                 const SizedBox(width: 12),
                 _buildCameraButton(
                   icon: Icons.photo_library,
                   label: 'Galerie',
-                  onTap: () => onCapture(ImageSource.gallery),
+                  onTap: canCapture ? () => onCapture(ImageSource.gallery) : null,
                 ),
               ],
             ),
@@ -163,7 +170,7 @@ class TicketScanZone extends StatelessWidget {
   Widget _buildCameraButton({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     return ElevatedButton.icon(
       onPressed: onTap,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models.dart';
 import '../models/hive_models.dart';
+import '../models/product_category.dart';
 import '../utils/unit_price.dart';
 
 // ===================================================
@@ -19,6 +20,7 @@ class ScanRepository {
   static const String _mistralExtractionsBoxName = 'mistral_extractions';
   static const String _pendingOfflineScansBoxName = 'pending_offline_scans';
   static const String _settingsBoxName = 'settings';
+  static const String _categoriesBoxName = 'product_categories';
 
   late Box<Map> _scansBox;
   late Box<Map> _articlesBox;
@@ -26,6 +28,9 @@ class ScanRepository {
   late Box<Map> _mistralExtractionsBox;
   late Box<Map> _pendingOfflineScansBox;
   late Box<Map> _settingsBox;
+
+  /// Catégorie de chaque produit, clé = clé produit (`bc_<EAN>` ou `name_<nom>_<marque>`)
+  late Box<Map> _categoriesBox;
 
   bool _isInitialized = false;
   final Completer<void> _ready = Completer<void>();
@@ -43,6 +48,7 @@ class ScanRepository {
     _mistralExtractionsBox = await Hive.openBox<Map>(_mistralExtractionsBoxName);
     _pendingOfflineScansBox = await Hive.openBox<Map>(_pendingOfflineScansBoxName);
     _settingsBox = await Hive.openBox<Map>(_settingsBoxName);
+    _categoriesBox = await Hive.openBox<Map>(_categoriesBoxName);
 
     _isInitialized = true;
 
@@ -83,19 +89,83 @@ class ScanRepository {
   }
 
   // ==========================================
-  // Alertes de prix
+  // Catégories des produits
   // ==========================================
 
-  static const String _alertThresholdKey = 'price_alert_threshold';
+  static const String _categoryLabelsKey = 'category_labels';
 
-  /// Seuil des alertes de hausse de prix, en %
-  int getPriceAlertThreshold({int fallback = 10}) {
-    if (!_isInitialized) return fallback;
-    return _settingsBox.get(_alertThresholdKey)?['percent'] as int? ?? fallback;
+  /// Une catégorie absente d'Open Food Facts est recherchée de nouveau après ce délai
+  static const Duration noCategoryRetryDelay = Duration(days: 30);
+
+  /// Catégorie d'un produit, `null` si elle est inconnue
+  ProductCategory? getProductCategory(String productKey) {
+    if (!_isInitialized) return null;
+    final raw = _categoriesBox.get(productKey);
+    if (raw == null || raw['id'] == null) return null;
+    return ProductCategory.fromMap(raw);
   }
 
-  Future<void> savePriceAlertThreshold(int percent) async {
-    await _settingsBox.put(_alertThresholdKey, {'percent': percent});
+  /// Toutes les catégories connues, par clé produit
+  Map<String, ProductCategory> getAllProductCategories() {
+    if (!_isInitialized) return {};
+    return {
+      for (final key in _categoriesBox.keys)
+        if (_categoriesBox.get(key)?['id'] != null)
+          key as String: ProductCategory.fromMap(_categoriesBox.get(key)!),
+    };
+  }
+
+  /// Enregistre la catégorie d'un produit. Une catégorie choisie à la main
+  /// n'est remplacée que par une autre catégorie choisie à la main.
+  Future<void> setProductCategory(String productKey, ProductCategory category) async {
+    final current = getProductCategory(productKey);
+    if (current != null && current.manual && !category.manual) return;
+    await _categoriesBox.put(productKey, category.toMap());
+  }
+
+  /// Retient qu'Open Food Facts n'a pas de catégorie pour ce produit
+  /// (pour ne pas le redemander à chaque lancement)
+  Future<void> markCategoryUnavailable(String productKey) async {
+    if (getProductCategory(productKey) != null) return;
+    await _categoriesBox.put(productKey, {'checkedAt': DateTime.now().toIso8601String()});
+  }
+
+  /// Catégories différentes déjà attribuées, par libellé
+  List<ProductCategory> getKnownCategories() {
+    final byId = <String, ProductCategory>{};
+    for (final category in getAllProductCategories().values) {
+      byId.putIfAbsent(category.id, () => category);
+    }
+    return byId.values.toList()..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+  }
+
+  /// Codes-barres des produits scannés dont la catégorie reste à chercher sur
+  /// Open Food Facts (jamais cherchée, ou absente depuis plus de [noCategoryRetryDelay])
+  List<String> barcodesMissingCategory({DateTime? now}) {
+    final reference = now ?? DateTime.now();
+    final barcodes = <String>{};
+    for (final raw in _articlesBox.values) {
+      final barcode = (raw['barcode'] as String?)?.trim();
+      if (barcode == null || barcode.isEmpty || !RegExp(r'^\d+$').hasMatch(barcode)) continue;
+      final entry = _categoriesBox.get('bc_$barcode');
+      if (entry?['id'] != null) continue;
+      final checkedAt = DateTime.tryParse(entry?['checkedAt'] as String? ?? '');
+      if (checkedAt != null && reference.difference(checkedAt) < noCategoryRetryDelay) continue;
+      barcodes.add(barcode);
+    }
+    return barcodes.toList();
+  }
+
+  /// Nom français mémorisé d'un identifiant de catégorie Open Food Facts
+  String? getCategoryLabel(String categoryId) {
+    if (!_isInitialized) return null;
+    return _settingsBox.get(_categoryLabelsKey)?[categoryId] as String?;
+  }
+
+  Future<void> saveCategoryLabel(String categoryId, String label) async {
+    final labels = Map<String, dynamic>.from(_settingsBox.get(_categoryLabelsKey) ?? {});
+    labels[categoryId] = label;
+    await _settingsBox.put(_categoryLabelsKey, labels);
   }
 
   // ==========================================
@@ -103,6 +173,7 @@ class ScanRepository {
   // ==========================================
 
   static const String _storesKey = 'stores';
+  static const String _hiddenStoresKey = 'hidden_stores';
   static const String _selectedStoreKey = 'selected_store';
 
   /// Magasins ajoutés par l'utilisateur (en plus de la liste par défaut)
@@ -111,11 +182,38 @@ class ScanRepository {
     return (_settingsBox.get(_storesKey)?['names'] as List?)?.cast<String>() ?? [];
   }
 
-  /// Mémorise un magasin ajouté par l'utilisateur
+  /// Magasins retirés de la liste proposée par l'utilisateur
+  List<String> getHiddenStores() {
+    if (!_isInitialized) return [];
+    return (_settingsBox.get(_hiddenStoresKey)?['names'] as List?)?.cast<String>() ?? [];
+  }
+
+  /// Mémorise un magasin ajouté par l'utilisateur (et le rend à nouveau visible)
   Future<void> addCustomStore(String storeName) async {
+    final lower = storeName.toLowerCase();
     final stores = getCustomStores();
-    if (stores.any((s) => s.toLowerCase() == storeName.toLowerCase())) return;
-    await _settingsBox.put(_storesKey, {'names': [...stores, storeName]});
+    if (!stores.any((s) => s.toLowerCase() == lower)) {
+      await _settingsBox.put(_storesKey, {'names': [...stores, storeName]});
+    }
+    final hidden = getHiddenStores().where((s) => s.toLowerCase() != lower).toList();
+    await _settingsBox.put(_hiddenStoresKey, {'names': hidden});
+  }
+
+  /// Supprime un magasin de la liste proposée : les magasins personnalisés sont
+  /// retirés et tout magasin (par défaut compris) est mémorisé comme masqué.
+  /// Les prix déjà relevés dans ce magasin restent dans l'historique.
+  /// Le dernier magasin choisi est oublié s'il s'agit de celui-là.
+  Future<void> removeStore(String storeName) async {
+    final lower = storeName.toLowerCase();
+    final custom = getCustomStores().where((s) => s.toLowerCase() != lower).toList();
+    await _settingsBox.put(_storesKey, {'names': custom});
+    final hidden = getHiddenStores();
+    if (!hidden.any((s) => s.toLowerCase() == lower)) {
+      await _settingsBox.put(_hiddenStoresKey, {'names': [...hidden, storeName]});
+    }
+    if (getSelectedStore()?.toLowerCase() == lower) {
+      await _settingsBox.delete(_selectedStoreKey);
+    }
   }
 
   /// Dernier magasin sélectionné dans le scanner
@@ -401,8 +499,10 @@ class ScanRepository {
     return count;
   }
 
-  /// Récupère la liste de tous les magasins connus (historique + personnalisés + courants)
+  /// Récupère la liste de tous les magasins connus (historique + personnalisés + courants),
+  /// hors magasins supprimés par l'utilisateur
   List<String> getAllKnownStores() {
+    final hidden = getHiddenStores().map((s) => s.toLowerCase()).toSet();
     final stores = <String>{};
     // Magasins courants
     stores.addAll(['Leclerc', 'Carrefour', 'Intermarché', 'Auchan', 'Lidl', 'Monoprix', 'Aldi', 'Super U']);
@@ -414,7 +514,10 @@ class ScanRepository {
         stores.add(article.storeName!.trim());
       }
     }
-    final list = stores.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final list = stores
+        .where((s) => !hidden.contains(s.toLowerCase()))
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return list;
   }
 
@@ -638,78 +741,6 @@ class ScanRepository {
     result.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
     
     return result;
-  }
-
-  /// Récupère les produits similaires à un produit donné (même catégorie)
-  List<Map<String, dynamic>> getSimilarProducts(String productId, {String? category}) {
-    final allArticles = getAllStoredArticles();
-    
-    // Trouver le produit de référence
-    StoredArticle? referenceArticle;
-    for (final article in allArticles) {
-      if (article.id == productId || article.barcode == productId) {
-        referenceArticle = article;
-        break;
-      }
-    }
-    
-    // Si on a pas trouvé par ID, chercher par nom
-    if (referenceArticle == null) {
-      for (final article in allArticles) {
-        if (article.name == productId) {
-          referenceArticle = article;
-          break;
-        }
-      }
-    }
-    
-    if (referenceArticle == null) return [];
-    
-    // Utiliser la catégorie du produit de référence ou celle fournie
-    final targetCategory = category ?? 
-        (referenceArticle.categories?.isNotEmpty == true 
-            ? referenceArticle.categories!.first
-            : null);
-    
-    // Récupérer tous les articles de la même catégorie ou avec un nom similaire
-    final similarProducts = <Map<String, dynamic>>[];
-    
-    for (final article in allArticles) {
-      // Éviter d'inclure le produit de référence lui-même
-      if (article.id == referenceArticle.id) continue;
-      
-      // Vérifier la catégorie
-      final hasSameCategory = targetCategory != null && 
-          article.categories?.contains(targetCategory) == true;
-      
-      // Vérifier la similarité du nom (si pas de catégorie)
-      final hasSimilarName = targetCategory == null && 
-          article.name.toLowerCase().contains(
-              referenceArticle.name.toLowerCase().split(' ').first) == true;
-      
-      if (hasSameCategory || hasSimilarName) {
-        similarProducts.add({
-          'id': article.id,
-          'name': article.name,
-          'brand': article.brand,
-          'barcode': article.barcode,
-          'storeName': article.storeName,
-          'price': article.price,
-          'quantity': article.quantity,
-          'unit': article.unit,
-          'scanDate': article.scanDate,
-          'nutriscore': article.nutriscore,
-          'imageUrl': article.imageUrl,
-          'categories': article.categories,
-        });
-      }
-    }
-    
-    // Tri par prix croissant
-    similarProducts.sort((a, b) => 
-        (a['price'] as double).compareTo(b['price'] as double));
-    
-    return similarProducts;
   }
 
   /// Supprime un magasin de tous les articles d'un produit
