@@ -1,8 +1,9 @@
 import '../models.dart';
 import 'product_observation.dart';
 
-/// Hausse de prix d'un produit dans un magasin, entre ses deux derniers scans dans ce magasin
-class PriceAlert {
+/// Changement de prix d'un produit dans un magasin, entre ses deux derniers
+/// achats dans ce magasin (onglet « Prix » du tableau de bord)
+class PriceChange {
   final String productId;
   final String name;
   final String? brand;
@@ -15,7 +16,7 @@ class PriceAlert {
   final String? cheaperStore;
   final double? cheaperPrice;
 
-  PriceAlert({
+  PriceChange({
     required this.productId,
     required this.name,
     this.brand,
@@ -27,21 +28,17 @@ class PriceAlert {
     this.cheaperPrice,
   });
 
-  double get increaseAmount => latestPrice - previousPrice;
-  double get increasePercent => previousPrice > 0 ? increaseAmount / previousPrice * 100 : 0.0;
+  double get amount => latestPrice - previousPrice;
+  double get percent => previousPrice > 0 ? amount / previousPrice * 100 : 0.0;
+  bool get isIncrease => amount > 0;
 
-  /// Seuils proposés dans l'interface (en %)
-  static const List<int> thresholdChoices = [5, 10, 20];
-  static const int defaultThreshold = 10;
-
-  /// Produits dont le dernier prix dans un magasin a augmenté d'au moins
-  /// [thresholdPercent] % par rapport au scan précédent dans ce même magasin.
-  /// Triés de la plus forte hausse à la plus faible.
-  static List<PriceAlert> calculate(List<ScanSession> sessions, {num thresholdPercent = defaultThreshold}) {
+  /// Tous les changements de plus d'un centime, de la plus forte hausse à la
+  /// plus forte baisse (en %).
+  static List<PriceChange> calculate(List<ScanSession> sessions) {
     final groups = groupByProduct(
       ProductObservation.fromSessions(sessions).where((o) => o.storeName != null),
     );
-    final alerts = <PriceAlert>[];
+    final changes = <PriceChange>[];
 
     for (final observations in groups.values) {
       final byStore = <String, List<ProductObservation>>{};
@@ -55,9 +52,7 @@ class PriceAlert {
         if (history.length < 2) continue;
         final previous = history[history.length - 2];
         final latest = history.last;
-        if (previous.price <= 0) continue;
-        final percent = (latest.price - previous.price) / previous.price * 100;
-        if (latest.price - previous.price <= 0.01 || percent < thresholdPercent) continue;
+        if (previous.price <= 0 || (latest.price - previous.price).abs() <= 0.01) continue;
 
         MapEntry<String, ProductObservation>? cheaper;
         for (final other in latestPrices.entries) {
@@ -65,7 +60,7 @@ class PriceAlert {
           if (cheaper == null || other.value.price < cheaper.value.price) cheaper = other;
         }
 
-        alerts.add(PriceAlert(
+        changes.add(PriceChange(
           productId: latest.productId,
           name: latest.item.name,
           brand: latest.item.brand,
@@ -79,7 +74,7 @@ class PriceAlert {
       }
     }
 
-    alerts.sort((a, b) => b.increasePercent.compareTo(a.increasePercent));
-    return alerts;
+    changes.sort((a, b) => b.percent.compareTo(a.percent));
+    return changes;
   }
 }

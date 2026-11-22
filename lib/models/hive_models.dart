@@ -21,6 +21,9 @@ class CachedProduct {
   final Map<String, String>? nutrientLevels;
   final Map<String, double>? nutriments;
 
+  /// Catégorie de comparaison Open Food Facts (`compared_to_category`)
+  final String? categoryId;
+
   CachedProduct({
     required this.ean,
     required this.productName,
@@ -35,6 +38,7 @@ class CachedProduct {
     this.allergens,
     this.nutrientLevels,
     this.nutriments,
+    this.categoryId,
   });
 
   Map<String, dynamic> toMap() => {
@@ -51,6 +55,7 @@ class CachedProduct {
     'allergens': allergens,
     'nutrientLevels': nutrientLevels,
     'nutriments': nutriments,
+    'categoryId': categoryId,
   };
 
   factory CachedProduct.fromMap(Map<dynamic, dynamic> map) => CachedProduct(
@@ -67,6 +72,7 @@ class CachedProduct {
     allergens: (map['allergens'] as List?)?.cast<String>(),
     nutrientLevels: (map['nutrientLevels'] as Map?)?.cast<String, String>(),
     nutriments: (map['nutriments'] as Map?)?.map((key, value) => MapEntry(key as String, (value as num).toDouble())),
+    categoryId: map['categoryId'] as String?,
   );
 }
 

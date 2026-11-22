@@ -6,10 +6,13 @@ import '../utils/unit_price.dart';
 // ===================================================
 
 /// Clé d'identité d'un produit : EAN si connu, sinon nom + marque normalisés.
-String productKeyOf(ScannedItem item) {
-  final barcode = item.barcode?.trim();
-  if (barcode != null && barcode.isNotEmpty) return 'bc_$barcode';
-  return 'name_${item.name.trim().toLowerCase()}_${(item.brand ?? '').trim().toLowerCase()}';
+String productKeyOf(ScannedItem item) => productKeyFor(barcode: item.barcode, name: item.name, brand: item.brand);
+
+/// Clé d'identité d'un produit à partir de ses champs (voir [productKeyOf])
+String productKeyFor({String? barcode, required String name, String? brand}) {
+  final ean = barcode?.trim();
+  if (ean != null && ean.isNotEmpty) return 'bc_$ean';
+  return 'name_${name.trim().toLowerCase()}_${(brand ?? '').trim().toLowerCase()}';
 }
 
 /// Identifiant à passer à la fiche produit : EAN, sinon nom, sinon id.

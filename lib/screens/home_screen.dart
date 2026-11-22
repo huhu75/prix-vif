@@ -12,11 +12,15 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onScanTicket;
   final VoidCallback onOpenAnalysis;
 
+  /// « Où acheter un produit ? » : recherche dans l'onglet Produits du tableau de bord
+  final VoidCallback? onFindWhereToBuy;
+
   const HomeScreen({
     super.key,
     required this.onScanBarcode,
     required this.onScanTicket,
     required this.onOpenAnalysis,
+    this.onFindWhereToBuy,
   });
 
   @override
@@ -68,6 +72,17 @@ class HomeScreen extends StatelessWidget {
                   color: AppTheme.secondary,
                   onTap: onScanTicket,
                 ),
+                if (onFindWhereToBuy != null) ...[
+                  const SizedBox(height: 16),
+                  HomeActionCard(
+                    key: const ValueKey('home_where_to_buy'),
+                    icon: Icons.travel_explore,
+                    title: 'Où acheter un produit ?',
+                    subtitle: 'Cherche un produit ou une catégorie : le magasin le moins cher',
+                    color: AppTheme.warning,
+                    onTap: onFindWhereToBuy!,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 HomeActionCard(
                   key: const ValueKey('home_analysis'),

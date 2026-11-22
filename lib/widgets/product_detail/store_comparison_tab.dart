@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
+import '../../analytics/analytics.dart';
 import '../../theme.dart';
 import '../../models/product_analysis_models.dart';
+import '../price_advice_card.dart';
 
 // ==========================================
 // ONGLET 2 : COMPARAISON PAR MAGASIN
@@ -14,11 +16,15 @@ class StoreComparisonTab extends StatelessWidget {
   final Function(String) onStoreDeleted;
   final Function(String)? onStoreEdit;
 
+  /// Conseil d'achat dans chaque magasin (recommandé / trop cher)
+  final Map<String, PriceAdvice> adviceByStore;
+
   const StoreComparisonTab({
     super.key,
     required this.analysis,
     required this.onStoreDeleted,
     this.onStoreEdit,
+    this.adviceByStore = const {},
   });
 
   @override
@@ -26,12 +32,24 @@ class StoreComparisonTab extends StatelessWidget {
     final theme = Theme.of(context);
     final cheapest = analysis.storeComparison.cheapestStore;
     final stores = analysis.storeComparison.storePrices;
-    
+    final bestAdvice = cheapest == null ? null : adviceByStore[cheapest.storeName];
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Où l'acheter : magasin recommandé et équivalent moins cher de la catégorie
+          if (bestAdvice != null) ...[
+            PriceAdviceCard(
+              key: const ValueKey('where_to_buy'),
+              advice: bestAdvice,
+              title: bestAdvice.verdict == AdviceVerdict.recommended
+                  ? 'Où l\'acheter : ${bestAdvice.store}'
+                  : 'Vu seulement chez ${bestAdvice.store}',
+            ),
+            const SizedBox(height: 16),
+          ],
           // Magasin le moins cher (mise en évidence) - seulement si magasins existants
           if (cheapest != null && stores.isNotEmpty) ...[
             Container(
@@ -156,6 +174,7 @@ class StoreComparisonTab extends StatelessWidget {
                 key: ValueKey('store_${entry.key}'),
                 storeInfo: storeInfo,
                 isCheapest: isCheapest,
+                advice: adviceByStore[entry.key],
                 onEdit: onStoreEdit != null ? () => onStoreEdit!(storeInfo.storeName) : null,
                 onDelete: () => onStoreDeleted(storeInfo.storeName),
               );
@@ -277,13 +296,47 @@ class _StorePriceCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
+  /// Conseil d'achat dans ce magasin
+  final PriceAdvice? advice;
+
   const _StorePriceCard({
     super.key,
     required this.storeInfo,
     this.isCheapest = false,
     this.onEdit,
     this.onDelete,
+    this.advice,
   });
+
+  /// « Recommandé » / « Trop cher : 0.14 € de moins chez Leclerc »
+  Widget? _verdict(ThemeData theme) {
+    final advice = this.advice;
+    if (advice == null) return null;
+    final (color, icon, text) = switch (advice.verdict) {
+      AdviceVerdict.recommended => (AppTheme.success, Icons.thumb_up_alt_outlined, 'Recommandé'),
+      AdviceVerdict.discouraged => (
+          AppTheme.error,
+          Icons.thumb_down_alt_outlined,
+          'Trop cher : ${advice.savingElsewhere!.toStringAsFixed(2)} € de moins chez ${advice.cheaperElsewhere!.storeName}',
+        ),
+      AdviceVerdict.unknown => (AppTheme.textMuted, Icons.info_outline, 'Pas encore comparé'),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -320,6 +373,7 @@ class _StorePriceCard extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
+                ?_verdict(theme),
               ],
             ),
           ),

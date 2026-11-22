@@ -13,6 +13,8 @@ import 'screens/product_selection_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'services/scan_repository.dart';
 import 'services/mistral_service.dart';
+import 'services/category_service.dart';
+import 'models/product_category.dart';
 import 'widgets/nav_buttons.dart';
 
 // Point d'entree de l'application
@@ -75,8 +77,20 @@ class _MainScreenState extends State<MainScreen> {
   bool? _requestedBarcodeMode;
   int _modeRequestId = 0;
 
+  // Séance de scan : une nouvelle à chaque arrivée sur le Scanner depuis
+  // l'accueil (le magasin est alors à choisir de nouveau)
+  int _scanSessionId = 0;
+
+  // « Où acheter un produit ? » : chaque demande ouvre la recherche du Dashboard
+  int _dashboardSearchRequest = 0;
+
   // Repository pour la persistance
   final ScanRepository _repository = ScanRepository();
+
+  // Catégorie de chaque produit (clé produit → catégorie), complétée depuis
+  // Open Food Facts au lancement et après chaque scan
+  late final CategoryService _categoryService = CategoryService(_repository);
+  Map<String, ProductCategory> _categories = {};
 
   @override
   void initState() {
@@ -93,6 +107,17 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     AppNavigation.homeRequests.removeListener(_showHome);
     super.dispose();
+  }
+
+  /// Cherche sur Open Food Facts la catégorie des produits qui n'en ont pas
+  /// encore (en arrière-plan), puis rafraîchit les écrans s'il en a trouvé
+  Future<void> _fillCategories() async {
+    try {
+      final found = await _categoryService.fillMissing();
+      if (found > 0 && mounted) await _reloadSessions();
+    } catch (e) {
+      debugPrint('MainScreen: catégories non complétées ($e)');
+    }
   }
 
   /// Met à jour le type de scan actuel
@@ -116,6 +141,7 @@ class _MainScreenState extends State<MainScreen> {
   /// Note l'onglet quitté dans l'historique (l'accueil, racine, le vide)
   void _recordTabChange(int index) {
     if (index == _currentIndex) return;
+    if (_currentIndex == _homeTab && index == _scanTab) _scanSessionId++;
     if (index == _homeTab) {
       _tabHistory.clear();
       return;
@@ -190,7 +216,9 @@ class _MainScreenState extends State<MainScreen> {
       final savedSessions = await _repository.getAllScans();
       setState(() {
         _sessions = List<ScanSession>.from(savedSessions);
+        _categories = _repository.getAllProductCategories();
       });
+      _fillCategories();
     } catch (e) {
       print('Erreur initialisation repository: $e');
       setState(() {
@@ -267,6 +295,7 @@ class _MainScreenState extends State<MainScreen> {
     if (!mounted) return;
     setState(() {
       _sessions = List<ScanSession>.from(allSessions);
+      _categories = _repository.getAllProductCategories();
       final current = _currentScannedItems
           .where((i) => storedById.containsKey(i.id))
           .map((i) => storedById[i.id]!)
@@ -384,6 +413,10 @@ class _MainScreenState extends State<MainScreen> {
         onScanBarcode: () => _openScanner(barcode: true),
         onScanTicket: () => _openScanner(barcode: false),
         onOpenAnalysis: () => _goToTab(_dashboardTab),
+        onFindWhereToBuy: () {
+          setState(() => _dashboardSearchRequest++);
+          _goToTab(_dashboardTab);
+        },
       ),
       // Page Scanner
       ScanScreen(
@@ -395,10 +428,14 @@ class _MainScreenState extends State<MainScreen> {
         onBack: _goBack,
         repository: _repository,
         onScanTypeChanged: _handleScanTypeChanged,
-        onScanSaved: _reloadSessions,
+        onScanSaved: () async {
+          await _reloadSessions();
+          _fillCategories();
+        },
         isActive: _currentIndex == _scanTab,
         requestedBarcodeMode: _requestedBarcodeMode,
         modeRequestId: _modeRequestId,
+        scanSessionId: _scanSessionId,
       ),
       // Page Resultats
       ResultsScreen(
@@ -415,8 +452,9 @@ class _MainScreenState extends State<MainScreen> {
       DashboardScreen(
         key: const ValueKey('dashboard_screen'),
         sessions: _sessions,
+        categories: _categories,
+        searchRequestId: _dashboardSearchRequest,
         repository: _repository,
-        onSessionSelected: _handleSessionSelected,
         onProductAnalysisRequested: _openProductSelection,
         onProductSelected: _openProductDetail,
         onBack: _goBack,

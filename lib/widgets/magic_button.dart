@@ -55,8 +55,8 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final buttonColor = widget.color ?? (widget.isPrimary ? AppTheme.primary : AppTheme.secondary);
-    
-    return AnimatedBuilder(
+
+    final button = AnimatedBuilder(
       animation: _glowAnimation,
       builder: (context, child) {
         return MouseRegion(
@@ -197,6 +197,10 @@ class _MagicButtonState extends State<MagicButton> with SingleTickerProviderStat
         );
       },
     );
+
+    // Sans action (et hors chargement), le bouton apparaît grisé
+    final enabled = widget.onPressed != null || widget.isLoading;
+    return enabled ? button : Opacity(opacity: 0.4, child: button);
   }
 }
 

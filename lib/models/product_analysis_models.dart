@@ -3,7 +3,6 @@
 // ===================================================
 
 import 'package:flutter/material.dart';
-import '../utils/unit_price.dart';
 
 /// Point de prix pour l'historique d'un produit dans un magasin
 class PricePoint {
@@ -220,88 +219,6 @@ class StorePriceComparison {
   String toString() => 'StorePriceComparison(product: $productName, stores: ${storePrices.length})';
 }
 
-/// Informations sur un produit similaire
-class SimilarProductInfo {
-  final String productId;
-  final String productName;
-  final String? brand;
-  final String? barcode;
-  final String? storeName;
-  final double price;
-  final double? quantity;
-  final String? unit;
-  final DateTime scanDate;
-  final String? nutriscore;
-  final String? imageUrl;
-  final List<String>? categories;
-
-  SimilarProductInfo({
-    required this.productId,
-    required this.productName,
-    this.brand,
-    this.barcode,
-    this.storeName,
-    required this.price,
-    this.quantity,
-    this.unit,
-    required this.scanDate,
-    this.nutriscore,
-    this.imageUrl,
-    this.categories,
-  });
-
-  /// Prix au kg / L / unité, `null` si la contenance est inconnue
-  UnitPrice? get unitPrice => UnitPrice.of(price, quantity, unit);
-
-  @override
-  String toString() => 'SimilarProductInfo(name: $productName, price: $price, store: $storeName)';
-}
-
-/// Comparaison des produits similaires
-class SimilarProductsComparison {
-  final String category;
-  final String referenceProductId;
-  final List<SimilarProductInfo> similarProducts;
-
-  SimilarProductsComparison({
-    required this.category,
-    required this.referenceProductId,
-    required this.similarProducts,
-  });
-
-  /// Unité de comparaison : la plus fréquente parmi les produits de contenance connue
-  PriceUnit? get comparisonUnit {
-    final counts = <PriceUnit, int>{};
-    for (final product in similarProducts) {
-      final unit = product.unitPrice?.unit;
-      if (unit != null) counts[unit] = (counts[unit] ?? 0) + 1;
-    }
-    if (counts.isEmpty) return null;
-    return counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
-  }
-
-  /// Récupère le produit le moins cher (au kg / L / unité quand c'est possible)
-  SimilarProductInfo? get cheapestProduct {
-    final sorted = productsSortedByPrice;
-    return sorted.isEmpty ? null : sorted.first;
-  }
-
-  /// Produits triés du moins cher au plus cher : d'abord ceux comparables au
-  /// kg / L / unité (par prix normalisé), puis les autres par prix à l'article
-  List<SimilarProductInfo> get productsSortedByPrice {
-    final unit = comparisonUnit;
-    bool comparable(SimilarProductInfo p) => unit != null && p.unitPrice?.unit == unit;
-    final byUnit = similarProducts.where(comparable).toList()
-      ..sort((a, b) => a.unitPrice!.value.compareTo(b.unitPrice!.value));
-    final others = similarProducts.where((p) => !comparable(p)).toList()
-      ..sort((a, b) => a.price.compareTo(b.price));
-    return [...byUnit, ...others];
-  }
-
-  @override
-  String toString() => 'SimilarProductsComparison(category: $category, products: ${similarProducts.length})';
-}
-
 /// Résultat complet de l'analyse d'un produit
 class ProductAnalysisResult {
   final String productId;
@@ -319,7 +236,6 @@ class ProductAnalysisResult {
   final StorePriceComparison storeComparison;
   
   /// Produits similaires
-  final SimilarProductsComparison? similarProducts;
 
   ProductAnalysisResult({
     required this.productId,
@@ -331,7 +247,6 @@ class ProductAnalysisResult {
     this.categories,
     required this.priceHistoryByStore,
     required this.storeComparison,
-    this.similarProducts,
   });
 
   /// Tendance globale (basée sur tous les magasins)

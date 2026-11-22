@@ -49,6 +49,10 @@ class OFFProduct {
   final Map<String, double> nutriments;
   final String source;
 
+  /// Catégorie de comparaison d'Open Food Facts (`compared_to_category`, ex.
+  /// `en:apple-juices`) : la catégorie précise qu'OFF utilise pour comparer
+  final String? categoryId;
+
   OFFProduct({
     required this.barcode,
     required this.name,
@@ -65,6 +69,7 @@ class OFFProduct {
     required this.nutrientLevels,
     required this.nutriments,
     this.source = 'Open Food Facts',
+    this.categoryId,
   });
 
   factory OFFProduct.fromJson(String barcode, Map<String, dynamic> json, {String source = 'Open Food Facts'}) {
@@ -194,7 +199,21 @@ class OFFProduct {
       nutrientLevels: nutrientLevels,
       nutriments: nutriments,
       source: source,
+      categoryId: comparedCategoryOf(p),
     );
+  }
+
+  /// Catégorie de comparaison d'une fiche OFF brute : `compared_to_category`,
+  /// sinon la dernière catégorie anglaise (`en:`) de `categories_tags`
+  static String? comparedCategoryOf(Map<String, dynamic> product) {
+    final compared = product['compared_to_category'];
+    if (compared is String && compared.trim().isNotEmpty) return compared.trim();
+    final tags = product['categories_tags'];
+    if (tags is List) {
+      final english = tags.whereType<String>().where((t) => t.startsWith('en:')).toList();
+      if (english.isNotEmpty) return english.last;
+    }
+    return null;
   }
 }
 
@@ -271,6 +290,7 @@ class OpenFoodFactsService {
           nutrientLevels: cached.nutrientLevels ?? {},
           nutriments: cached.nutriments ?? {},
           source: 'Cache',
+          categoryId: cached.categoryId,
         );
       }
     }
@@ -310,6 +330,7 @@ class OpenFoodFactsService {
                 allergens: product.allergens,
                 nutrientLevels: product.nutrientLevels,
                 nutriments: product.nutriments,
+                categoryId: product.categoryId,
               ));
               print('Cache STORE pour EAN: $cleanBarcode (source: ${provider.name})');
             }

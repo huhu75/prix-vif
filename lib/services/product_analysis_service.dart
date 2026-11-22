@@ -1,5 +1,8 @@
+import '../analytics/analytics.dart';
 import '../models/hive_models.dart';
 import '../models/product_analysis_models.dart';
+import '../models/product_category.dart';
+import 'category_service.dart';
 import 'open_food_facts_service.dart';
 import 'scan_repository.dart';
 
@@ -10,7 +13,26 @@ class ProductAnalysisData {
   /// Fiche Open Food Facts (en ligne, en cache, ou reconstituée depuis l'article local)
   final OFFProduct? offProduct;
 
-  const ProductAnalysisData({required this.analysis, this.offProduct});
+  /// Clé produit (voir [productKeyOf]) : sert à enregistrer sa catégorie
+  final String productKey;
+
+  /// Catégorie du produit, `null` si elle est inconnue
+  final ProductCategory? category;
+
+  /// Tous les produits de sa catégorie (toutes marques, tous magasins)
+  final CategoryGroup? categoryGroup;
+
+  /// Conseil d'achat dans chaque magasin où le produit a été vu (dernier prix)
+  final Map<String, PriceAdvice> adviceByStore;
+
+  const ProductAnalysisData({
+    required this.analysis,
+    this.offProduct,
+    this.productKey = '',
+    this.category,
+    this.categoryGroup,
+    this.adviceByStore = const {},
+  });
 }
 
 /// Rassemble tout ce que la fiche produit affiche : historique des prix par
@@ -21,9 +43,16 @@ class ProductAnalysisService {
   /// Recherche OFF par code-barres ; remplaçable dans les tests (pas de réseau)
   final Future<OFFProduct?> Function(String barcode) lookupBarcode;
 
-  ProductAnalysisService(this.repository, {Future<OFFProduct?> Function(String barcode)? lookupBarcode})
-      : lookupBarcode = lookupBarcode ??
-            ((barcode) => (OpenFoodFactsService()..setRepository(repository)).lookupBarcode(barcode));
+  /// Enregistre la catégorie OFF d'un produit qui n'en a pas encore
+  final CategoryService categoryService;
+
+  ProductAnalysisService(
+    this.repository, {
+    Future<OFFProduct?> Function(String barcode)? lookupBarcode,
+    CategoryService? categoryService,
+  })  : lookupBarcode = lookupBarcode ??
+            ((barcode) => (OpenFoodFactsService()..setRepository(repository)).lookupBarcode(barcode)),
+        categoryService = categoryService ?? CategoryService(repository);
 
   /// Article de référence : même id, même code-barres ou même nom
   StoredArticle? _findReference(String productId, String productName) {
@@ -77,36 +106,6 @@ class ProductAnalysisService {
       );
     }
 
-    // Produits similaires
-    SimilarProductsComparison? similarProducts;
-    if (reference != null) {
-      final category = reference.categories?.isNotEmpty == true ? reference.categories!.first : null;
-      final similarList = repository
-          .getSimilarProducts(productId, category: category)
-          .map((raw) => SimilarProductInfo(
-                productId: raw['id'] as String,
-                productName: raw['name'] as String,
-                brand: raw['brand'] as String?,
-                barcode: raw['barcode'] as String?,
-                storeName: raw['storeName'] as String?,
-                price: (raw['price'] as num).toDouble(),
-                quantity: (raw['quantity'] as num?)?.toDouble(),
-                unit: raw['unit'] as String?,
-                scanDate: raw['scanDate'] as DateTime,
-                nutriscore: raw['nutriscore'] as String?,
-                imageUrl: raw['imageUrl'] as String?,
-                categories: (raw['categories'] as List<dynamic>?)?.cast<String>(),
-              ))
-          .toList();
-      if (similarList.isNotEmpty) {
-        similarProducts = SimilarProductsComparison(
-          category: category ?? 'Produits similaires',
-          referenceProductId: productId,
-          similarProducts: similarList,
-        );
-      }
-    }
-
     return ProductAnalysisResult(
       productId: productId,
       productName: productName,
@@ -123,7 +122,6 @@ class ProductAnalysisService {
         brand: reference?.brand,
         storePrices: storePrices,
       ),
-      similarProducts: similarProducts,
     );
   }
 
@@ -153,6 +151,44 @@ class ProductAnalysisService {
       );
     }
 
-    return ProductAnalysisData(analysis: analysis, offProduct: offProduct);
+    // Catégorie : connue, sinon celle de la fiche OFF (enregistrée pour la suite)
+    final productKey = productKeyFor(
+      barcode: reference?.barcode ?? barcode,
+      name: reference?.name ?? productName,
+      brand: reference?.brand,
+    );
+    var category = repository.getProductCategory(productKey);
+    if (category == null && barcode != null && offProduct?.categoryId != null) {
+      try {
+        category = await categoryService.applyFromProduct(barcode, offProduct!).timeout(const Duration(seconds: 4));
+      } catch (_) {
+        // Taxonomie indisponible : la catégorie sera complétée plus tard
+      }
+    }
+
+    // Catégorie et conseils d'achat à partir de tous les prix relevés
+    final sessions = await repository.getAllScans();
+    final categories = {
+      ...repository.getAllProductCategories(),
+      productKey: ?category,
+    };
+    final adviceByStore = {
+      for (final store in analysis.storeComparison.storePrices.keys)
+        store: PriceAdvice.calculate(
+          sessions: sessions,
+          categories: categories,
+          productKey: productKey,
+          store: store,
+        ),
+    };
+
+    return ProductAnalysisData(
+      analysis: analysis,
+      offProduct: offProduct,
+      productKey: productKey,
+      category: category,
+      categoryGroup: category == null ? null : CategoryGroup.forCategory(category.id, sessions, categories),
+      adviceByStore: adviceByStore,
+    );
   }
 }

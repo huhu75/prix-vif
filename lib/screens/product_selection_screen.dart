@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../analytics/product_observation.dart';
 import '../models/product_analysis_models.dart';
 import '../services/scan_repository.dart';
 import '../utils/product_type_utils.dart';
@@ -35,12 +36,19 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   // Options de tri
   SortOption _sortOption = SortOption.name;
   
-  /// Types de produit disponibles (catégorie OFF la plus spécifique), triés
+  /// Catégorie affichée d'un produit : sa catégorie (en français), sinon la
+  /// dernière catégorie Open Food Facts de l'article, sinon `null`
+  String? _typeOf(UniqueProductInfo product) {
+    final key = productKeyFor(barcode: product.barcode, name: product.productName, brand: product.brand);
+    return widget.repository.getProductCategory(key)?.label ?? productTypeOf(product.categories);
+  }
+
+  /// Types de produit disponibles, triés
   List<String> get _availableTypes {
     final types = <String>{};
     for (final product in _products) {
-      final type = productTypeLabel(product.categories);
-      if (type != uncategorizedTypeLabel) types.add(type);
+      final type = _typeOf(product);
+      if (type != null) types.add(type);
     }
     final sorted = types.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
@@ -129,7 +137,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     _filteredProducts = _products.where((product) {
       // Filtre par type de produit (catégorie OFF)
       if (_selectedType != null &&
-          productTypeLabel(product.categories) != _selectedType) {
+          (_typeOf(product) ?? uncategorizedTypeLabel) != _selectedType) {
         return false;
       }
       // Sans recherche textuelle, le filtre par type suffit
@@ -141,8 +149,8 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
           product.brand?.toLowerCase().contains(query) ?? false;
       final barcodeMatch = product.barcode?.contains(_searchQuery) ?? false;
       final categoryMatch =
-          product.categories?.any((c) => c.toLowerCase().contains(query)) ??
-              false;
+          (_typeOf(product)?.toLowerCase().contains(query) ?? false) ||
+              (product.categories?.any((c) => c.toLowerCase().contains(query)) ?? false);
       return nameMatch || brandMatch || barcodeMatch || categoryMatch;
     }).toList();
     _applySort();
@@ -283,6 +291,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                             final product = _filteredProducts[index];
                             return _ProductCard(
                               product: product,
+                              type: _typeOf(product),
                               onTap: () => _navigateToProductDetail(product),
                             );
                           },
@@ -405,10 +414,14 @@ class _TypeChip extends StatelessWidget {
 /// Carte d'un produit dans la liste de sélection
 class _ProductCard extends StatelessWidget {
   final UniqueProductInfo product;
+
+  /// Catégorie affichée sous le nom, `null` si inconnue
+  final String? type;
   final VoidCallback onTap;
 
   const _ProductCard({
     required this.product,
+    this.type,
     required this.onTap,
   });
 
@@ -500,8 +513,8 @@ class _ProductCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  // Type de produit (catégorie Open Food Facts)
-                  if (isCategorized(product.categories)) ...[
+                  // Catégorie du produit
+                  if (type != null) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -513,7 +526,7 @@ class _ProductCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            productTypeLabel(product.categories),
+                            type!,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppTheme.textMuted,
                               fontSize: 11,

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../models/product_analysis_models.dart';
+import '../../models/product_category.dart';
 import '../../services/open_food_facts_service.dart';
 
 class ProductInfoTab extends StatelessWidget {
@@ -14,13 +15,59 @@ class ProductInfoTab extends StatelessWidget {
   /// Supprime le produit
   final VoidCallback? onDelete;
 
+  /// Catégorie du produit (comparaison avec les autres marques)
+  final ProductCategory? category;
+
+  /// Ouvre le choix de catégorie
+  final VoidCallback? onChooseCategory;
+
   const ProductInfoTab({
     super.key,
     required this.product,
     required this.analysis,
     this.onRematch,
     this.onDelete,
+    this.category,
+    this.onChooseCategory,
   });
+
+  /// Catégorie du produit avec le bouton Choisir / Modifier
+  Widget _buildCategory(BuildContext context) {
+    if (onChooseCategory == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Container(
+      key: const ValueKey('product_category_card'),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: AppTheme.glassmorphism(),
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.category_outlined, color: AppTheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Catégorie', style: theme.textTheme.labelSmall?.copyWith(color: AppTheme.textMuted)),
+                Text(
+                  category?.label ?? 'Sans catégorie : choisis-la pour comparer aux autres marques',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: category == null ? AppTheme.textSecondary : AppTheme.textPrimary,
+                    fontWeight: category == null ? FontWeight.w400 : FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            key: const ValueKey('info_choose_category'),
+            onPressed: onChooseCategory,
+            child: Text(category == null ? 'Choisir' : 'Modifier'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildActions() {
     if (onRematch == null && onDelete == null) return const SizedBox.shrink();
@@ -69,6 +116,7 @@ class ProductInfoTab extends StatelessWidget {
         child: Column(
           children: [
             _buildActions(),
+            _buildCategory(context),
             const Expanded(
               child: Center(
                 child: Text(
@@ -91,6 +139,7 @@ class ProductInfoTab extends StatelessWidget {
         children: [
           // 0. Corriger la correspondance Open Food Facts / supprimer le produit
           _buildActions(),
+          _buildCategory(context),
 
           // 1. En-tête Premium avec image, marque, quantité, EAN
           _buildPremiumHeader(context, p),

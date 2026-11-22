@@ -1,20 +1,36 @@
 // Saisie du prix après le scan d'un code-barres
 import 'package:flutter/material.dart';
+import '../../analytics/analytics.dart';
 import '../../theme.dart';
 import '../../services/open_food_facts_service.dart';
 import '../magic_button.dart';
+import '../price_advice_card.dart';
 import '../price_card.dart';
 
 /// Demande le prix d'un produit scanné ; retourne `null` si l'utilisateur annule.
-Future<double?> showPriceInputSheet(BuildContext context, String barcode, OFFProduct? product) async {
+/// [advise] calcule le conseil d'achat pour le prix saisi (`null` tant qu'il
+/// n'y a pas de prix) : la carte s'affiche dès le scan et se met à jour à
+/// chaque chiffre tapé.
+Future<double?> showPriceInputSheet(
+  BuildContext context,
+  String barcode,
+  OFFProduct? product, {
+  PriceAdvice Function(double? price)? advise,
+}) async {
   final TextEditingController priceController = TextEditingController();
   final formKey = GlobalKey<FormState>();
+
+  double? typedPrice() {
+    final value = double.tryParse(priceController.text.replaceAll(',', '.'));
+    return value != null && value > 0 ? value : null;
+  }
 
   return showModalBottomSheet<double>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) {
+    builder: (context) => StatefulBuilder(builder: (context, setSheetState) {
+      final advice = advise?.call(typedPrice());
       return Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
@@ -31,7 +47,8 @@ Future<double?> showPriceInputSheet(BuildContext context, String barcode, OFFPro
         ),
         child: Form(
           key: formKey,
-          child: Column(
+          child: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -161,9 +178,15 @@ Future<double?> showPriceInputSheet(BuildContext context, String barcode, OFFPro
                 ),
                 textAlign: TextAlign.center,
               ),
+              // Conseil d'achat pour le magasin choisi (mis à jour avec le prix saisi)
+              if (advice != null) ...[
+                const SizedBox(height: 12),
+                PriceAdviceCard(advice: advice),
+              ],
               const SizedBox(height: 20),
               TextFormField(
                 controller: priceController,
+                onChanged: (_) => setSheetState(() {}),
                 autofocus: true,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.center,
@@ -202,8 +225,9 @@ Future<double?> showPriceInputSheet(BuildContext context, String barcode, OFFPro
               ),
             ],
           ),
+          ),
         ),
       );
-    },
+    }),
   );
 }

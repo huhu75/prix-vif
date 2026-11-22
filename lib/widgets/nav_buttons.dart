@@ -28,7 +28,7 @@ class AppBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _NavCircleButton(
+    return AppNavActionButton(
       key: const ValueKey('nav_back'),
       icon: Icons.arrow_back,
       tooltip: tooltip,
@@ -44,7 +44,7 @@ class AppHomeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _NavCircleButton(
+    return AppNavActionButton(
       key: const ValueKey('nav_home'),
       icon: Icons.home_outlined,
       tooltip: 'Accueil',
@@ -53,12 +53,14 @@ class AppHomeButton extends StatelessWidget {
   }
 }
 
-class _NavCircleButton extends StatelessWidget {
+/// Bouton rond bleu teinté des barres d'app (Retour, Accueil, et les autres
+/// accès à un écran, comme « Tous mes produits »)
+class AppNavActionButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
 
-  const _NavCircleButton({
+  const AppNavActionButton({
     super.key,
     required this.icon,
     required this.tooltip,
