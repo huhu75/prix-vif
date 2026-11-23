@@ -420,6 +420,69 @@ Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ;
 - Magasins par défaut : une seule liste, `ScanRepository.defaultStores`, utilisée par le scanner, `getAllKnownStores` et la correction d'un article.
 - Caméra (v1.15.0, inchangé) : elle ne démarre qu'au tap sur SCANNER (`_startScanner`, qui refuse sans magasin), et au retour au premier plan si elle tournait avant.
 
+## Plan de la navigation v2 (décidé le 2026-11-23)
+
+Refonte de la navigation guidée par la Règle 0 de `CLAUDE.md` : situation prioritaire « en magasin, produit en main », le moins de taps possible, utilisable à une main, pour le foyer. Une version par étape ; à la fin de chaque étape l'app fonctionne, les tests passent, et des captures sont validées avant le commit.
+
+| Étape | Version | Contenu | État |
+|---|---|---|---|
+| 1 | v2.0.0 → v2.1.1 | Barre du bas et bouton Scanner central, Accueil, Profil | ✅ fait |
+| 2 | v2.2.0 | Parcours en rayon : scanner plein écran et écran Résultat du scan | ⏳ à faire |
+| 3 | v2.3.0 | Onglet Produits unique | ⏳ à faire |
+| 4 | v2.4.0 | Fiche produit sur une page | ⏳ à faire |
+| 5 | v2.5.0 | Ma liste : vraie liste de courses | ⏳ à faire |
+
+### Étape 1 — Barre du bas, Accueil, Profil ✅ (v2.0.0, v2.1.0, v2.1.1)
+
+- Barre du bas : Accueil · Produits · [Scanner] · Ma liste · Profil ; le Scanner s'ouvre en plein écran depuis n'importe quel onglet.
+- Accueil : en-tête fixe inspiré de Leboncoin (logo et recherche), raccourcis de catégorie, panier (cliquable, comparé sur de vrais prix), Où économiser, derniers scans, hausses. Pas de tuiles de scan en double du bouton central.
+- Produits et Ma liste : contenu provisoire de l'ancien tableau de bord (remplacé aux étapes 3 et 5).
+- Profil : relevés, historique des scans, Mes magasins, export CSV, clé Mistral, données de démo.
+- Supprimés : onglets Résultats, Dashboard et Historique, ancien accueil, bouton Accueil des écrans de détail.
+
+### Étape 2 — Parcours en rayon (v2.2.0)
+
+- Scanner plein écran : la caméra s'allume dès le tap sur le bouton central ; bascule Code-barres / Ticket en haut ; « Choisir une photo » en bas ; on ne choisit plus le magasin avant de scanner.
+- Écran Résultat du scan (remplace la feuille `showPriceInputSheet`) : le produit (image, Nutri-Score, « Déjà vu dans N magasins », prix au kg / L), le comparatif vert / rouge (`StorePricesCard`) dès le scan, le prix avec le magasin pré-rempli (le dernier utilisé, modifiable d'un tap), « Enregistrer le prix » en bas. Enregistrer ramène directement à la caméra pour le produit suivant.
+- Bandeau « N prix enregistrés · Annuler le dernier » sur le scanner (remplace l'ancien onglet Résultats).
+- Produit jamais vu : seulement le prix à saisir.
+- Ticket : le magasin est demandé, pré-rempli, dans la confirmation du ticket.
+- Le style de l'écran Résultat du scan a été validé sur un prototype construit avec les vrais composants (néon, verre dépoli, `MagicButton`).
+
+### Étape 3 — Onglet Produits unique (v2.3.0)
+
+- Une seule liste : image, nom, « N prix · N magasins », meilleur prix en vert avec le magasin ; un tap ouvre la fiche.
+- Puces : Tous · En hausse · En baisse · Catégories.
+- Recherche tolérante (`ProductSearchQuery`), champ en bas de l'écran (sous le pouce).
+- Supprimés : l'écran Tous mes produits (`ProductSelectionScreen`) et les onglets provisoires « Où acheter » / « Évolution ».
+
+### Étape 4 — Fiche produit sur une page (v2.4.0)
+
+- Une page qui défile : en-tête (image, Nutri-Score, catégorie), meilleur prix et « + Ma liste », prix par magasin classés (un tap ouvre la feuille du magasin), évolution du prix, moins cher dans la catégorie, infos produit repliables.
+- En bas : « Ajouter un prix » et « Modifier » (corriger un prix, pas le bon produit, catégorie, supprimer).
+- Supprimés : les 4 onglets et le menu ⋮.
+
+### Étape 5 — Ma liste, vraie liste de courses (v2.5.0)
+
+- « + Ma liste » sur la fiche produit et sur le Résultat du scan, avec une quantité (stockage Hive).
+- Synthèse : meilleur magasin unique, panier panaché (chaque produit là où il est le moins cher) avec l'économie, une barre par magasin avec l'écart, produits sans prix connu dans un magasin.
+- Mêmes règles que le panier (v2.1.1) : aucun prix estimé.
+- Liste vide : le panier habituel, comme aujourd'hui.
+
+### Décisions prises
+
+- Style : on garde l'identité visuelle actuelle (titres néon, verre dépoli, dégradés teintés, `MagicButton`). Les propositions d'interface se montrent avec les vrais composants (prototype Flutter et captures), pas en maquettes plates.
+- Magasin : demandé au moment d'enregistrer le prix, pré-rempli avec le dernier utilisé (vérifier un prix n'a pas besoin du magasin).
+- Caméra : allumée au tap sur le bouton Scanner, jamais à l'ouverture de l'app.
+- Panier : seuls les prix réellement relevés comptent ; conclusion à partir de 3 produits en commun.
+- Hors périmètre (pas de données ou hors objectifs) : distance et carte des magasins, disponibilité, avis, recommandations « IA » personnalisées, alertes push, favoris, compte utilisateur.
+
+### Points ouverts
+
+- Recherche de l'onglet Produits : en bas (Règle 0, par défaut) ou en haut comme sur les maquettes de référence.
+- Catégories Open Food Facts dont le nom français manque : affichées en anglais (« Confectionary based spreads ») ; à corriger avant d'afficher plus de raccourcis de catégorie.
+- Données de démo : un seul produit relevé dans deux magasins, donc pas de conclusion du panier dans la démo.
+
 ## Recherche, magasins de la fiche produit et comparatif au scan (v1.18.0 – v1.20.0)
 
 - Recherche de produit : `lib/utils/product_search.dart`. `normalizeForSearch` (minuscules, sans accents ni ponctuation) et `ProductSearchQuery.score` : chaque mot tapé doit correspondre à un mot du nom, de la marque, d'une catégorie, d'un magasin ou au code-barres (début de mot 3, milieu de mot 2 à partir de 3 lettres, une faute de frappe 1 à partir de 5 lettres), pondéré par champ (nom ×3, marque ×2, catégorie et magasin ×1, code-barres 9), +10 si le nom commence par la recherche. `null` = pas de correspondance. Utilisée par `HomeProductSearch`, `ProductsTab` (tri par pertinence, ordre d'origine à égalité) et `ProductSelectionScreen` (filtre seulement, le tri choisi reste).

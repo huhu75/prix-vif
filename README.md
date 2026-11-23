@@ -665,11 +665,13 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 
 ## 🚀 Évolution Possible
 
+**En cours** : refonte de la navigation en 5 étapes (étape 1 faite). Le plan détaillé, les décisions et les points ouverts sont dans `AGENT.MD`, section « Plan de la navigation v2 ».
+
 Pour aller plus loin :
 - [ ] Synchronisation cloud (Firebase/Back4App) pour sauvegarder l'historique
 - [ ] Export PDF des sessions de scan
 - [ ] Alertes sur produits peu sains (basé sur Nutri-Score)
-- [ ] Intégration avec des listes de courses
+- [ ] Intégration avec des listes de courses (prévue à l'étape 5 de la navigation v2)
 - [ ] Partage de sessions entre utilisateurs
 
 ---
