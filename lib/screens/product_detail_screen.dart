@@ -542,7 +542,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ],
           ),
           actions: [
-            const AppHomeButton(),
             // Bouton pour rafraîchir
             IconButton(
               icon: const Icon(Icons.refresh, color: AppTheme.textPrimary),
@@ -662,7 +661,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         style: const TextStyle(fontSize: 18, color: AppTheme.textPrimary),
         overflow: TextOverflow.ellipsis,
       ),
-      actions: const [AppHomeButton(), SizedBox(width: 8)],
     );
   }
 

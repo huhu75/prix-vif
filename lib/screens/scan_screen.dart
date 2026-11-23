@@ -31,12 +31,15 @@ import '../widgets/scan/ticket_confirmation_sheet.dart';
 import '../widgets/scan/ticket_scan_zone.dart';
 
 class ScanScreen extends StatefulWidget {
+  /// Articles scannés pendant la séance (pastille du bouton Résultats)
   final List<ScannedItem> scannedItems;
-  final Function(ScannedItem) onItemScanned;
-  final VoidCallback onViewResults;
-  final VoidCallback onViewHistory;
+  final Function(ScannedItem)? onItemScanned;
+
+  /// Boutons Résultats / Historique de la barre d'app ; absents si `null`
+  final VoidCallback? onViewResults;
+  final VoidCallback? onViewHistory;
   final ScanRepository? repository;
-  final Function(String) onScanTypeChanged;
+  final Function(String)? onScanTypeChanged;
   final Future<void> Function()? onScanSaved;
 
   /// Bouton Retour de la barre d'app (onglet précédent) ; absent si `null`
@@ -57,12 +60,12 @@ class ScanScreen extends StatefulWidget {
 
   const ScanScreen({
     super.key,
-    required this.scannedItems,
-    required this.onItemScanned,
-    required this.onViewResults,
-    required this.onViewHistory,
+    this.scannedItems = const [],
+    this.onItemScanned,
+    this.onViewResults,
+    this.onViewHistory,
     this.repository,
-    required this.onScanTypeChanged,
+    this.onScanTypeChanged,
     this.onScanSaved,
     this.onBack,
     this.isActive = true,
@@ -78,14 +81,7 @@ class ScanScreen extends StatefulWidget {
 class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   String? _scannedBarcode;
   String? _errorMessage;
-  final List<String> _stores = [
-    'Carrefour',
-    'Auchan',
-    'Leclerc',
-    'Monoprix',
-    'Franprix',
-    'Biocoop',
-  ];
+  final List<String> _stores = List.of(ScanRepository.defaultStores);
   // Magasin de la séance : `null` tant qu'il n'est pas choisi (rien ne se
   // scanne avant). Le dernier magasin choisi est proposé en raccourci.
   String? _selectedStore;
@@ -146,7 +142,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     
     // Notifier le type initial
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.onScanTypeChanged(_isBarcodeMode ? 'barcode' : 'ticket');
+      widget.onScanTypeChanged?.call(_isBarcodeMode ? 'barcode' : 'ticket');
     });
     
     // La caméra ne démarre pas ici : seulement au tap sur SCANNER, une fois
@@ -235,7 +231,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       _isBarcodeMode = barcode;
       if (barcode) _ticketImage = null;
     });
-    widget.onScanTypeChanged(barcode ? 'barcode' : 'ticket');
+    widget.onScanTypeChanged?.call(barcode ? 'barcode' : 'ticket');
     _syncCamera();
   }
 
@@ -655,7 +651,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
         if (imported != null && imported.isNotEmpty) {
           for (var item in imported) {
-            widget.onItemScanned(item);
+            widget.onItemScanned?.call(item);
           }
 
           // Étape 4c — Persister immédiatement les articles matchés via ScanRepository
@@ -841,7 +837,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           categories: product?.categories,
         );
         
-        widget.onItemScanned(scannedItem);
+        widget.onItemScanned?.call(scannedItem);
         
         // 💾 SAUVEGARDE AUTOMATIQUE (Solution robuste - Étape 5c)
         // Créer une session avec cet article unique et la persister immédiatement
@@ -910,6 +906,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             onPressed: () => showMistralSettingsDialog(context, repository: widget.repository),
             tooltip: 'Paramètres API',
           ),
+          if (widget.onViewResults != null)
           IconButton(
             icon: Badge(
               label: Text(
@@ -924,6 +921,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             tooltip: 'Résultats',
           ),
           const SizedBox(width: 4),
+          if (widget.onViewHistory != null)
           IconButton(
             icon: const Icon(Icons.history, color: AppTheme.primary),
             onPressed: widget.onViewHistory,

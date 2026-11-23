@@ -163,10 +163,9 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         leading: const AppBackButton(),
-        // Titre court : Retour, Accueil et Tri partagent la barre
+        // Titre court : Retour et Tri partagent la barre
         title: const NeonTitle(text: 'PRODUITS', fontSize: 20),
         actions: [
-          const AppHomeButton(),
           // Bouton de tri
           PopupMenuButton<SortOption>(
             icon: const Icon(Icons.sort, color: AppTheme.textPrimary),

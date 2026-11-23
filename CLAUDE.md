@@ -4,6 +4,43 @@ Ce fichier définit des règles **obligatoires** pour toute session de travail s
 
 ---
 
+## 🎯 Règle 0 — Objectifs de l'app et ergonomie (à relire avant de toucher à un écran)
+
+Décidés par le propriétaire de l'app le 2026-11-23. Toute modification d'interface doit servir ces objectifs et respecter ces règles.
+
+### À quoi sert Prix Vif
+
+1. **Savoir où acheter moins cher** : pour chaque produit, le magasin le moins cher et celui à éviter.
+2. **Vérifier un prix en rayon** : produit en main, savoir tout de suite si le prix est bon ici ou s'il est moins cher ailleurs.
+3. **Suivre les hausses de prix** : ce qui augmente ou baisse pour un même produit dans un même magasin.
+4. **Bien choisir ses produits** : Nutri-Score, équivalent moins cher au kg / L dans la même catégorie.
+
+Hors objectif : le suivi des dépenses ou du budget (onglet retiré en v1.17.0).
+
+### Situation prioritaire : en magasin, produit en main
+
+C'est là que l'app doit être la plus simple. Les autres usages (enregistrer un ticket après les courses, préparer ses courses, analyser les prix) passent après et ne doivent jamais rallonger ce parcours.
+
+### Utilisateurs : le foyer
+
+Quelques proches, pas forcément à l'aise avec la technique. L'app doit se comprendre sans explication.
+
+### Règles d'ergonomie non négociables
+
+1. **Le moins de taps possible.** Depuis l'ouverture de l'app, l'action principale (scanner un produit en rayon et voir où il est moins cher) se fait en 1 ou 2 taps. Une modification qui ajoute un écran, un tap ou un choix obligatoire sur ce parcours ne se fait pas.
+2. **Utilisable à une main.** Les actions importantes sont en bas de l'écran (sous le pouce), avec de gros boutons et le moins de saisie au clavier possible. Une action importante ne doit pas être seulement dans le menu ⋮ ou derrière une petite icône en haut de l'écran.
+
+### Avant d'ajouter ou de modifier un écran, un bouton ou un menu
+
+- [ ] À quel objectif ci-dessus sert-il ? Si aucun : ne pas l'ajouter.
+- [ ] Combien de taps sur le parcours « en magasin, produit en main », avant et après ? Le nombre ne doit pas augmenter.
+- [ ] La fonction existe-t-elle déjà ailleurs dans l'app ? Si oui, améliorer cet endroit plutôt qu'ajouter un nouveau chemin.
+- [ ] Le bouton est-il atteignable au pouce, téléphone tenu d'une main ?
+- [ ] Un proche peu à l'aise avec la technique comprend-il l'écran sans explication ?
+- [ ] En cas de doute sur l'ergonomie : proposer et demander avant de coder.
+
+---
+
 ## 📌 Règle 1 — Versionner le README.md à chaque étape
 
 **À chaque étape de travail terminée** (nouvelle fonctionnalité, correction de bug, refactor, changement de dépendance, etc.), le fichier `README.md` doit être mis à jour **et versionné**, en expliquant explicitement ce qui a changé à cette étape.
@@ -43,6 +80,7 @@ Ce fichier définit des règles **obligatoires** pour toute session de travail s
 
 ### Checklist avant chaque commit
 
+- [ ] Changement d'interface : objectifs et règles d'ergonomie de la Règle 0 respectés
 - [ ] Nouvelle entrée `### vX.Y.Z — AAAA-MM-JJ — <titre>` en tête de `## 📋 Historique des versions`
 - [ ] Pied de page `*Dernière mise à jour : ...*` et `*Statut : ...*` à jour
 - [ ] Sections du README concernées (fonctionnalités, utilisation, structure, dépendances) synchronisées avec le code

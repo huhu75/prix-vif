@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../services/scan_repository.dart';
 import '../theme.dart';
 import '../utils/unit_price.dart';
 
@@ -194,8 +195,7 @@ class _ArticleEditDialogState extends State<_ArticleEditDialog> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    for (final store in (widget.knownStores ??
-                        ['Leclerc', 'Carrefour', 'Intermarché', 'Auchan', 'Lidl', 'Monoprix', 'Aldi', 'Super U']))
+                    for (final store in (widget.knownStores ?? ScanRepository.defaultStores))
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: ActionChip(

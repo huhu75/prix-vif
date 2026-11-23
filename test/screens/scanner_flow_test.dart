@@ -37,8 +37,10 @@ bool _ticketButtonEnabled(WidgetTester tester, String label) => tester
     ))
     .enabled;
 
+/// Tuile de l'accueil qui ouvre le scanner en plein écran
 Future<void> _openFromHome(WidgetTester tester, String cardKey) async {
   await tester.tap(find.byKey(ValueKey(cardKey)));
+  await settle(tester);
   await settle(tester);
 }
 
@@ -126,23 +128,20 @@ void main() {
       expect(_cameraCalls, isNotEmpty, reason: 'SCANNER lance la caméra');
     });
 
-    testWidgets('le magasin reste choisi au retour de Résultats, pas pour une nouvelle séance', (tester) async {
+    testWidgets('chaque ouverture du scanner est une nouvelle séance : magasin à rechoisir', (tester) async {
       await tester.pumpWidget(const PrixVifApp());
       await settle(tester);
       await _openFromHome(tester, 'home_scan_barcode');
       await _chooseStore(tester, 'Leclerc');
-
-      // Résultats puis Retour : même séance
-      await tester.tap(find.text('Résultats').hitTestable().last);
-      await settle(tester);
-      await tester.tap(find.byKey(const ValueKey('nav_back')).hitTestable());
-      await settle(tester);
       expect(find.text('Prêt à scanner chez Leclerc'), findsOneWidget);
 
-      // Accueil puis carte de scan : nouvelle séance, magasin à rechoisir
-      await tester.tap(find.text('Accueil').hitTestable().last);
+      // Fermer le scanner puis le rouvrir par le bouton central
+      await tester.tap(find.byKey(const ValueKey('nav_back')).hitTestable());
       await settle(tester);
-      await _openFromHome(tester, 'home_scan_barcode');
+      await settle(tester);
+      await tester.tap(find.byKey(const ValueKey('nav_scan')));
+      await settle(tester);
+      await settle(tester);
       expect(find.byKey(const ValueKey('scan_idle_no_store')), findsOneWidget);
       expect(_scanButtonEnabled(tester), isFalse);
     });

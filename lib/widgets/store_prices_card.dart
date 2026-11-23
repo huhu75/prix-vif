@@ -106,9 +106,8 @@ class StorePricesCard extends StatelessWidget {
       key: const ValueKey('store_prices_card'),
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLight.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(16),
+      // Même verre dépoli que les autres cartes de l'app
+      decoration: AppTheme.glassmorphism().copyWith(
         border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
       ),
       child: Column(

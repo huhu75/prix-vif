@@ -82,7 +82,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       appBar: AppBar(
         title: const NeonTitle(text: 'DÉTAILS', fontSize: 22),
         leading: AppBackButton(onPressed: onBack),
-        actions: const [AppHomeButton(), SizedBox(width: 8)],
       ),
       body: Column(
         children: [

@@ -172,6 +172,12 @@ class ScanRepository {
   // Magasins
   // ==========================================
 
+  /// Magasins proposés par défaut (scanner, Mes magasins, correction d'un article)
+  static const List<String> defaultStores = [
+    'Aldi', 'Auchan', 'Biocoop', 'Carrefour', 'Franprix',
+    'Intermarché', 'Leclerc', 'Lidl', 'Monoprix', 'Super U',
+  ];
+
   static const String _storesKey = 'stores';
   static const String _hiddenStoresKey = 'hidden_stores';
   static const String _selectedStoreKey = 'selected_store';
@@ -613,7 +619,7 @@ class ScanRepository {
     final hidden = getHiddenStores().map((s) => s.toLowerCase()).toSet();
     final stores = <String>{};
     // Magasins courants
-    stores.addAll(['Leclerc', 'Carrefour', 'Intermarché', 'Auchan', 'Lidl', 'Monoprix', 'Aldi', 'Super U']);
+    stores.addAll(defaultStores);
     // Magasins personnalisés
     stores.addAll(getCustomStores());
     // Magasins trouvés dans les articles enregistrés
