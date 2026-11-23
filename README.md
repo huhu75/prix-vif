@@ -8,6 +8,66 @@
 
 ## 📋 Historique des versions
 
+### v2.1.1 — 2026-11-23 — Panier : seuls les prix réellement relevés comptent
+
+- **Corrigé** : « Où faire mes courses ? » et la carte « Ton panier est moins cher chez … » estimaient le prix d'un produit jamais relevé dans un magasin (prix moyen des autres magasins). Un magasin pouvait « gagner » sur 6 prix inventés sur 10. Aucun prix n'est plus estimé
+- **Modifié** : les magasins sont classés par **indice de prix** : pour chaque produit relevé dans au moins deux magasins, l'écart avec le prix le plus bas relevé, en moyenne. Un produit vu dans un seul magasin ne départage pas les magasins
+- **Modifié** : l'économie en euros compare **les mêmes produits** : ceux relevés à la fois dans le magasin le moins cher et dans l'autre magasin (« 0,61 € de moins qu'à Carrefour, sur 3 produits relevés dans les deux », « −8 % »)
+- **Modifié** : la conclusion n'apparaît qu'à partir de **3 produits en commun** (`ShoppingBasketAnalysis.minCommonProducts`). En dessous, l'Accueil n'affiche pas la carte du panier, et Ma liste indique combien de produits relever encore. Les magasins sans aucun produit relevé ailleurs sont listés comme « pas encore comparables »
+- **Modifié** : le panier panaché compare, sur les produits relevés dans le magasin le moins cher, ce qu'on économiserait encore en achetant chacun là où il est le moins cher
+- **Modifié** : `StoreBasketCost` (`priceIndex`, `comparedCount`, `commonWithBest`, `total` / `bestTotal` sur les produits communs) ; tests du panier réécrits (`basket_and_price_changes_test.dart`)
+
+### v2.1.0 — 2026-11-23 — Accueil : recherche en haut et panier cliquable
+
+- **Modifié** : l'en-tête de l'Accueil s'inspire de l'app Leboncoin : un petit logo et une grande barre **Rechercher sur Prix Vif**, fixés en haut de l'écran quand on fait défiler. Le grand titre « PRIX VIF » et le slogan disparaissent de l'Accueil
+- **Ajouté** : raccourcis de catégorie sous la barre de recherche (des ronds avec une icône et le nom de la catégorie, défilement horizontal, 8 au plus, affichés dès que 3 catégories sont connues). Un rond ouvre l'onglet Produits avec la recherche remplie par cette catégorie (`categoryIcon`, paramètre `initialQuery` de `ProductsScreen`)
+- **Ajouté** : la carte « Ton panier est moins cher chez … » s'ouvre d'un tap (flèche) sur le détail du panier, l'onglet **Ma liste**. Avant, elle ne réagissait pas
+- **Ajouté** : la carte du panier indique sur combien de prix réellement relevés repose la comparaison (« D'après 4 prix relevés sur 10 »)
+- **Modifié** : tests de l'Accueil (en-tête, carte du panier, raccourcis de catégorie, icônes) et test de démarrage
+
+### v2.0.0 — 2026-11-23 — Nouvelle navigation : barre du bas et bouton Scanner central
+
+- **Modifié** : la barre du bas passe de 5 onglets (Accueil, Scanner, Résultats, Dashboard, Historique) à 4 onglets autour d'un **bouton Scanner rond et lumineux au centre** (`AppNavBar`, `lib/widgets/app_nav_bar.dart`) : **Accueil · Produits · [Scanner] · Ma liste · Profil**. Le bouton Scanner est visible sur tous les onglets et ouvre le scanner en plein écran ; Retour le referme et ramène sur l'onglet quitté
+- **Modifié** : nouvel **Accueil** (`lib/screens/home_screen.dart`), dans le style néon de l'app : recherche (ouvre l'onglet Produits, curseur dans la recherche), carte « Ton panier est moins cher chez … » avec l'économie, **Où économiser** (les 3 produits au plus gros écart entre magasins : « 0,99 € chez Leclerc au lieu de 1,20 € chez Carrefour »), **Tes derniers scans** (avec une pastille « Meilleur prix » ou « +0,14 € » face au magasin le moins cher) et **Ce qui a augmenté**. Toucher un produit ouvre sa fiche. Pas de tuiles de scan en double du bouton Scanner : seule une invitation « Scanne ton premier produit » s'affiche tant que rien n'a été scanné
+- **Ajouté** : onglet **Produits** (`ProductsScreen`), provisoire jusqu'à la liste unique de l'étape suivante : **Où acheter** (où chaque produit est le moins cher, recherche, par catégorie) et **Évolution** (hausses et baisses), plus l'accès à **Tous mes produits**
+- **Ajouté** : onglet **Ma liste** (`MyListScreen`), provisoire jusqu'à la vraie liste de courses : **Où faire mes courses ?** (ton panier habituel dans chaque magasin) et **Ce que chaque magasin a de moins cher**
+- **Ajouté** : onglet **Profil** (`ProfileScreen`) : tes relevés (prix relevés, produits, magasins), **Historique des scans** (avec le détail d'une session pour corriger un ticket), **Mes magasins**, **Exporter mes relevés** (CSV), **Lecture des tickets (clé Mistral)** et **Retirer les données de démo**
+- **Ajouté** : écran **Mes magasins** (`StoresScreen`) : ajouter, renommer partout (`renameStore`) ou retirer un magasin de la liste
+- **Modifié** : le bouton retour d'Android ramène d'un onglet à l'Accueil ; l'app ne se ferme que depuis l'Accueil
+- **Modifié** : une seule liste de magasins par défaut (`ScanRepository.defaultStores`) pour le scanner, Mes magasins et la correction d'un article (avant : deux listes différentes)
+- **Supprimé** : l'onglet **Résultats** et son écran (les scans sont enregistrés automatiquement ; ils se retrouvent dans Profil › Historique), l'onglet **Dashboard** (son contenu est réparti entre Accueil, Produits et Ma liste), l'onglet **Historique** (déplacé dans le Profil), l'ancien accueil et sa recherche (`HomeProductSearch`), le bouton **Accueil** des écrans de détail (`AppHomeButton`, `AppNavigation`) et l'historique des onglets
+- **Corrigé** : refermer le scanner juste au lancement, avant l'ouverture de la base, ne provoque plus d'erreur
+- **Modifié** : tests réécrits pour la nouvelle navigation (`navigation_test.dart`, `home_screen_test.dart`, `scanner_flow_test.dart`) ; `tabs_test.dart` (Produits, Ma liste, Profil, Mes magasins) remplace `dashboard_screen_test.dart`
+
+### v1.20.0 — 2026-11-23 — Retrouver un produit depuis l'accueil
+
+- **Ajouté** : barre de recherche en haut de l'accueil (`HomeProductSearch`, `lib/widgets/home_product_search.dart`), dès qu'un produit a été scanné. Les résultats s'affichent pendant la frappe avec le magasin le moins cher et son prix ; toucher un produit ouvre directement sa fiche sur l'onglet Magasins. Avant, il fallait passer par Analyser → Tableau de bord → Tous mes produits → recherche → fiche
+- **Ajouté** : champ vide et sélectionné, la recherche propose les 5 produits **Récemment scannés** ; rien trouvé, elle propose de scanner le produit ; **Comparer dans le tableau de bord** reprend le texte tapé dans l'onglet Produits
+- **Ajouté** : recherche tolérante commune (`ProductSearchQuery`, `lib/utils/product_search.dart`) : sans accents ni majuscules (« pate » trouve « Pâtes »), mot par mot dans n'importe quel ordre et en début de mot (« lait demi »), une faute de frappe permise dans les mots de 5 lettres et plus (« yahourt »), et recherche dans la marque, la catégorie, les magasins et le code-barres. Les résultats les plus pertinents viennent en premier (le nom compte plus que la marque, qui compte plus que la catégorie ou le magasin)
+- **Modifié** : l'onglet Produits du tableau de bord et **Tous mes produits** utilisent cette recherche (avant : texte exact, accents compris). Tous mes produits ouvre maintenant la fiche sur l'onglet **Magasins** (avant : onglet Fiche, sans prix)
+- **Supprimé** : la carte « Où acheter un produit ? » de l'accueil, remplacée par la barre de recherche
+- **Ajouté** : tests `test/utils/product_search_test.dart` (7 cas) et `test/widgets/home_product_search_test.dart` (5 cas)
+
+### v1.19.0 — 2026-11-23 — Comparatif des magasins au scan d'un produit connu
+
+- **Ajouté** : quand un code-barres scanné correspond à un produit déjà relevé, la feuille de saisie du prix affiche tout de suite la carte **Où l'acheter ?** (`StorePricesCard`, `lib/widgets/store_prices_card.dart`) : chaque magasin avec son dernier prix, le moins cher en vert (« Le moins cher · vas-y »), le plus cher en rouge (« À éviter · +0.40 € »), l'écart des autres, et le magasin où l'on se trouve repéré « ici »
+- **Ajouté** : une phrase de conclusion pour le magasin courant (« Tu es au bon endroit », « 0.14 € de plus ici que chez Lidl », « Le plus cher ici : 0.40 € de moins chez Lidl »). Elle suit le prix tapé, chiffre par chiffre ; un magasin encore jamais vu pour ce produit s'ajoute au comparatif avec le prix saisi
+- **Modifié** : avec ce comparatif, la carte de conseil d'achat n'apparaît plus que si elle propose un équivalent moins cher de la catégorie (le reste faisait doublon)
+- **Ajouté** : `ProductStorePrices.forProduct` (prix d'un produit dans chaque magasin) et `buildStorePriceRows` (rôle de chaque magasin : moins cher, à éviter, autre, seul)
+- **Ajouté** : tests `test/widgets/store_prices_card_test.dart` (9 cas, dont la feuille de saisie du prix)
+
+### v1.18.0 — 2026-11-23 — Modifier un magasin depuis la fiche produit
+
+- **Ajouté** : dans l'onglet **Magasins** de la fiche produit, toucher la carte d'un magasin ouvre sa feuille (`showStoreEditSheet`, `lib/widgets/product_detail/store_edit_sheet.dart`) : changer de magasin en un tap parmi les magasins connus (ou en tapant un nom), corriger le dernier prix, retirer le magasin
+- **Ajouté** : choix **Ce produit** / **Partout** dans cette feuille. « Partout » renomme le magasin dans tous les produits, les sessions, la liste du scanner et le dernier magasin choisi (`ScanRepository.renameStore`) ; renommer vers un magasin existant les fusionne (ex. « Carefour » → « Carrefour »)
+- **Ajouté** : bouton **Ajouter un prix dans un magasin** (onglet Magasins et menu ⋮) : enregistrer un prix vu en rayon sans scanner le produit (`ScanRepository.addPriceForProduct`, qui reprend la fiche du dernier scan)
+- **Modifié** : le menu ⋮ « Changer de magasin » devient **Modifier un magasin** et ouvre la même feuille (après le choix du magasin si le produit en a plusieurs)
+- **Corrigé** : la corbeille rouge des cartes magasin retirait le magasin de tous les scans du produit en un seul tap, sans confirmation. Retirer un magasin se fait maintenant depuis la feuille, avec confirmation
+- **Corrigé** : changer le magasin d'un produit vu sur un ticket changeait le magasin de tout le ticket ; une session ne prend le nouveau magasin que si tous ses articles y sont
+- **Corrigé** : les scans « Inconnu » (sans magasin) de la fiche produit ne pouvaient pas être rattachés à un magasin
+- **Modifié** : un magasin ajouté ou renommé depuis une fiche apparaît dans le Scanner à la séance suivante
+- **Ajouté** : `ScanRepository.countStoreArticles` et `ScanRepository.unknownStoreLabel` ; tests `test/screens/store_editing_test.dart` (9 cas : dépôt et fiche produit)
+
 ### v1.17.0 — 2026-11-22 — Tableau de bord centré sur le prix des produits
 
 - **Ajouté** : onglet **Produits**, ouvert par défaut (`ProductsTab`, calcul `ProductStorePrices`) : pour chaque produit, le magasin le moins cher (en vert) et son prix dans les autres magasins avec l'écart (« Carrefour 1.49 € (+0.14 €) »). Les plus gros écarts viennent en premier, puis les produits « Vus dans un seul magasin ». Une recherche permet de retrouver un produit, et toucher un produit ouvre sa fiche sur l'onglet Magasins
@@ -278,49 +338,51 @@
 
 ## ✨ Fonctionnalités
 
+### 🧭 Navigation
+- **Barre du bas** : **Accueil · Produits · [Scanner] · Ma liste · Profil**. Le gros bouton **Scanner** au centre ouvre le scanner en plein écran depuis n'importe quel onglet
+- Le bouton retour d'Android ramène d'un onglet à l'Accueil ; l'app ne se ferme que depuis l'Accueil
+
 ### 🏠 Accueil
-- Écran d'ouverture de l'app, avec 3 actions : **Scanner un code-barres**, **Scanner un ticket de caisse**, **Analyser les produits et magasins**
-- Chaque scan ouvre le Scanner directement dans le bon mode ; l'analyse ouvre le tableau de bord
-- Accessible à tout moment par l'onglet **Accueil** de la barre du bas, ou par le bouton Accueil des écrans de détail
+- **En-tête fixe**, comme Leboncoin : un petit logo et la barre **Rechercher sur Prix Vif** (ouvre l'onglet Produits)
+- **Raccourcis de catégorie** (dès 3 catégories connues) : un rond par catégorie, qui ouvre Produits filtré sur cette catégorie
+- **Ton panier est moins cher chez …** (dès 3 produits relevés dans les deux magasins) : le magasin le moins cher pour tes courses habituelles et l'économie sur ces mêmes produits ; un tap ouvre le détail (onglet Ma liste)
+- **Où économiser** : les produits pour lesquels changer de magasin rapporte le plus
+- Tant que rien n'a été scanné : une invitation à scanner un premier produit (ou un ticket)
+- **Tes derniers scans** : chaque produit avec son prix, son magasin et une pastille « Meilleur prix » ou « +0,14 € » s'il est moins cher ailleurs
+- **Ce qui a augmenté** depuis ton achat précédent ; toucher un produit ouvre sa fiche
 
 ### 🎯 Scanner
-- **En deux étapes** : 1. choisir le magasin (obligatoire à chaque séance, le dernier est proposé en raccourci), 2. appuyer sur **SCANNER** pour lancer la caméra. Elle ne démarre jamais avant
+- **En deux étapes** : 1. choisir le magasin (obligatoire à chaque ouverture du scanner, le dernier est proposé en raccourci), 2. appuyer sur **SCANNER** pour lancer la caméra. Elle ne démarre jamais avant
 - **Caméra réelle** : Accès à la caméra du téléphone/tablette
 - Scan de codes-barres en temps réel
 - Contrôles de la caméra : flash
-- Aperçu des derniers articles scannés
 - Interface intuitive avec animation de ligne de détection
 - **Mode bi-mode** : Bascule entre scan de code-barres et capture de ticket
 - **Saisie de prix** : Après scan d'un code-barres, dialogue modal pour entrer le prix réel
+- **Comparatif au scan** : si le produit a déjà été relevé, la feuille de saisie montre tout de suite chaque magasin avec son prix, le moins cher en vert (y aller) et le plus cher en rouge (à éviter), et dit si le magasin où tu es est le bon
 - **Magasins mémorisés** : les magasins ajoutés et le dernier magasin choisi sont conservés entre deux lancements (le dernier est proposé, pas présélectionné)
 - **Capture photo** : Photographier un ticket de caisse via la galerie ou la caméra
 - **Compression d'image** : Réduction automatique des images à 1024px max, JPEG 80% avec affichage des gains de taille
-
-### 📊 Résultats
-- Liste des articles scannés avec cartes modernes
-- Statistiques en temps réel : nombre d'articles, total, moyenne
-- Sélection multiple pour suppression groupée (les articles supprimés sont aussi retirés de l'historique et du Dashboard)
-- « Enregistrer » regroupe les articles de la session courante en une seule session dans l'historique (les scans déjà sauvegardés automatiquement y sont fusionnés, sans laisser de session vide)
-- Affichage du total en grand
 - **Sauvegarde automatique après chaque scan**
 
-### 📈 Tableau de Bord (Dashboard)
-Trois onglets, centrés sur une question : où chaque produit est-il le moins cher ?
-- **Produits** (ouvert par défaut) : pour chaque produit, le magasin le moins cher et son prix dans les autres magasins avec l'écart, les plus gros écarts en premier, puis les produits vus dans un seul magasin. Une recherche permet de retrouver un produit
-- **Magasins** : **Où faire mes courses ?**, le coût de ton panier habituel dans chaque magasin (avec le nombre de prix relevés et le total en achetant chaque produit là où il est le moins cher) ; **Ce que chaque magasin a de moins cher**, la liste des produits qui sont le moins chers dans chaque magasin
+### 🏷️ Produits
+- **Où acheter** : pour chaque produit, le magasin le moins cher et son prix dans les autres magasins avec l'écart, les plus gros écarts en premier, puis les produits vus dans un seul magasin. Recherche tolérante (accents, début de mot, faute de frappe, marque, catégorie, magasin) et vue **Par catégorie** (au kg / L)
 - **Évolution** : **Ce qui a augmenté** et **Ce qui a baissé** depuis ton achat précédent du même produit dans le même magasin, avec le magasin où il est moins cher
-- **Tous mes produits** (icône de la barre du haut) : liste des produits scannés, puis la **fiche produit** (évolution, magasins, produits similaires, fiche Open Food Facts) avec **Pas le bon produit ?** (choisir la bonne fiche Open Food Facts) et **Supprimer**
-- Toucher un produit dans un onglet ouvre directement sa fiche (onglet Magasins ou Évolution)
-- **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`) sur les cartes et dans la fiche produit
+- **Tous mes produits** (icône de la barre du haut) : la liste complète des produits scannés, avec tri et filtres
+- **Fiche produit** (en touchant un produit) : évolution, magasins, catégorie, fiche Open Food Facts, avec **Pas le bon produit ?** et **Supprimer**. Toucher un magasin permet de le changer (pour ce produit ou partout), de corriger son dernier prix ou de le retirer ; **Ajouter un prix dans un magasin** sans scanner
+- **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`)
 
-### 🕒 Historique
-- Liste des sessions de scan précédentes
-- Filtres par : récents, montant, nombre d'articles
-- Affichage compact avec aperçu des produits
-- Détails complets d'une session, avec **correction d'un article** (prix, contenance, magasin) ou suppression en le touchant
-- Bouton « Retirer les données de démo » (ne supprime que les sessions d'exemple)
-- **Export CSV** de toutes les sessions (bouton partage) : un fichier lisible dans Excel / Numbers, envoyé par e-mail, Drive ou enregistré dans Fichiers
-- Suppression individuelle ou totale (les données de démo ne sont injectées qu'au tout premier lancement et ne reviennent pas après « Tout supprimer »)
+### 🛒 Ma liste
+- **Où faire mes courses ?** : les magasins classés du moins cher au plus cher, comparés uniquement sur des prix réellement relevés (aucun prix estimé) : surcoût de chaque magasin sur les produits relevés aussi dans le moins cher, conclusion dès 3 produits en commun, et ce qu'on économiserait encore en achetant chaque produit là où il est le moins cher
+- **Ce que chaque magasin a de moins cher** : les produits qui sont le moins chers dans chaque magasin
+
+### 👤 Profil
+- **Tes relevés** : nombre de prix relevés, de produits et de magasins
+- **Historique des scans** : les sessions de scan, filtrables par magasin ; le détail d'une session permet de **corriger un article** (prix, contenance, magasin) ou de le supprimer ; suppression d'une session ou de tout l'historique
+- **Mes magasins** : ajouter un magasin, le renommer partout (produits, tickets, scanner) ou le retirer de la liste (les prix déjà relevés restent)
+- **Exporter mes relevés** : un fichier CSV lisible dans Excel / Numbers, envoyé par e-mail, Drive ou enregistré dans Fichiers
+- **Lecture des tickets (clé Mistral)** : saisir la clé API utilisée pour lire les tickets
+- **Retirer les données de démo** (ne supprime que les sessions d'exemple, injectées au tout premier lancement)
 
 ### 📱 Mode Hors-Ligne
 - Détection automatique de la connectivité réseau
@@ -467,30 +529,35 @@ prix_vif/
 │   ├── utils/
 │   │   ├── image_utils.dart          # Utilitaires compression d'image
 │   │   ├── unit_price.dart           # Contenance → prix au kg / L / unité
+│   │   ├── product_search.dart       # Recherche tolérante (accents, début de mot, faute de frappe)
 │   │   └── product_type_utils.dart   # Type de produit issu des catégories Open Food Facts
 │   │
 │   ├── screens/
-│   │   ├── home_screen.dart          # Accueil : les 3 actions (code-barres, ticket, analyse)
-│   │   ├── scan_screen.dart          # Écran scanner : état et flux (code-barres, ticket, hors-ligne)
-│   │   ├── results_screen.dart       # Écran résultats
-│   │   ├── history_screen.dart       # Écran historique
+│   │   ├── home_screen.dart          # Accueil : recherche, deux scans, panier, derniers scans, hausses
+│   │   ├── scan_screen.dart          # Scanner plein écran : état et flux (code-barres, ticket, hors-ligne)
+│   │   ├── products_screen.dart      # Onglet Produits : où acheter, évolution des prix
+│   │   ├── my_list_screen.dart       # Onglet Ma liste : où faire mes courses
+│   │   ├── profile_screen.dart       # Onglet Profil : relevés, historique, magasins, export, réglages
+│   │   ├── stores_screen.dart        # Mes magasins : ajouter, renommer, retirer
+│   │   ├── history_screen.dart       # Historique des scans (depuis le Profil)
 │   │   ├── session_detail_screen.dart # Détails d'une session
-│   │   ├── dashboard_screen.dart     # Tableau de bord : assemble les sections
 │   │   ├── product_selection_screen.dart # Liste des produits scannés (recherche, tri, filtres)
 │   │   └── product_detail_screen.dart    # Fiche produit : chargement + onglets
 │   │
 │   └── widgets/
 │       ├── price_card.dart           # Cartes produits (avec Nutri-Score et prix au kg / L)
+│       ├── store_prices_card.dart    # Comparatif des magasins d'un produit connu (au scan)
+│       ├── app_nav_bar.dart          # Barre du bas : 4 onglets et bouton Scanner central
 │       ├── article_edit_dialog.dart  # Correction / suppression d'un article enregistré
 │       ├── off_match_sheet.dart       # Choix d'une autre fiche Open Food Facts pour un produit
 │       ├── scanner_overlay.dart      # Overlay scanner
 │       ├── magic_button.dart         # Boutons animés
-│       ├── nav_buttons.dart          # Boutons Retour / Accueil des barres d'app (AppNavigation)
+│       ├── nav_buttons.dart          # Bouton Retour et boutons ronds des barres d'app
 │       ├── magic_title.dart          # Titres néon
 │       ├── ai_scan_effect.dart       # Effet de scan IA
 │       ├── logo.dart                  # Logo de l'application
-│       ├── dashboard/                 # Onglets du Dashboard (Produits, Magasins, Évolution) et briques communes
-│       ├── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, similaires)
+│       ├── dashboard/                 # Contenus des onglets Produits et Ma liste (où acheter, évolution, magasins) et briques communes
+│       ├── product_detail/            # Onglets de la fiche produit (fiche, évolution, magasins, catégorie) et feuille d'un magasin
 │       └── scan/                      # Composants du scanner (magasin, mode, attente avant caméra, zone ticket, prix, confirmation, clé Mistral)
 │
 ├── test/                           # Tests unitaires et widgets (modèles, dépôt Hive, écrans)
@@ -511,10 +578,9 @@ prix_vif/
 - Passage de callbacks entre widgets
 
 ### Navigation
-- `BottomNavigationBar` pour la navigation principale (5 onglets : Accueil, Scanner, Résultats, Dashboard, Historique), ouverture sur l'Accueil
-- Bouton **Retour** sur chaque écran sauf l'accueil (onglet précédent, ou écran précédent) ; le bouton retour d'Android fait de même
-- Bouton **Accueil** sur les écrans ouverts par-dessus les onglets (détails d'une session, sélection et fiche produit)
-- `MaterialPageRoute` pour les détails
+- `AppNavBar` pour la navigation principale : 4 onglets (Accueil, Produits, Ma liste, Profil) et le bouton Scanner central, ouverture sur l'Accueil
+- Le scanner, la fiche produit, l'historique et Mes magasins s'ouvrent par-dessus les onglets (`MaterialPageRoute`), avec un bouton **Retour**
+- Bouton retour d'Android : d'un onglet vers l'Accueil, puis fermeture de l'app
 - `IndexedStack` pour conserver l'état
 - **Synchronisation automatique** entre onglets
 
@@ -538,17 +604,17 @@ prix_vif/
 
 ### 📱 Scanner un code-barres
 1. Lancez l'application sur votre appareil Android/iOS : elle s'ouvre sur l'**accueil**
-2. Touchez **Scanner un code-barres** (ou, depuis le Scanner, sélectionnez le mode **CODE-BARRES**)
+2. Touchez le bouton **Scanner** au centre de la barre du bas
 3. **Choisissez le magasin** dans la liste (ou touchez le raccourci « Dernier : … »)
 4. Appuyez sur **SCANNER** : la caméra se lance (autorisez l'accès la première fois)
 5. Pointez la caméra vers un code-barres
 6. Le code est scanné automatiquement
 7. **Intégration Open Food Facts** : L'application récupère automatiquement les informations du produit (nom, marque, Nutri-Score, catégories, image)
-8. Un dialogue s'ouvre : entrez le **prix réel** du produit
-9. **✅ Sauvegarde automatique** : L'article est immédiatement persisté en base et apparaît dans le Dashboard
+8. Un dialogue s'ouvre : entrez le **prix réel** du produit. Si le produit est déjà connu, le comparatif des magasins s'affiche au-dessus (où aller, où éviter)
+9. **✅ Sauvegarde automatique** : L'article est immédiatement persisté en base et apparaît dans Produits, Ma liste et l'historique du Profil
 
 ### 📸 Capturer un ticket de caisse
-1. Sur l'accueil, touchez **Scanner un ticket de caisse** (ou, depuis le Scanner, sélectionnez le mode **TICKET**)
+1. Touchez le bouton **Scanner** au centre de la barre du bas, puis sélectionnez le mode **TICKET**
 2. **Choisissez le magasin** : les boutons Appareil photo / Galerie restent grisés avant
 3. Prenez une photo du ticket avec la caméra ou choisissez depuis la galerie
 4. **Compression automatique** : L'image est réduite à max 1024px, JPEG 80%
@@ -557,24 +623,15 @@ prix_vif/
 7. **Matching Open Food Facts** : Chaque article est associé à un produit OFF (avec confirmation utilisateur). La recherche se fait en 3 passes : nom complet, puis nom nettoyé avec les abréviations du ticket développées (LESS → lessive), puis avec un ou deux mots en moins
 8. **Persistance automatique** : La session complète est sauvegardée en base
 
-### 📊 Consulter le Tableau de Bord
-- Accès : carte **Analyser les produits et magasins** de l'accueil, ou onglet **Dashboard** de la barre du bas
-- **Produits** : où chaque produit est le moins cher, et combien il coûte ailleurs ; utilise la recherche pour retrouver un produit
-- **Magasins** : le magasin le moins cher pour ton panier habituel, et ce que chaque magasin a de moins cher
-- **Évolution** : ce qui a augmenté ou baissé depuis ton dernier achat ; touche un produit pour voir sa fiche
-- **Tous mes produits** (icône en haut à droite) : la liste complète des produits scannés
+### 🏷️ Comparer les prix
+- **Produits** (barre du bas) : où chaque produit est le moins cher et combien il coûte ailleurs ; la recherche retrouve un produit par son nom, sa marque, sa catégorie ou un magasin ; la vue **Évolution** montre ce qui a augmenté ou baissé
+- **Ma liste** (barre du bas) : le magasin le moins cher pour ton panier habituel, et ce que chaque magasin a de moins cher
+- Touche un produit pour ouvrir sa fiche ; sur la fiche, touche un magasin pour le modifier
 
-### 📜 Consulter les résultats
-- **Icône 🧾 (2ème onglet)** : Affiche la liste des articles scannés dans la session courante
-- Sélection multiple → suppression groupée
-- Bouton "Enregistrer" → regroupe les articles courants en une seule session (les sessions automatiques correspondantes sont fusionnées)
-- Affichage du total en grand avec statistiques (moyenne, nombre d'articles)
-
-### 🕒 Consulter l'historique
-- **Icône 🕰️ (4ème onglet)** : Liste des sessions de scan précédentes
-- Appuyez sur une session → affiche les détails complets
-- Filtres par magasin disponibles
-- Menu → supprimer une session ou tout l'historique
+### 👤 Profil
+- **Historique des scans** : touche une session pour voir ses articles et en corriger un
+- **Mes magasins** : touche un magasin pour le renommer ou le retirer ; **Ajouter un magasin** en bas
+- **Exporter mes relevés** : partage un fichier CSV
 
 ---
 
@@ -608,11 +665,13 @@ Toutes les fonctionnalités principales sont désormais opérationnelles :
 
 ## 🚀 Évolution Possible
 
+**En cours** : refonte de la navigation en 5 étapes (étape 1 faite). Le plan détaillé, les décisions et les points ouverts sont dans `AGENT.MD`, section « Plan de la navigation v2 ».
+
 Pour aller plus loin :
 - [ ] Synchronisation cloud (Firebase/Back4App) pour sauvegarder l'historique
 - [ ] Export PDF des sessions de scan
 - [ ] Alertes sur produits peu sains (basé sur Nutri-Score)
-- [ ] Intégration avec des listes de courses
+- [ ] Intégration avec des listes de courses (prévue à l'étape 5 de la navigation v2)
 - [ ] Partage de sessions entre utilisateurs
 
 ---
@@ -651,7 +710,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 22 Novembre 2026 (v1.17.0 — voir Historique des versions)*
+*Dernière mise à jour : 23 Novembre 2026 (v2.1.1 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Tableau de bord centré sur le prix des produits (Produits, Magasins, Évolution), scanner en deux étapes (magasin puis SCANNER), page d'accueil (3 actions) et boutons Retour / Accueil, recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables et export CSV*
+*Statut : ✅ Nouvelle navigation (Accueil avec recherche fixée en haut, Produits, Ma liste, Profil et bouton Scanner central), recherche de produit tolérante aux accents et fautes de frappe, comparatif des magasins au scan d'un produit connu (où aller, où éviter), magasin modifiable depuis la fiche produit (ce produit ou partout) et ajout d'un prix sans scanner, tableau de bord centré sur le prix des produits (Produits, Magasins, Évolution), scanner en deux étapes (magasin puis SCANNER), page d'accueil (3 actions) et boutons Retour / Accueil, recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables et export CSV*

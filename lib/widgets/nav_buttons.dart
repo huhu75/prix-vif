@@ -1,22 +1,6 @@
-// Boutons de navigation communs à tous les écrans (Retour, Accueil)
+// Boutons des barres d'app communs à tous les écrans (Retour et accès à un écran)
 import 'package:flutter/material.dart';
 import '../theme.dart';
-
-/// Navigation globale de l'app.
-class AppNavigation {
-  AppNavigation._();
-
-  /// Incrémenté à chaque demande de retour à l'accueil. MainScreen l'écoute
-  /// pour afficher l'onglet Accueil (les écrans ouverts par-dessus les onglets
-  /// ne sont pas sous MainScreen dans l'arbre, ils ne peuvent pas l'appeler).
-  static final ValueNotifier<int> homeRequests = ValueNotifier<int>(0);
-
-  /// Ferme tous les écrans ouverts par-dessus les onglets et affiche l'accueil
-  static void goHome(BuildContext context) {
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    homeRequests.value++;
-  }
-}
 
 /// Bouton « Retour » des barres d'app : flèche dans un rond bleu teinté,
 /// plus visible qu'une simple flèche. Sans [onPressed], ferme l'écran courant.
@@ -37,24 +21,8 @@ class AppBackButton extends StatelessWidget {
   }
 }
 
-/// Bouton « Accueil » des écrans ouverts par-dessus les onglets (détails d'une
-/// session, sélection et fiche produit) : revient directement à l'accueil.
-class AppHomeButton extends StatelessWidget {
-  const AppHomeButton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppNavActionButton(
-      key: const ValueKey('nav_home'),
-      icon: Icons.home_outlined,
-      tooltip: 'Accueil',
-      onPressed: () => AppNavigation.goHome(context),
-    );
-  }
-}
-
-/// Bouton rond bleu teinté des barres d'app (Retour, Accueil, et les autres
-/// accès à un écran, comme « Tous mes produits »)
+/// Bouton rond bleu teinté des barres d'app (Retour, et les autres accès à un
+/// écran, comme « Tous mes produits »)
 class AppNavActionButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;

@@ -43,6 +43,27 @@ class ProductStorePrices {
   /// Vu dans au moins 2 magasins avec un vrai écart de prix
   bool get hasPriceDifference => storeCount >= 2 && priceDiff > 0.01;
 
+  /// Prix du produit [productKey] dans chaque magasin où il a été vu,
+  /// `null` s'il n'a jamais été vu dans un magasin (produit inconnu)
+  static ProductStorePrices? forProduct(List<ScanSession> sessions, String productKey) {
+    final observations = ProductObservation.fromSessions(sessions)
+        .where((o) => o.key == productKey && o.storeName != null)
+        .toList();
+    if (observations.isEmpty) return null;
+    final latest = latestByStore(observations);
+    final prices = [
+      for (final entry in latest.entries) StorePrice(entry.key, entry.value.price, entry.value.date),
+    ]..sort((a, b) => a.price.compareTo(b.price));
+    final meta = observations.reduce((a, b) => b.date.isAfter(a.date) ? b : a);
+    return ProductStorePrices(
+      productKey: meta.key,
+      productId: meta.productId,
+      name: meta.item.name,
+      brand: meta.item.brand,
+      storePrices: prices,
+    );
+  }
+
   /// Tous les produits vus dans au moins un magasin : d'abord ceux qui ont un
   /// écart de prix entre magasins (du plus gros au plus petit), puis les autres
   /// par nom.

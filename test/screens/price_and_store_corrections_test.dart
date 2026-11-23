@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:prix_vif/models.dart';
-import 'package:prix_vif/screens/results_screen.dart';
 import 'package:prix_vif/services/scan_repository.dart';
 import 'package:prix_vif/widgets/article_edit_dialog.dart';
 
@@ -267,66 +266,6 @@ void main() {
       // Le champ magasin doit contenir "Leclerc"
       final storeField = tester.widget<TextFormField>(find.byKey(const ValueKey('edit_store')));
       expect(storeField.controller?.text, 'Leclerc');
-    });
-  });
-
-  // ─── ResultsScreen ──────────────────────────────────────────────────────────
-
-  group("ResultsScreen — modification d'un article", () {
-    testWidgets('bouton modifier sur la carte permet de corriger prix et magasin', (tester) async {
-      final initialItem = _item('r1', 'Pâtes', 1.10, 'Lidl');
-      ScannedItem? updatedItem;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: ResultsScreen(
-              scannedItems: [initialItem],
-              onBack: () {},
-              onItemRemoved: (_) {},
-              onClearAll: () async {},
-              onSaveSession: () {},
-              onItemUpdated: (item) => updatedItem = item,
-            ),
-          ),
-        ),
-      );
-
-      // Toucher le bouton modifier
-      await tester.tap(find.byKey(const ValueKey('edit_result_r1')));
-      await _settle(tester);
-
-      expect(find.text("Modifier l'article"), findsOneWidget);
-
-      await tester.enterText(find.byKey(const ValueKey('edit_price')), '1,25');
-      await tester.enterText(find.byKey(const ValueKey('edit_store')), 'Aldi');
-      await tester.tap(find.byKey(const ValueKey('edit_save')));
-      await _settle(tester);
-
-      expect(updatedItem, isNotNull);
-      expect(updatedItem!.price, 1.25);
-      expect(updatedItem!.storeName, 'Aldi');
-    });
-
-    testWidgets('le bouton modifier est absent si onItemUpdated est null', (tester) async {
-      final item = _item('r2', 'Eau', 0.50, 'Leclerc');
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: ResultsScreen(
-              scannedItems: [item],
-              onBack: () {},
-              onItemRemoved: (_) {},
-              onClearAll: () async {},
-              onSaveSession: () {},
-              // onItemUpdated non fourni
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byKey(const ValueKey('edit_result_r2')), findsNothing);
     });
   });
 }

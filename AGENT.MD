@@ -400,19 +400,96 @@ Règle : tout nouveau calcul d'analyse va dans `lib/analytics/` avec ses tests ;
 
 ## Découpage des écrans (v1.9.1 – v1.9.3)
 
-- Dashboard (v1.17.0) : `dashboard_screen.dart` calcule `DashboardStats` et l'affiche en trois onglets (`DefaultTabController`), centrés sur le prix des produits : `ProductsTab` (ouvert par défaut : `productPrices`, recherche locale sur nom + marque, produits comparés puis « Vus dans un seul magasin »), `StoresTab` (`ShoppingBasketAnalysis` via `BasketCard`, puis `cheapestByStore`) et `PricesTab`, intitulé « Évolution » (`increases` / `decreases`, des `PriceChange` entre les deux derniers achats d'un produit dans un même magasin). Les onglets sont dans `lib/widgets/dashboard/`, avec les briques communes dans `dashboard_card.dart` (`DashboardCard`, `ExpandableList` qui montre 5 lignes puis « Voir les N autres », formats `formatEuros`…). Ils ne reçoivent que leurs données et un callback `onProductTap` : la fiche produit s'ouvre sur l'onglet Magasins (2) ou Évolution (1). Le bouton « Tous mes produits » (`AppNavActionButton`) appelle `onProductAnalysisRequested`.
+- Dashboard (v1.17.0, remplacé en v2.0.0 par les onglets Produits et Ma liste, qui réutilisent les mêmes widgets de `lib/widgets/dashboard/`) : `dashboard_screen.dart` calculait `DashboardStats` et l'affichait en trois onglets (`DefaultTabController`), centrés sur le prix des produits : `ProductsTab` (ouvert par défaut : `productPrices`, recherche locale sur nom + marque, produits comparés puis « Vus dans un seul magasin »), `StoresTab` (`ShoppingBasketAnalysis` via `BasketCard`, puis `cheapestByStore`) et `PricesTab`, intitulé « Évolution » (`increases` / `decreases`, des `PriceChange` entre les deux derniers achats d'un produit dans un même magasin). Les onglets sont dans `lib/widgets/dashboard/`, avec les briques communes dans `dashboard_card.dart` (`DashboardCard`, `ExpandableList` qui montre 5 lignes puis « Voir les N autres », formats `formatEuros`…). Ils ne reçoivent que leurs données et un callback `onProductTap` : la fiche produit s'ouvre sur l'onglet Magasins (2) ou Évolution (1). Le bouton « Tous mes produits » (`AppNavActionButton`) appelle `onProductAnalysisRequested`.
 - Fiche produit : `product_detail_screen.dart` ne fait que charger (`ProductAnalysisService.load`) et afficher la barre d'onglets ; les onglets sont dans `lib/widgets/product_detail/`. `ProductAnalysisService` accepte un `lookupBarcode` de remplacement pour les tests (pas de réseau).
 - Corrections au niveau d'un produit (v1.10.0) : `ScanRepository.deleteProduct` / `rematchProduct` / `countProductArticles` utilisent `_matchesProduct` (id, code-barres ou nom), la même règle que `getPriceHistoryByStore` : ce qui est affiché sur la fiche est exactement ce qui est supprimé ou corrigé. Les écrans qui ouvrent une fiche lui passent le code-barres, sinon le nom (jamais l'id d'un article).
 - Scanner : `scan_screen.dart` garde l'état (caméra, mode, magasin, image du ticket) et les flux métier (`_onBarcodeScanned`, `_processTicketImage`, hors-ligne) ; les composants d'interface sont dans `lib/widgets/scan/` et ne reçoivent que des valeurs et des callbacks.
 
-## Navigation et accueil (v1.13.0)
+## Navigation (v2.0.0)
 
-- `MainScreen` (`main.dart`) : `IndexedStack` de 5 onglets, indexés par des constantes (`_homeTab` 0, `_scanTab` 1, `_resultsTab` 2, `_dashboardTab` 3, `_historyTab` 4). L'app s'ouvre sur `_homeTab`. `_goToTab` affiche l'onglet tout de suite, puis recharge les sessions pour le Dashboard et l'Historique (une erreur de rechargement, par exemple Hive pas encore ouvert, n'empêche pas le changement d'onglet).
-- Accueil : `home_screen.dart` (`HomeScreen` + `HomeActionCard`) ne reçoit que 3 callbacks. `_openScanner(barcode:)` passe au Scanner en fixant `_requestedBarcodeMode` et en incrémentant `_modeRequestId`. `ScanScreen.didUpdateWidget` applique le mode demandé à chaque nouvel identifiant, même si on redemande le même mode après l'avoir changé à la main. Il n'appelle pas `onScanTypeChanged` à ce moment-là (le parent est en train de se reconstruire et connaît déjà le type).
-- Retour entre onglets (v1.14.0) : `_tabHistory` garde les onglets quittés (`_recordTabChange`, 20 au plus) et se vide à chaque passage par l'accueil, la racine. `_goBack` affiche le dernier onglet de l'historique, sinon l'accueil. Il sert au bouton Retour des onglets (`onBack` de `ScanScreen`, `ResultsScreen`, `DashboardScreen`, `HistoryScreen`) et au bouton retour d'Android via le `PopScope` de `MainScreen` (`canPop` seulement sur l'accueil). Le bouton « Scanner maintenant » de Résultats vide utilise `onScan`, qui ouvre toujours le Scanner.
-- Boutons de navigation : `lib/widgets/nav_buttons.dart`. `AppBackButton` ferme l'écran courant (`maybePop`) ou appelle son `onPressed`. `AppHomeButton` appelle `AppNavigation.goHome` : `popUntil(isFirst)` puis incrément de `AppNavigation.homeRequests`, un `ValueNotifier` que `MainScreen` écoute pour afficher l'accueil. Les écrans poussés par `Navigator` ne sont pas sous `MainScreen` dans l'arbre et ne peuvent pas l'appeler directement.
-- Caméra (v1.15.0) : tous les onglets de l'`IndexedStack` sont construits au lancement. La caméra ne démarre **jamais** toute seule : seulement au tap sur SCANNER (`_startScanner`, qui refuse sans magasin), et au retour au premier plan si elle tournait avant (`_resumeScanOnForeground`). `_syncCamera` ne fait que l'arrêter quand l'onglet est caché (`isActive` faux), en mode ticket ou sans magasin.
-- Magasin, étape 1 obligatoire (v1.15.0) : `_selectedStore` vaut `null` au début de chaque séance. `MainScreen._scanSessionId` est incrémenté à chaque arrivée sur le Scanner depuis l'accueil (carte ou onglet), et `ScanScreen.didUpdateWidget` remet alors le magasin et le ticket à zéro. Sans magasin : SCANNER grisé (`MagicButton` sans `onPressed`), `TicketScanZone(canCapture: false)` grise Appareil photo / Galerie, et la zone code-barres affiche `ScanIdlePanel`. Le dernier magasin (`getSelectedStore`, box `settings`) devient `_lastStore`, proposé par le raccourci « Dernier : … » de `StoreSelector`. Il n'est plus présélectionné. `_processTicketImage` fige le magasin au début de l'analyse.
+- `MainScreen` (`main.dart`) : `IndexedStack` de 4 onglets (Accueil 0, Produits 1, Ma liste 2, Profil 3) et `AppNavBar` (`lib/widgets/app_nav_bar.dart`), dont le bouton Scanner central (`nav_scan`) appelle `_openScanner`. L'app s'ouvre sur l'Accueil.
+- Le scanner n'est plus un onglet : `_openScanner(barcode:)` pousse un `ScanScreen` plein écran (nouvelle instance, donc nouvelle séance : magasin à rechoisir) avec `requestedBarcodeMode` et un `onBack` qui ferme la route. Ses boutons Résultats / Historique sont facultatifs et absents ici. Au retour, les sessions sont rechargées.
+- Les écrans de détail s'ouvrent par `Navigator.push` : fiche produit (`_openProductDetail`, onglet choisi par l'appelant : 2 Magasins, 1 Évolution), Tous mes produits, historique (`_openHistory`), détail d'une session, Mes magasins. L'historique est poussé avec un `ValueListenableBuilder` sur `_sessionsListenable`, mis à jour par `_reloadSessions`, car une route poussée n'est pas reconstruite avec `MainScreen`.
+- `_reloadSessions` ignore une base pas encore ouverte (tap juste au lancement) : l'ouverture rechargera.
+- Bouton retour d'Android : `PopScope(canPop: Accueil)` ; depuis un autre onglet, il affiche l'Accueil. Il n'y a plus d'historique des onglets ni de bouton Accueil (`AppHomeButton` et `AppNavigation` supprimés).
+- Accueil (`home_screen.dart`) : `_SearchHeader` fixe en haut (logo et barre de recherche, hors du `ListView`, comme Leboncoin), puis une liste de sections. Les raccourcis de catégorie (`_CategoryShortcuts`, icône par mots-clés avec `categoryIcon`) viennent de `stats.categoryGroups`, 8 au plus, affichés à partir de 3 ; un rond appelle `_openProducts(query: libellé)`, repris par `ProductsTab.initialQuery`. La carte du panier (`home_basket`) appelle `onOpenBasket`, qui affiche l'onglet Ma liste. L'Accueil ne reçoit que les sessions, les catégories et des callbacks. `DashboardStats.fromSessions` fournit le panier (`shoppingBasket`), « Où économiser » (les 3 premiers `productPrices` avec `hasPriceDifference`, déjà triés par écart), les hausses (`increases`) et les prix par magasin des derniers scans (pastille « Meilleur prix » / « +x € »). La recherche appelle `_openProducts(focusSearch: true)`. Pas de tuiles de scan (le bouton central les remplace) : `_FirstScanCard` n'apparaît que sans aucun scan.
+- Onglet Produits (`products_screen.dart`, provisoire) : `DefaultTabController` « Où acheter » (`ProductsTab`) / « Évolution » (`PricesTab`), recréé à chaque `_productsRequest` pour s'ouvrir sur la vue demandée (`ProductsView`) et, depuis la recherche de l'accueil, avec le curseur dans la recherche.
+- Onglet Ma liste (`my_list_screen.dart`, provisoire) : `StoresTab` (panier habituel et ce que chaque magasin a de moins cher).
+- Panier (`ShoppingBasketAnalysis`, v2.1.1) : aucun prix estimé. Seuls les produits relevés dans au moins deux magasins (`BasketProduct.isCompared`) comptent. Classement par indice de prix (moyenne de prix / prix le plus bas relevé, sur les produits comparés du magasin) ; chaque magasin est ensuite comparé au moins cher sur leurs produits communs (`commonWithBest`, `total`, `bestTotal`). `comparisonStore` : le magasin au plus gros surcoût parmi ceux qui ont au moins `minCommonProducts` (3) produits communs avec le moins cher ; `null` = pas de conclusion (la carte de l'Accueil est masquée). `calculate` renvoie `null` si aucun produit n'est relevé dans deux magasins.
+- Onglet Profil (`profile_screen.dart`) : statistiques (`ProductObservation`), historique, Mes magasins (`stores_screen.dart` : `addCustomStore`, `renameStore`, `removeStore`), export CSV (`shareArticlesCsv`), clé Mistral (`showMistralSettingsDialog`), retrait de la démo (`removeDemoData`).
+- Magasins par défaut : une seule liste, `ScanRepository.defaultStores`, utilisée par le scanner, `getAllKnownStores` et la correction d'un article.
+- Caméra (v1.15.0, inchangé) : elle ne démarre qu'au tap sur SCANNER (`_startScanner`, qui refuse sans magasin), et au retour au premier plan si elle tournait avant.
+
+## Plan de la navigation v2 (décidé le 2026-11-23)
+
+Refonte de la navigation guidée par la Règle 0 de `CLAUDE.md` : situation prioritaire « en magasin, produit en main », le moins de taps possible, utilisable à une main, pour le foyer. Une version par étape ; à la fin de chaque étape l'app fonctionne, les tests passent, et des captures sont validées avant le commit.
+
+| Étape | Version | Contenu | État |
+|---|---|---|---|
+| 1 | v2.0.0 → v2.1.1 | Barre du bas et bouton Scanner central, Accueil, Profil | ✅ fait |
+| 2 | v2.2.0 | Parcours en rayon : scanner plein écran et écran Résultat du scan | ⏳ à faire |
+| 3 | v2.3.0 | Onglet Produits unique | ⏳ à faire |
+| 4 | v2.4.0 | Fiche produit sur une page | ⏳ à faire |
+| 5 | v2.5.0 | Ma liste : vraie liste de courses | ⏳ à faire |
+
+### Étape 1 — Barre du bas, Accueil, Profil ✅ (v2.0.0, v2.1.0, v2.1.1)
+
+- Barre du bas : Accueil · Produits · [Scanner] · Ma liste · Profil ; le Scanner s'ouvre en plein écran depuis n'importe quel onglet.
+- Accueil : en-tête fixe inspiré de Leboncoin (logo et recherche), raccourcis de catégorie, panier (cliquable, comparé sur de vrais prix), Où économiser, derniers scans, hausses. Pas de tuiles de scan en double du bouton central.
+- Produits et Ma liste : contenu provisoire de l'ancien tableau de bord (remplacé aux étapes 3 et 5).
+- Profil : relevés, historique des scans, Mes magasins, export CSV, clé Mistral, données de démo.
+- Supprimés : onglets Résultats, Dashboard et Historique, ancien accueil, bouton Accueil des écrans de détail.
+
+### Étape 2 — Parcours en rayon (v2.2.0)
+
+- Scanner plein écran : la caméra s'allume dès le tap sur le bouton central ; bascule Code-barres / Ticket en haut ; « Choisir une photo » en bas ; on ne choisit plus le magasin avant de scanner.
+- Écran Résultat du scan (remplace la feuille `showPriceInputSheet`) : le produit (image, Nutri-Score, « Déjà vu dans N magasins », prix au kg / L), le comparatif vert / rouge (`StorePricesCard`) dès le scan, le prix avec le magasin pré-rempli (le dernier utilisé, modifiable d'un tap), « Enregistrer le prix » en bas. Enregistrer ramène directement à la caméra pour le produit suivant.
+- Bandeau « N prix enregistrés · Annuler le dernier » sur le scanner (remplace l'ancien onglet Résultats).
+- Produit jamais vu : seulement le prix à saisir.
+- Ticket : le magasin est demandé, pré-rempli, dans la confirmation du ticket.
+- Le style de l'écran Résultat du scan a été validé sur un prototype construit avec les vrais composants (néon, verre dépoli, `MagicButton`).
+
+### Étape 3 — Onglet Produits unique (v2.3.0)
+
+- Une seule liste : image, nom, « N prix · N magasins », meilleur prix en vert avec le magasin ; un tap ouvre la fiche.
+- Puces : Tous · En hausse · En baisse · Catégories.
+- Recherche tolérante (`ProductSearchQuery`), champ en bas de l'écran (sous le pouce).
+- Supprimés : l'écran Tous mes produits (`ProductSelectionScreen`) et les onglets provisoires « Où acheter » / « Évolution ».
+
+### Étape 4 — Fiche produit sur une page (v2.4.0)
+
+- Une page qui défile : en-tête (image, Nutri-Score, catégorie), meilleur prix et « + Ma liste », prix par magasin classés (un tap ouvre la feuille du magasin), évolution du prix, moins cher dans la catégorie, infos produit repliables.
+- En bas : « Ajouter un prix » et « Modifier » (corriger un prix, pas le bon produit, catégorie, supprimer).
+- Supprimés : les 4 onglets et le menu ⋮.
+
+### Étape 5 — Ma liste, vraie liste de courses (v2.5.0)
+
+- « + Ma liste » sur la fiche produit et sur le Résultat du scan, avec une quantité (stockage Hive).
+- Synthèse : meilleur magasin unique, panier panaché (chaque produit là où il est le moins cher) avec l'économie, une barre par magasin avec l'écart, produits sans prix connu dans un magasin.
+- Mêmes règles que le panier (v2.1.1) : aucun prix estimé.
+- Liste vide : le panier habituel, comme aujourd'hui.
+
+### Décisions prises
+
+- Style : on garde l'identité visuelle actuelle (titres néon, verre dépoli, dégradés teintés, `MagicButton`). Les propositions d'interface se montrent avec les vrais composants (prototype Flutter et captures), pas en maquettes plates.
+- Magasin : demandé au moment d'enregistrer le prix, pré-rempli avec le dernier utilisé (vérifier un prix n'a pas besoin du magasin).
+- Caméra : allumée au tap sur le bouton Scanner, jamais à l'ouverture de l'app.
+- Panier : seuls les prix réellement relevés comptent ; conclusion à partir de 3 produits en commun.
+- Hors périmètre (pas de données ou hors objectifs) : distance et carte des magasins, disponibilité, avis, recommandations « IA » personnalisées, alertes push, favoris, compte utilisateur.
+
+### Points ouverts
+
+- Recherche de l'onglet Produits : en bas (Règle 0, par défaut) ou en haut comme sur les maquettes de référence.
+- Catégories Open Food Facts dont le nom français manque : affichées en anglais (« Confectionary based spreads ») ; à corriger avant d'afficher plus de raccourcis de catégorie.
+- Données de démo : un seul produit relevé dans deux magasins, donc pas de conclusion du panier dans la démo.
+
+## Recherche, magasins de la fiche produit et comparatif au scan (v1.18.0 – v1.20.0)
+
+- Recherche de produit : `lib/utils/product_search.dart`. `normalizeForSearch` (minuscules, sans accents ni ponctuation) et `ProductSearchQuery.score` : chaque mot tapé doit correspondre à un mot du nom, de la marque, d'une catégorie, d'un magasin ou au code-barres (début de mot 3, milieu de mot 2 à partir de 3 lettres, une faute de frappe 1 à partir de 5 lettres), pondéré par champ (nom ×3, marque ×2, catégorie et magasin ×1, code-barres 9), +10 si le nom commence par la recherche. `null` = pas de correspondance. Utilisée par `HomeProductSearch`, `ProductsTab` (tri par pertinence, ordre d'origine à égalité) et `ProductSelectionScreen` (filtre seulement, le tri choisi reste).
+- Accueil (v1.20.0) : `HomeScreen` reçoit `products` (`ProductStorePrices.calculate(_sessions)`, recalculé dans `MainScreen._searchableProducts` seulement quand la liste `_sessions` change), `categoryOf`, `onProductTap` (fiche sur l'onglet Magasins, index 2) et `onSearchInDashboard` (incrémente `_dashboardSearchRequest` et passe `searchQuery` au `DashboardScreen`, repris par `ProductsTab.initialQuery`). La recherche n'apparaît que s'il y a au moins un produit vu dans un magasin.
+- Feuille d'un magasin (v1.18.0) : `showStoreEditSheet` (`lib/widgets/product_detail/store_edit_sheet.dart`) renvoie une `StoreEditAction` (`StoreMoved`, `StoreRenamed`, `StoreLastPriceEdit`, `StoreRemoved`) ; c'est `ProductDetailScreen._handleStoreCardEdit` qui écrit dans le dépôt. Elle s'ouvre au tap sur une carte de `StoreComparisonTab` ou par le menu ⋮ « Modifier un magasin » (`_pickStoreToEdit`). `showAddStorePriceSheet` + `ScanRepository.addPriceForProduct` ajoutent un prix sans scan : nouvel article copié du dernier scan à l'unité du produit (la contenance d'une ligne de ticket « x N » n'est pas reprise), dans sa propre session `barcode`.
+- Magasins dans le dépôt : un magasin n'est qu'un nom (`storeName` de l'article et de la session). `changeStoreForProduct` ne touche que les articles du produit ; une session ne prend le nouveau magasin que si tous ses articles y sont (`_syncScanStore`). `renameStore` change articles et sessions, puis `removeStore(ancien)` et `addCustomStore(nouveau)` dans cet ordre (le masquage compare sans la casse) et reporte le dernier magasin choisi. `unknownStoreLabel` (« Inconnu ») désigne les articles sans magasin, comme dans `getPriceHistoryByStore`. Le Scanner recharge sa liste de magasins (`_loadSavedStores`) à chaque nouvelle séance.
+- Comparatif au scan (v1.19.0) : `ScanScreen._knownPrices` → `ProductStorePrices.forProduct(sessions, 'bc_<EAN>')` ; s'il n'est pas `null`, `showPriceInputSheet(knownPrices:, currentStore:)` affiche `StorePricesCard` (`lib/widgets/store_prices_card.dart`). `buildStorePriceRows` remplace le prix du magasin courant par le prix tapé et donne à chaque ligne son rôle (`best`, `avoid` si le plus cher avec plus d'un centime d'écart, `other`, `alone`). La carte de conseil (`PriceAdviceCard`) n'est alors affichée que si elle propose un équivalent moins cher de la catégorie.
 
 ---
 

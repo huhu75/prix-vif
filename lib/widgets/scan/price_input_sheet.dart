@@ -6,16 +6,22 @@ import '../../services/open_food_facts_service.dart';
 import '../magic_button.dart';
 import '../price_advice_card.dart';
 import '../price_card.dart';
+import '../store_prices_card.dart';
 
 /// Demande le prix d'un produit scanné ; retourne `null` si l'utilisateur annule.
 /// [advise] calcule le conseil d'achat pour le prix saisi (`null` tant qu'il
 /// n'y a pas de prix) : la carte s'affiche dès le scan et se met à jour à
 /// chaque chiffre tapé.
+/// [knownPrices] : prix du produit déjà relevés dans chaque magasin (produit
+/// connu) ; le comparatif s'affiche dès le scan, avec [currentStore] repéré
+/// « ici » et le prix saisi pris en compte.
 Future<double?> showPriceInputSheet(
   BuildContext context,
   String barcode,
   OFFProduct? product, {
   PriceAdvice Function(double? price)? advise,
+  ProductStorePrices? knownPrices,
+  String? currentStore,
 }) async {
   final TextEditingController priceController = TextEditingController();
   final formKey = GlobalKey<FormState>();
@@ -31,6 +37,9 @@ Future<double?> showPriceInputSheet(
     backgroundColor: Colors.transparent,
     builder: (context) => StatefulBuilder(builder: (context, setSheetState) {
       final advice = advise?.call(typedPrice());
+      // Avec le comparatif des magasins, le conseil ne sert plus que pour
+      // l'équivalent moins cher de la catégorie
+      final showAdvice = advice != null && (knownPrices == null || advice.cheaperEquivalent != null);
       return Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
@@ -170,6 +179,15 @@ Future<double?> showPriceInputSheet(
                 ),
               ),
               
+              // Produit déjà vu : où l'acheter, où ne pas l'acheter
+              if (knownPrices != null) ...[
+                const SizedBox(height: 12),
+                StorePricesCard(
+                  prices: knownPrices,
+                  currentStore: currentStore,
+                  typedPrice: typedPrice(),
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
                 'Code-barres scanné : $barcode',
@@ -179,7 +197,7 @@ Future<double?> showPriceInputSheet(
                 textAlign: TextAlign.center,
               ),
               // Conseil d'achat pour le magasin choisi (mis à jour avec le prix saisi)
-              if (advice != null) ...[
+              if (showAdvice) ...[
                 const SizedBox(height: 12),
                 PriceAdviceCard(advice: advice),
               ],
