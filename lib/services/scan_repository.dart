@@ -452,6 +452,31 @@ class ScanRepository {
     return items;
   }
 
+  /// Nom affiché par la fiche produit pour les scans sans magasin
+  static const String unknownStoreLabel = 'Inconnu';
+
+  /// L'article est-il affiché sous [storeName] dans la fiche produit ?
+  /// ([unknownStoreLabel] regroupe les articles sans magasin)
+  static bool _isInStore(String? articleStore, String storeName) {
+    final store = articleStore?.trim() ?? '';
+    if (storeName == unknownStoreLabel) return store.isEmpty || store == unknownStoreLabel;
+    return store == storeName.trim();
+  }
+
+  /// Magasin d'une session : celui de ses articles s'ils sont tous du même
+  /// magasin (sinon il ne change pas, ex. un ticket corrigé article par article)
+  Future<void> _syncScanStore(String scanId) async {
+    final scanMap = _scansBox.get(scanId);
+    if (scanMap == null) return;
+    final stores = _articlesBox.values
+        .where((a) => a['scanId'] == scanId)
+        .map((a) => (a['storeName'] as String?)?.trim() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet();
+    if (stores.length != 1 || scanMap['storeName'] == stores.single) return;
+    await _scansBox.put(scanId, {...Map<String, dynamic>.from(scanMap), 'storeName': stores.single});
+  }
+
   /// Change le magasin de tous les scans d'un produit (ou ceux associés à un magasin particulier)
   Future<int> changeStoreForProduct(String productId, String? oldStore, String newStore) async {
     final cleanNewStore = newStore.trim();
@@ -459,10 +484,11 @@ class ScanRepository {
 
     final allArticles = getAllStoredArticles();
     int count = 0;
+    final touchedScans = <String>{};
 
     for (final article in allArticles) {
       if (_matchesProduct(article.toMap(), productId)) {
-        if (oldStore != null && oldStore.isNotEmpty && article.storeName != oldStore) {
+        if (oldStore != null && oldStore.isNotEmpty && !_isInStore(article.storeName, oldStore)) {
           continue;
         }
 
@@ -484,19 +510,101 @@ class ScanRepository {
         );
 
         await _articlesBox.put(article.id, updatedArticle.toMap());
-
-        // Synchroniser le magasin de la session parente si session barcode ou à magasin unique
-        final scanMap = _scansBox.get(article.scanId);
-        if (scanMap != null &&
-            (scanMap['type'] == 'barcode' || scanMap['storeName'] == oldStore || scanMap['storeName'] == null)) {
-          final updatedScanMap = Map<String, dynamic>.from(scanMap);
-          updatedScanMap['storeName'] = cleanNewStore;
-          await _scansBox.put(article.scanId, updatedScanMap);
-        }
+        touchedScans.add(article.scanId);
         count++;
       }
     }
+    // Sessions dont tous les articles sont maintenant dans le nouveau magasin
+    for (final scanId in touchedScans) {
+      await _syncScanStore(scanId);
+    }
+    // Nouveau magasin proposé ensuite dans le scanner
+    if (count > 0) await addCustomStore(cleanNewStore);
     return count;
+  }
+
+  /// Nombre d'articles (tous produits confondus) enregistrés dans [storeName]
+  int countStoreArticles(String storeName) =>
+      _articlesBox.values.where((a) => _isInStore(a['storeName'] as String?, storeName)).length;
+
+  /// Renomme un magasin partout : articles, sessions, liste du scanner et
+  /// dernier magasin choisi. Renommer vers un magasin existant fusionne les
+  /// deux (ex. corriger « Carefour » en « Carrefour »).
+  /// Retourne le nombre d'articles modifiés.
+  Future<int> renameStore(String oldName, String newName) async {
+    final from = oldName.trim();
+    final to = newName.trim();
+    if (from.isEmpty || to.isEmpty || from == to || from == unknownStoreLabel) return 0;
+
+    var count = 0;
+    for (final key in _articlesBox.keys.toList()) {
+      final map = _articlesBox.get(key);
+      if (map == null || (map['storeName'] as String?)?.trim() != from) continue;
+      await _articlesBox.put(key, {...Map<String, dynamic>.from(map), 'storeName': to});
+      count++;
+    }
+    for (final key in _scansBox.keys.toList()) {
+      final map = _scansBox.get(key);
+      if (map == null || (map['storeName'] as String?)?.trim() != from) continue;
+      await _scansBox.put(key, {...Map<String, dynamic>.from(map), 'storeName': to});
+    }
+
+    // Liste du scanner : l'ancien nom disparaît, le nouveau le remplace (dans
+    // cet ordre : un simple changement de majuscules reste visible)
+    final wasSelected = getSelectedStore()?.trim().toLowerCase() == from.toLowerCase();
+    await removeStore(from);
+    await addCustomStore(to);
+    if (wasSelected) await saveSelectedStore(to);
+    return count;
+  }
+
+  /// Enregistre un prix relevé sans scanner (depuis la fiche produit) : un
+  /// nouvel article copié du scan le plus récent du produit, dans sa propre
+  /// session. Retourne `null` si le produit n'a aucun scan.
+  Future<ScannedItem?> addPriceForProduct(
+    String productId, {
+    required String storeName,
+    required double price,
+    DateTime? date,
+  }) async {
+    final store = storeName.trim();
+    if (store.isEmpty) return null;
+    final articles = getArticlesForProduct(productId);
+    if (articles.isEmpty) return null;
+    // Référence : de préférence un scan d'un seul article (une ligne de ticket
+    // « x 2 » est un pack, sa contenance ne vaut pas pour un prix à l'unité)
+    final reference = articles.firstWhere(
+      (a) => !(a.unit?.trim().startsWith('x ') ?? false),
+      orElse: () => articles.first,
+    );
+    final isPack = reference.unit?.trim().startsWith('x ') ?? false;
+    final when = date ?? DateTime.now();
+    final id = 'manual_${when.microsecondsSinceEpoch}';
+    final item = ScannedItem(
+      id: id,
+      name: reference.name,
+      brand: reference.brand,
+      price: price,
+      currency: reference.currency,
+      quantity: isPack ? null : reference.quantity,
+      unit: isPack ? null : reference.unit,
+      scanDate: when,
+      imageUrl: reference.imageUrl,
+      barcode: reference.barcode,
+      storeName: store,
+      nutriscore: reference.nutriscore,
+      categories: reference.categories,
+    );
+    await saveScan(ScanSession(
+      id: id,
+      items: [item],
+      date: when,
+      endDate: when,
+      storeName: store,
+      type: 'barcode',
+    ));
+    await addCustomStore(store);
+    return item;
   }
 
   /// Récupère la liste de tous les magasins connus (historique + personnalisés + courants),

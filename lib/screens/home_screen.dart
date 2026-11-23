@@ -1,26 +1,41 @@
 // Page d'accueil : point d'entrée de l'app, avec les 3 actions principales
 import 'package:flutter/material.dart';
+import '../analytics/analytics.dart';
 import '../theme.dart';
+import '../widgets/home_product_search.dart';
 import '../widgets/logo.dart';
 import '../widgets/magic_title.dart';
 
 /// Page d'accueil affichée à l'ouverture de l'app.
-/// Chaque carte mène à une action : scan de code-barres, scan de ticket,
+/// En haut, la recherche d'un produit déjà scanné (dès qu'il y en a un) ;
+/// puis une carte par action : scan de code-barres, scan de ticket,
 /// analyse des produits et des magasins.
 class HomeScreen extends StatelessWidget {
   final VoidCallback onScanBarcode;
   final VoidCallback onScanTicket;
   final VoidCallback onOpenAnalysis;
 
-  /// « Où acheter un produit ? » : recherche dans l'onglet Produits du tableau de bord
-  final VoidCallback? onFindWhereToBuy;
+  /// Produits vus dans au moins un magasin, pour la recherche
+  final List<ProductStorePrices> products;
+
+  /// Catégorie d'un produit (recherche par catégorie), `null` si inconnue
+  final String? Function(ProductStorePrices product)? categoryOf;
+
+  /// Ouvre la fiche d'un produit trouvé ; sans lui, pas de recherche
+  final void Function(String productId, String productName)? onProductTap;
+
+  /// « Comparer dans le tableau de bord » : la recherche reprise dans l'onglet Produits
+  final ValueChanged<String>? onSearchInDashboard;
 
   const HomeScreen({
     super.key,
     required this.onScanBarcode,
     required this.onScanTicket,
     required this.onOpenAnalysis,
-    this.onFindWhereToBuy,
+    this.products = const [],
+    this.categoryOf,
+    this.onProductTap,
+    this.onSearchInDashboard,
   });
 
   @override
@@ -54,6 +69,17 @@ class HomeScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
                 ),
+                // Retrouver un produit déjà scanné : le magasin le moins cher, puis sa fiche
+                if (onProductTap != null && products.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  HomeProductSearch(
+                    products: products,
+                    categoryOf: categoryOf,
+                    onProductTap: onProductTap!,
+                    onSeeAll: onSearchInDashboard,
+                    onScanBarcode: onScanBarcode,
+                  ),
+                ],
                 const SizedBox(height: 32),
                 HomeActionCard(
                   key: const ValueKey('home_scan_barcode'),
@@ -72,17 +98,6 @@ class HomeScreen extends StatelessWidget {
                   color: AppTheme.secondary,
                   onTap: onScanTicket,
                 ),
-                if (onFindWhereToBuy != null) ...[
-                  const SizedBox(height: 16),
-                  HomeActionCard(
-                    key: const ValueKey('home_where_to_buy'),
-                    icon: Icons.travel_explore,
-                    title: 'Où acheter un produit ?',
-                    subtitle: 'Cherche un produit ou une catégorie : le magasin le moins cher',
-                    color: AppTheme.warning,
-                    onTap: onFindWhereToBuy!,
-                  ),
-                ],
                 const SizedBox(height: 16),
                 HomeActionCard(
                   key: const ValueKey('home_analysis'),

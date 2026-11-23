@@ -168,6 +168,8 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       _compressedImageBytes = null;
       _compressionMessage = null;
       cameraNeedsSync = true;
+      // Magasins renommés ou ajoutés depuis une fiche produit
+      _loadSavedStores();
     }
 
     // Mode demandé depuis l'accueil. Le parent connaît déjà le type de scan :
@@ -751,6 +753,20 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     }
   }
 
+  /// Derniers prix du produit [barcode] dans chaque magasin, `null` s'il n'a
+  /// jamais été scanné dans un magasin
+  Future<ProductStorePrices?> _knownPrices(String barcode) async {
+    final repository = widget.repository;
+    if (repository == null || barcode.trim().isEmpty) return null;
+    try {
+      final sessions = await repository.getAllScans();
+      return ProductStorePrices.forProduct(sessions, 'bc_${barcode.trim()}');
+    } catch (e) {
+      debugPrint('Prix connus indisponibles : $e');
+      return null;
+    }
+  }
+
   void _onBarcodeScanned(List<Barcode> barcodes) async {
     if (_isProcessingScan) return;
     if (_cameraService.isScanning && barcodes.isNotEmpty) {
@@ -794,8 +810,19 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       final advise = await _buildAdvisor(barcodeValue, product);
       if (!mounted) return;
 
+      // Produit déjà vu : comparatif des magasins affiché dès le scan
+      final knownPrices = await _knownPrices(barcodeValue);
+      if (!mounted) return;
+
       // Demander le prix à l'utilisateur en passant le produit récupéré (ou null)
-      final double? price = await showPriceInputSheet(context, barcodeValue, product, advise: advise);
+      final double? price = await showPriceInputSheet(
+        context,
+        barcodeValue,
+        product,
+        advise: advise,
+        knownPrices: knownPrices,
+        currentStore: _selectedStore,
+      );
       
       if (price != null) {
         // Traiter le code scanné

@@ -13,8 +13,12 @@ import '../price_advice_card.dart';
 
 class StoreComparisonTab extends StatelessWidget {
   final ProductAnalysisResult analysis;
-  final Function(String) onStoreDeleted;
-  final Function(String)? onStoreEdit;
+
+  /// Ouvre la feuille d'un magasin (changer, renommer, corriger le prix, retirer)
+  final void Function(String storeName)? onStoreEdit;
+
+  /// Ajoute un prix relevé dans un magasin, sans scanner
+  final VoidCallback? onAddPrice;
 
   /// Conseil d'achat dans chaque magasin (recommandé / trop cher)
   final Map<String, PriceAdvice> adviceByStore;
@@ -22,8 +26,8 @@ class StoreComparisonTab extends StatelessWidget {
   const StoreComparisonTab({
     super.key,
     required this.analysis,
-    required this.onStoreDeleted,
     this.onStoreEdit,
+    this.onAddPrice,
     this.adviceByStore = const {},
   });
 
@@ -150,6 +154,13 @@ class StoreComparisonTab extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (onStoreEdit != null && stores.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Touche un magasin pour le changer, le renommer ou corriger son prix',
+              style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textMuted),
+            ),
+          ],
           const SizedBox(height: 12),
           
           // Afficher un message si pas de magasin
@@ -176,9 +187,24 @@ class StoreComparisonTab extends StatelessWidget {
                 isCheapest: isCheapest,
                 advice: adviceByStore[entry.key],
                 onEdit: onStoreEdit != null ? () => onStoreEdit!(storeInfo.storeName) : null,
-                onDelete: () => onStoreDeleted(storeInfo.storeName),
               );
             }),
+          ],
+
+          // Prix vu dans un autre magasin, sans scanner
+          if (onAddPrice != null) ...[
+            const SizedBox(height: 4),
+            OutlinedButton.icon(
+              key: const ValueKey('add_store_price'),
+              onPressed: onAddPrice,
+              icon: const Icon(Icons.add_business_outlined),
+              label: const Text('Ajouter un prix dans un magasin'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
           ],
           
           // Résumé - seulement si au moins 2 magasins
@@ -293,8 +319,9 @@ class _StorePriceBarChart extends StatelessWidget {
 class _StorePriceCard extends StatelessWidget {
   final StorePriceInfo storeInfo;
   final bool isCheapest;
+
+  /// Toucher la carte ouvre la feuille du magasin
   final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
 
   /// Conseil d'achat dans ce magasin
   final PriceAdvice? advice;
@@ -304,7 +331,6 @@ class _StorePriceCard extends StatelessWidget {
     required this.storeInfo,
     this.isCheapest = false,
     this.onEdit,
-    this.onDelete,
     this.advice,
   });
 
@@ -342,94 +368,93 @@ class _StorePriceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
         color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: isCheapest 
-            ? Border.all(color: Colors.green, width: 2)
-            : Border.all(color: AppTheme.surfaceLight, width: 1),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: isCheapest
+              ? const BorderSide(color: Colors.green, width: 2)
+              : const BorderSide(color: AppTheme.surfaceLight, width: 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('store_card_${storeInfo.storeName}'),
+          onTap: onEdit,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Text(
-                  storeInfo.storeName,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        storeInfo.storeName,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Dernier scan : ${_formatDate(storeInfo.lastScanDate)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                      ?_verdict(theme),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Dernier scan : ${_formatDate(storeInfo.lastScanDate)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textMuted,
-                    fontSize: 11,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Prix
+                    Text(
+                      '${storeInfo.lastPrice.toStringAsFixed(2)} €',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: isCheapest ? Colors.green : AppTheme.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Prix moyen
+                    Text(
+                      'Moy. : ${storeInfo.averagePrice.toStringAsFixed(2)} €',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Nombre de scans
+                    Text(
+                      '${storeInfo.scanCount} scan${storeInfo.scanCount > 1 ? 's' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
                 ),
-                ?_verdict(theme),
+                // Repère « modifiable » : la carte entière ouvre la feuille du magasin
+                if (onEdit != null) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    key: ValueKey('edit_store_btn_${storeInfo.storeName}'),
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    color: AppTheme.accent,
+                    tooltip: 'Modifier ce magasin',
+                    onPressed: onEdit,
+                  ),
+                ],
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Prix
-              Text(
-                '${storeInfo.lastPrice.toStringAsFixed(2)} €',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: isCheapest ? Colors.green : AppTheme.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 4),
-              // Prix moyen
-              Text(
-                'Moy. : ${storeInfo.averagePrice.toStringAsFixed(2)} €',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              // Nombre de scans
-              Text(
-                '${storeInfo.scanCount} scan${storeInfo.scanCount > 1 ? 's' : ''}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-          // Bouton de modification (changer le magasin ou corriger le prix)
-          if (onEdit != null) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              key: ValueKey('edit_store_btn_${storeInfo.storeName}'),
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              color: AppTheme.accent,
-              tooltip: 'Modifier ce magasin ou corriger le prix',
-              onPressed: onEdit,
-            ),
-          ],
-          // Bouton de suppression
-          if (onDelete != null) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.delete_forever, size: 18),
-              color: Colors.red.withValues(alpha: 0.7),
-              tooltip: 'Supprimer ce magasin',
-              onPressed: onDelete,
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

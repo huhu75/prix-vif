@@ -14,6 +14,7 @@ import '../widgets/product_detail/category_tab.dart';
 import '../widgets/product_detail/price_evolution_tab.dart';
 import '../widgets/product_detail/product_info_tab.dart';
 import '../widgets/product_detail/store_comparison_tab.dart';
+import '../widgets/product_detail/store_edit_sheet.dart';
 
 /// Écran de détails d'un produit avec analyse complète
 /// Contient 4 onglets : Fiche, Évolution des prix, Magasins (avec conseil
@@ -126,13 +127,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       
       // Recharger l'analyse pour mettre à jour l'UI
       await _loadAnalysis();
+      await widget.onChanged?.call();
       
       // Afficher un message de confirmation
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.green,
-            content: Text('Magasin "$storeName" supprimé avec succès'),
+            content: Text('« $storeName » retiré de ce produit'),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -285,145 +287,71 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  /// Change le magasin de ce produit (pour un magasin cible ou tous ses magasins)
-  Future<void> _handleChangeStore({String? targetOldStore}) async {
-    final stores = _analysisResult?.storeComparison.storePrices.keys.toList() ?? [];
-    String? selectedOldStore = targetOldStore ?? (stores.isNotEmpty ? stores.first : null);
-    final storeController = TextEditingController(text: selectedOldStore ?? '');
-    final knownStores = widget.repository.getAllKnownStores();
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), duration: const Duration(seconds: 3)),
+    );
+  }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: AppTheme.surfaceDark,
-            title: const Text('Changer de magasin'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (targetOldStore == null && stores.length > 1) ...[
-                    const Text(
-                      'Magasin actuel à remplacer :',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String?>(
-                      initialValue: selectedOldStore,
-                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Tous les magasins du produit'),
-                        ),
-                        ...stores.map((s) => DropdownMenuItem<String?>(
-                              value: s,
-                              child: Text(s),
-                            )),
-                      ],
-                      onChanged: (val) {
-                        setDialogState(() {
-                          selectedOldStore = val;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ] else if (selectedOldStore != null) ...[
-                    Text(
-                      'Remplacer le magasin « $selectedOldStore » par :',
-                      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-                  ] else ...[
-                    const Text(
-                      'Définir le nouveau magasin :',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  TextFormField(
-                    key: const ValueKey('change_store_input'),
-                    controller: storeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nouveau magasin',
-                      hintText: 'ex. Leclerc, Carrefour, Lidl...',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Suggestions :',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                  ),
-                  const SizedBox(height: 4),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+  /// Menu ⋮ « Modifier un magasin » : la feuille du magasin, après avoir
+  /// choisi lequel si le produit en a plusieurs
+  Future<void> _pickStoreToEdit() async {
+    final stores = _analysisResult?.storeComparison.storesSortedByPrice.map((s) => s.storeName).toList() ?? [];
+    if (stores.isEmpty) {
+      _showMessage('Aucun magasin pour ce produit : ajoute un prix d\'abord');
+      return;
+    }
+    final store = stores.length == 1
+        ? stores.single
+        : await showDialog<String>(
+            context: context,
+            builder: (dialogContext) => SimpleDialog(
+              backgroundColor: AppTheme.surfaceDark,
+              title: const Text('Quel magasin ?'),
+              children: [
+                for (final store in stores)
+                  SimpleDialogOption(
+                    key: ValueKey('pick_store_$store'),
+                    onPressed: () => Navigator.of(dialogContext).pop(store),
                     child: Row(
                       children: [
-                        for (final s in knownStores)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ActionChip(
-                              label: Text(s, style: const TextStyle(fontSize: 11)),
-                              onPressed: () {
-                                setDialogState(() {
-                                  storeController.text = s;
-                                });
-                              },
-                              backgroundColor: storeController.text.toLowerCase() == s.toLowerCase()
-                                  ? AppTheme.accent.withValues(alpha: 0.25)
-                                  : AppTheme.surfaceLight,
-                              padding: EdgeInsets.zero,
-                            ),
-                          ),
+                        const Icon(Icons.storefront_outlined, color: AppTheme.primary),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(store)),
+                        Text(
+                          '${_analysisResult!.storeComparison.storePrices[store]!.lastPrice.toStringAsFixed(2)} €',
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Annuler'),
-              ),
-              FilledButton(
-                key: const ValueKey('confirm_change_store'),
-                onPressed: () {
-                  if (storeController.text.trim().isNotEmpty) {
-                    Navigator.of(dialogContext).pop(true);
-                  }
-                },
-                child: const Text('Valider'),
-              ),
-            ],
           );
-        },
-      ),
+    if (store != null && mounted) await _handleStoreCardEdit(store);
+  }
+
+  /// Ajoute un prix vu dans un magasin, sans scanner le produit
+  Future<void> _addStorePrice() async {
+    final productStores = _analysisResult?.storeComparison.storePrices.keys.toList() ?? const <String>[];
+    final result = await showAddStorePriceSheet(
+      context,
+      productName: _analysisResult?.productName ?? widget.productName,
+      knownStores: widget.repository.getAllKnownStores(),
+      productStores: productStores,
     );
-
-    if (confirmed != true || !mounted) return;
-    final newStore = storeController.text.trim();
-    if (newStore.isEmpty) return;
-
-    final count = await widget.repository.changeStoreForProduct(
+    if (result == null || !mounted) return;
+    final added = await widget.repository.addPriceForProduct(
       widget.productId,
-      selectedOldStore,
-      newStore,
+      storeName: result.store,
+      price: result.price,
     );
     await _loadAnalysis();
     await widget.onChanged?.call();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Magasin mis à jour pour $count scan${count > 1 ? "s" : ""} ($newStore)'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    _showMessage(added == null
+        ? 'Impossible d\'ajouter ce prix'
+        : 'Prix ajouté : ${result.price.toStringAsFixed(2)} € chez ${result.store}');
   }
 
   /// Ouvre une feuille listant tous les scans du produit pour en corriger un
@@ -522,50 +450,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// Action depuis la carte d'un magasin dans StoreComparisonTab
+  /// Feuille d'un magasin (carte de l'onglet Magasins ou menu ⋮) : changer
+  /// de magasin pour ce produit, renommer le magasin partout, corriger le
+  /// dernier prix ou retirer le magasin
   Future<void> _handleStoreCardEdit(String storeName) async {
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        title: Text('Magasin « $storeName »'),
-        children: [
-          SimpleDialogOption(
-            key: const ValueKey('store_choice_change_store'),
-            onPressed: () => Navigator.of(dialogContext).pop('change_store'),
-            child: const Row(
-              children: [
-                Icon(Icons.store, color: AppTheme.accent),
-                SizedBox(width: 12),
-                Text('Changer le magasin pour ce produit'),
-              ],
-            ),
-          ),
-          SimpleDialogOption(
-            key: const ValueKey('store_choice_edit_price'),
-            onPressed: () => Navigator.of(dialogContext).pop('edit_price'),
-            child: const Row(
-              children: [
-                Icon(Icons.edit, color: AppTheme.primary),
-                SizedBox(width: 12),
-                Text('Modifier le dernier prix dans ce magasin'),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final info = _analysisResult?.storeComparison.storePrices[storeName];
+    if (info == null) return;
+    final isUnknown = storeName == ScanRepository.unknownStoreLabel;
+    final action = await showStoreEditSheet(
+      context,
+      storeName: storeName,
+      lastPrice: info.lastPrice,
+      productScanCount: info.scanCount,
+      storeScanCount: widget.repository.countStoreArticles(storeName),
+      knownStores: widget.repository.getAllKnownStores(),
+      canRename: !isUnknown,
+      canRemove: !isUnknown,
     );
+    if (action == null || !mounted) return;
 
-    if (choice == 'change_store') {
-      await _handleChangeStore(targetOldStore: storeName);
-    } else if (choice == 'edit_price') {
-      final articles = widget.repository
-          .getArticlesForProduct(widget.productId)
-          .where((a) => a.storeName == storeName)
-          .toList();
-      if (articles.isNotEmpty) {
-        await _openEditDialogForItem(articles.first);
-      }
+    switch (action) {
+      case StoreMoved(:final newStore):
+        final count = await widget.repository.changeStoreForProduct(widget.productId, storeName, newStore);
+        await _loadAnalysis();
+        await widget.onChanged?.call();
+        _showMessage('$count scan${count > 1 ? 's' : ''} déplacé${count > 1 ? 's' : ''} vers $newStore');
+      case StoreRenamed(:final newName):
+        final count = await widget.repository.renameStore(storeName, newName);
+        await _loadAnalysis();
+        await widget.onChanged?.call();
+        _showMessage('« $storeName » renommé en « $newName » ($count scan${count > 1 ? 's' : ''})');
+      case StoreLastPriceEdit():
+        final articles = widget.repository
+            .getArticlesForProduct(widget.productId)
+            .where((a) => isUnknown ? (a.storeName?.trim().isEmpty ?? true) : a.storeName == storeName)
+            .toList();
+        if (articles.isNotEmpty) await _openEditDialogForItem(articles.first);
+      case StoreRemoved():
+        await _handleStoreDeleted(storeName);
     }
   }
 
@@ -635,7 +557,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     _handleEditScansList();
                     break;
                   case 'change_store':
-                    _handleChangeStore();
+                    _pickStoreToEdit();
+                    break;
+                  case 'add_price':
+                    _addStorePrice();
                     break;
                   case 'rematch':
                     _rematchProduct();
@@ -659,7 +584,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   value: 'change_store',
                   child: ListTile(
                     leading: Icon(Icons.store, color: AppTheme.primary),
-                    title: Text('Changer de magasin'),
+                    title: Text('Modifier un magasin'),
+                  ),
+                ),
+                PopupMenuItem(
+                  key: ValueKey('action_add_price'),
+                  value: 'add_price',
+                  child: ListTile(
+                    leading: Icon(Icons.add_business_outlined, color: AppTheme.primary),
+                    title: Text('Ajouter un prix dans un magasin'),
                   ),
                 ),
                 PopupMenuItem(
@@ -701,8 +634,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // Onglet 2 : Comparaison par magasin
             StoreComparisonTab(
               analysis: _analysisResult!,
-              onStoreDeleted: _handleStoreDeleted,
               onStoreEdit: _handleStoreCardEdit,
+              onAddPrice: _addStorePrice,
               adviceByStore: _data?.adviceByStore ?? const {},
             ),
 

@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../analytics/product_observation.dart';
 import '../models/product_analysis_models.dart';
 import '../services/scan_repository.dart';
+import '../utils/product_search.dart';
 import '../utils/product_type_utils.dart';
 import '../widgets/magic_title.dart';
 import '../widgets/nav_buttons.dart';
@@ -133,25 +134,23 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   }
 
   void _filterAndSortProducts() {
-    final query = _searchQuery.trim().toLowerCase();
+    final query = ProductSearchQuery(_searchQuery);
     _filteredProducts = _products.where((product) {
       // Filtre par type de produit (catégorie OFF)
       if (_selectedType != null &&
           (_typeOf(product) ?? uncategorizedTypeLabel) != _selectedType) {
         return false;
       }
-      // Sans recherche textuelle, le filtre par type suffit
-      if (query.isEmpty) return true;
-      // Recherche dans le nom, la marque, le code-barres ET les catégories
+      // Recherche tolérante (accents, début de mot, faute de frappe) dans le
+      // nom, la marque, le code-barres, les catégories et les magasins
       // (permet de trouver un produit en tapant son type, ex: "lait")
-      final nameMatch = product.productName.toLowerCase().contains(query);
-      final brandMatch =
-          product.brand?.toLowerCase().contains(query) ?? false;
-      final barcodeMatch = product.barcode?.contains(_searchQuery) ?? false;
-      final categoryMatch =
-          (_typeOf(product)?.toLowerCase().contains(query) ?? false) ||
-              (product.categories?.any((c) => c.toLowerCase().contains(query)) ?? false);
-      return nameMatch || brandMatch || barcodeMatch || categoryMatch;
+      return query.matches(
+        name: product.productName,
+        brand: product.brand,
+        barcode: product.barcode,
+        categories: [?_typeOf(product), ...?product.categories],
+        stores: product.storeNames,
+      );
     }).toList();
     _applySort();
   }
@@ -210,7 +209,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: TextField(
                     decoration: InputDecoration(
-                      hintText: 'Rechercher un produit...',
+                      hintText: 'Produit, marque, catégorie ou magasin',
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
                         color: AppTheme.textMuted,
                       ),
@@ -356,6 +355,8 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
           // retrouve ainsi tous les scans du produit, pas seulement le premier
           productId: (product.barcode?.isNotEmpty ?? false) ? product.barcode! : product.productName,
           productName: product.productName,
+          // Onglet Magasins : le prix dans chaque magasin, modifiable
+          initialTabIndex: 2,
           onChanged: widget.onChanged,
         ),
       ),

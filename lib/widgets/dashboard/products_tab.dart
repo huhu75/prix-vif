@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../analytics/analytics.dart';
 import '../../models/product_category.dart';
 import '../../theme.dart';
+import '../../utils/product_search.dart';
 import '../../utils/unit_price.dart';
 import 'dashboard_card.dart';
 import 'section_header.dart';
@@ -26,6 +27,9 @@ class ProductsTab extends StatefulWidget {
   /// Place le curseur dans la recherche à l'ouverture (« Où l'acheter ? »)
   final bool autofocusSearch;
 
+  /// Recherche déjà tapée (depuis la recherche de l'accueil)
+  final String initialQuery;
+
   const ProductsTab({
     super.key,
     required this.products,
@@ -33,6 +37,7 @@ class ProductsTab extends StatefulWidget {
     this.categoryOf = _noCategory,
     required this.onProductTap,
     this.autofocusSearch = false,
+    this.initialQuery = '',
   });
 
   static ProductCategory? _noCategory(ProductStorePrices _) => null;
@@ -42,8 +47,9 @@ class ProductsTab extends StatefulWidget {
 }
 
 class _ProductsTabState extends State<ProductsTab> {
-  final TextEditingController _search = TextEditingController();
-  String _query = '';
+  late final TextEditingController _search = TextEditingController(text: widget.initialQuery);
+  late String _query = widget.initialQuery.trim();
+  late ProductSearchQuery _searchQuery = ProductSearchQuery(_query);
   _ProductsView _view = _ProductsView.byProduct;
 
   @override
@@ -52,15 +58,39 @@ class _ProductsTabState extends State<ProductsTab> {
     super.dispose();
   }
 
-  bool _matchesProduct(ProductStorePrices product) {
-    if (_query.isEmpty) return true;
-    final category = widget.categoryOf(product)?.label ?? '';
-    return '${product.name} ${product.brand ?? ''} $category'.toLowerCase().contains(_query);
-  }
+  void _setQuery(String value) => setState(() {
+        _query = value.trim();
+        _searchQuery = ProductSearchQuery(_query);
+      });
+
+  /// Pertinence d'un produit pour la recherche (nom, marque, catégorie,
+  /// magasins), `null` s'il ne correspond pas
+  double? _scoreOf(ProductStorePrices product) => _searchQuery.score(
+        name: product.name,
+        brand: product.brand,
+        categories: [?widget.categoryOf(product)?.label],
+        stores: product.storePrices.map((p) => p.storeName),
+      );
+
+  bool _matchesProduct(ProductStorePrices product) => _scoreOf(product) != null;
 
   bool _matchesGroup(CategoryGroup group) {
-    if (_query.isEmpty || group.category.label.toLowerCase().contains(_query)) return true;
-    return group.offers.any((o) => '${o.name} ${o.brand ?? ''}'.toLowerCase().contains(_query));
+    if (_searchQuery.isEmpty || _searchQuery.matches(name: group.category.label)) return true;
+    return group.offers.any((o) => _searchQuery.matches(name: o.name, brand: o.brand, stores: [o.storeName]));
+  }
+
+  /// Produits qui correspondent, les plus pertinents d'abord (ordre d'origine
+  /// sans recherche ou à pertinence égale)
+  List<ProductStorePrices> _visibleProducts() {
+    if (_searchQuery.isEmpty) return widget.products;
+    final scored = [
+      for (final (index, product) in widget.products.indexed)
+        if (_scoreOf(product) case final score?) (product: product, score: score, index: index),
+    ]..sort((a, b) {
+        final byScore = b.score.compareTo(a.score);
+        return byScore != 0 ? byScore : a.index.compareTo(b.index);
+      });
+    return [for (final entry in scored) entry.product];
   }
 
   @override
@@ -73,7 +103,7 @@ class _ProductsTabState extends State<ProductsTab> {
           key: const ValueKey('dashboard_product_search'),
           controller: _search,
           autofocus: widget.autofocusSearch,
-          onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
+          onChanged: _setQuery,
           decoration: InputDecoration(
             hintText: 'Où l\'acheter ? Produit, marque ou catégorie',
             prefixIcon: const Icon(Icons.search),
@@ -83,10 +113,10 @@ class _ProductsTabState extends State<ProductsTab> {
                 : IconButton(
                     icon: const Icon(Icons.close),
                     tooltip: 'Effacer',
-                    onPressed: () => setState(() {
+                    onPressed: () {
                       _search.clear();
-                      _query = '';
-                    }),
+                      _setQuery('');
+                    },
                   ),
           ),
         ),
@@ -117,7 +147,7 @@ class _ProductsTabState extends State<ProductsTab> {
   }
 
   List<Widget> _buildByProduct() {
-    final visible = widget.products.where(_matchesProduct).toList();
+    final visible = _visibleProducts();
     if (visible.isEmpty) return [_noMatch()];
     final compared = visible.where((p) => p.hasPriceDifference).toList();
     final single = visible.where((p) => !p.hasPriceDifference).toList();

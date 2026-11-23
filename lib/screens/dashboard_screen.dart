@@ -34,6 +34,9 @@ class DashboardScreen extends StatelessWidget {
   /// le curseur dans la recherche
   final int searchRequestId;
 
+  /// Texte déjà tapé dans la recherche de l'accueil (repris par l'onglet Produits)
+  final String searchQuery;
+
   const DashboardScreen({
     super.key,
     required this.sessions,
@@ -43,6 +46,7 @@ class DashboardScreen extends StatelessWidget {
     this.repository,
     this.onBack,
     this.searchRequestId = 0,
+    this.searchQuery = '',
   });
 
   // Onglets de la fiche produit ouverts depuis le tableau de bord
@@ -87,6 +91,7 @@ class DashboardScreen extends StatelessWidget {
               categoryGroups: stats.categoryGroups,
               categoryOf: stats.categoryOf,
               autofocusSearch: searchRequestId > 0,
+              initialQuery: searchQuery,
               onProductTap: (id, name) => _openProduct(context, id, name, _productStoresTab),
             ),
             StoresTab(

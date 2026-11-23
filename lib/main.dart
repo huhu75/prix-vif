@@ -15,6 +15,7 @@ import 'services/scan_repository.dart';
 import 'services/mistral_service.dart';
 import 'services/category_service.dart';
 import 'models/product_category.dart';
+import 'analytics/analytics.dart';
 import 'widgets/nav_buttons.dart';
 
 // Point d'entree de l'application
@@ -81,8 +82,14 @@ class _MainScreenState extends State<MainScreen> {
   // l'accueil (le magasin est alors à choisir de nouveau)
   int _scanSessionId = 0;
 
-  // « Où acheter un produit ? » : chaque demande ouvre la recherche du Dashboard
+  // Recherche de l'accueil reprise dans le Dashboard : chaque demande ouvre
+  // l'onglet Produits avec ce texte dans sa recherche
   int _dashboardSearchRequest = 0;
+  String _dashboardSearchQuery = '';
+
+  // Produits de la recherche de l'accueil, recalculés quand les sessions changent
+  List<ProductStorePrices> _homeProducts = const [];
+  List<ScanSession>? _homeProductsSource;
 
   // Repository pour la persistance
   final ScanRepository _repository = ScanRepository();
@@ -402,6 +409,15 @@ class _MainScreenState extends State<MainScreen> {
     await _reloadSessions();
   }
 
+  /// Produits de la recherche de l'accueil (dernier prix dans chaque magasin)
+  List<ProductStorePrices> get _searchableProducts {
+    if (!identical(_homeProductsSource, _sessions)) {
+      _homeProductsSource = _sessions;
+      _homeProducts = ProductStorePrices.calculate(_sessions);
+    }
+    return _homeProducts;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Les pages sont construites dynamiquement pour toujours refléter
@@ -413,8 +429,15 @@ class _MainScreenState extends State<MainScreen> {
         onScanBarcode: () => _openScanner(barcode: true),
         onScanTicket: () => _openScanner(barcode: false),
         onOpenAnalysis: () => _goToTab(_dashboardTab),
-        onFindWhereToBuy: () {
-          setState(() => _dashboardSearchRequest++);
+        products: _searchableProducts,
+        categoryOf: (product) => _categories[product.productKey]?.label,
+        // Fiche ouverte sur l'onglet Magasins : le prix dans chaque magasin
+        onProductTap: (id, name) => _openProductDetail(id, name, initialTabIndex: 2),
+        onSearchInDashboard: (query) {
+          setState(() {
+            _dashboardSearchRequest++;
+            _dashboardSearchQuery = query;
+          });
           _goToTab(_dashboardTab);
         },
       ),
@@ -454,6 +477,7 @@ class _MainScreenState extends State<MainScreen> {
         sessions: _sessions,
         categories: _categories,
         searchRequestId: _dashboardSearchRequest,
+        searchQuery: _dashboardSearchQuery,
         repository: _repository,
         onProductAnalysisRequested: _openProductSelection,
         onProductSelected: _openProductDetail,
