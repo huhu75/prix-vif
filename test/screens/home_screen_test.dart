@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:prix_vif/main.dart';
 import 'package:prix_vif/models.dart';
+import 'package:prix_vif/models/product_category.dart';
 import 'package:prix_vif/screens/home_screen.dart';
 import 'package:prix_vif/screens/scan_screen.dart';
 import 'package:prix_vif/theme.dart';
@@ -26,7 +27,8 @@ ScannedItem _item(String id, String name, double price, String store, DateTime d
       storeName: store,
     );
 
-/// Lait : 1.00 € puis 1.20 € chez Carrefour, 0.99 € chez Leclerc ; Beurre chez Carrefour
+/// Lait : 1.00 € puis 1.20 € chez Carrefour, 0.99 € chez Leclerc ; Beurre
+/// chez Carrefour ; Pain et Café dans les deux magasins (3 produits communs)
 List<ScanSession> _sessions() {
   final now = DateTime(2026, 11, 20);
   final before = DateTime(2026, 11, 10);
@@ -34,12 +36,18 @@ List<ScanSession> _sessions() {
     ScanSession(id: 'avant', date: before, items: [
       _item('1', 'Lait', 1.00, 'Carrefour', before),
       _item('2', 'Beurre', 3.00, 'Carrefour', before),
+      _item('6', 'Pain', 2.00, 'Carrefour', before),
+      _item('7', 'Café', 4.00, 'Carrefour', before),
     ]),
     ScanSession(id: 'carrefour', date: now, items: [
       _item('3', 'Lait', 1.20, 'Carrefour', now),
       _item('4', 'Beurre', 3.00, 'Carrefour', now.subtract(const Duration(hours: 1))),
     ]),
-    ScanSession(id: 'leclerc', date: now, items: [_item('5', 'Lait', 0.99, 'Leclerc', before)]),
+    ScanSession(id: 'leclerc', date: now, items: [
+      _item('5', 'Lait', 0.99, 'Leclerc', before),
+      _item('8', 'Pain', 2.10, 'Leclerc', before),
+      _item('9', 'Café', 3.50, 'Leclerc', before),
+    ]),
   ];
 }
 
@@ -52,7 +60,11 @@ void main() {
     late List<String> calls;
     late List<(String, int)> opened;
 
-    Future<void> pumpHome(WidgetTester tester, List<ScanSession> sessions) async {
+    Future<void> pumpHome(
+      WidgetTester tester,
+      List<ScanSession> sessions, {
+      Map<String, ProductCategory> categories = const {},
+    }) async {
       calls = [];
       opened = [];
       useTallTestScreen();
@@ -67,6 +79,9 @@ void main() {
           onSeeProducts: () => calls.add('products'),
           onSeeIncreases: () => calls.add('increases'),
           onProductTap: (id, _, {initialTabIndex = 0}) => opened.add((id, initialTabIndex)),
+          categories: categories,
+          onCategoryTap: (label) => calls.add('category:$label'),
+          onOpenBasket: () => calls.add('basket'),
         ),
       ));
       await settle(tester);
@@ -75,7 +90,9 @@ void main() {
     testWidgets('rien de scanné : recherche et invitation au premier scan', (tester) async {
       await pumpHome(tester, const []);
 
-      expect(find.text('PRIX VIF'), findsWidgets);
+      // En-tête fixe : logo et barre de recherche, sans grand titre
+      expect(find.text('Rechercher sur Prix Vif'), findsOneWidget);
+      expect(find.text('PRIX VIF'), findsNothing);
       expect(find.text('Scanne ton premier produit'), findsOneWidget);
       for (final key in ['home_search', 'home_scan_barcode', 'home_scan_ticket']) {
         await tester.tap(find.byKey(ValueKey(key)));
@@ -92,6 +109,12 @@ void main() {
       // Le bouton Scanner de la barre du bas suffit : pas de tuiles en double
       expect(find.byKey(const ValueKey('home_first_scan')), findsNothing);
       expect(find.text('Ton panier est moins cher chez'), findsOneWidget);
+      // Comparaison à l'identique : Lait, Pain, Café dans les deux magasins
+      // (Leclerc 6,59 € contre 7,20 € chez Carrefour) ; la carte ouvre le détail
+      expect(find.text('0,61 € de moins qu\'à Carrefour'), findsOneWidget);
+      expect(find.text('Sur 3 produits relevés dans les deux'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('home_basket')));
+      expect(calls, ['basket']);
 
       // Où économiser : Lait à 0,99 € chez Leclerc au lieu de 1,20 € chez Carrefour
       expect(find.text('Où économiser'), findsOneWidget);
@@ -112,6 +135,70 @@ void main() {
       await tester.tap(find.text('+0,20 €'));
       expect(opened.last, ('lait', 1), reason: 'fiche sur l\'onglet Évolution');
     });
+  });
+
+  testWidgets('raccourcis de catégorie : un rond par catégorie, qui ouvre Produits filtré', (tester) async {
+    final calls = <String>[];
+    useTallTestScreen();
+    addTearDown(resetTestScreen);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.theme,
+      home: HomeScreen(
+        sessions: _sessions(),
+        categories: const {
+          'bc_lait': ProductCategory(id: 'en:milks', label: 'Laits'),
+          'bc_beurre': ProductCategory(id: 'en:butters', label: 'Beurres'),
+        },
+        onScanBarcode: () {},
+        onScanTicket: () {},
+        onSearch: () {},
+        onSeeProducts: () {},
+        onSeeIncreases: () {},
+        onProductTap: (_, _, {initialTabIndex = 0}) {},
+        onCategoryTap: calls.add,
+      ),
+    ));
+    await settle(tester);
+
+    // Moins de 3 catégories : pas de rangée
+    expect(find.text('Laits'), findsNothing);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.theme,
+      home: HomeScreen(
+        sessions: [
+          ..._sessions(),
+          ScanSession(id: 'eau', date: DateTime(2026, 11, 20), items: [
+            _item('6', 'Eau', 0.50, 'Leclerc', DateTime(2026, 11, 20)),
+          ]),
+        ],
+        categories: const {
+          'bc_lait': ProductCategory(id: 'en:milks', label: 'Laits'),
+          'bc_beurre': ProductCategory(id: 'en:butters', label: 'Beurres'),
+          'bc_eau': ProductCategory(id: 'en:waters', label: 'Eaux'),
+        },
+        onScanBarcode: () {},
+        onScanTicket: () {},
+        onSearch: () {},
+        onSeeProducts: () {},
+        onSeeIncreases: () {},
+        onProductTap: (_, _, {initialTabIndex = 0}) {},
+        onCategoryTap: calls.add,
+      ),
+    ));
+    await settle(tester);
+    expect(find.text('Laits'), findsOneWidget);
+    expect(find.text('Eaux'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home_category_Laits')));
+    expect(calls, ['Laits']);
+  });
+
+  test('icône d\'une catégorie d\'après son nom', () {
+    expect(categoryIcon('Laits demi-écrémés'), Icons.local_drink_outlined);
+    expect(categoryIcon('Pâtes sèches'), Icons.rice_bowl_outlined);
+    expect(categoryIcon('Cafés moulus'), Icons.local_cafe_outlined);
+    expect(categoryIcon('Lessives'), Icons.cleaning_services_outlined);
+    expect(categoryIcon('Divers'), Icons.category_outlined);
   });
 
   group('Depuis l\'accueil de l\'app', () {

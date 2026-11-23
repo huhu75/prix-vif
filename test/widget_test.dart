@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prix_vif/main.dart';
-import 'package:prix_vif/widgets/magic_title.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'dart:io';
@@ -16,7 +15,7 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const PrixVifApp());
 
-    // L'app s'ouvre sur l'accueil, dont le titre utilise NeonTitle
-    expect(find.byType(NeonTitle), findsWidgets);
+    // L'app s'ouvre sur l'accueil, avec sa barre de recherche en haut
+    expect(find.text('Rechercher sur Prix Vif'), findsOneWidget);
   });
 }

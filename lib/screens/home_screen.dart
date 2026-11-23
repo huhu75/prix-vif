@@ -1,13 +1,15 @@
-// Accueil : recherche, les deux scans, le magasin le moins cher pour ton
-// panier, tes derniers scans et ce qui a augmenté
+// Accueil : la recherche fixée en haut (comme Leboncoin), les catégories,
+// le magasin le moins cher pour ton panier, où économiser, tes derniers scans
+// et ce qui a augmenté
 import 'package:flutter/material.dart';
 
 import '../analytics/analytics.dart';
 import '../models.dart';
+import '../models/product_category.dart';
 import '../theme.dart';
+import '../utils/product_search.dart';
 import '../widgets/logo.dart';
 import '../widgets/magic_button.dart';
-import '../widgets/magic_title.dart';
 
 String _euros(double value) => '${value.toStringAsFixed(2).replaceAll('.', ',')} €';
 
@@ -46,6 +48,20 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onSeeIncreases;
   final ProductTap onProductTap;
 
+  /// Catégorie de chaque produit (clé produit → catégorie), pour les raccourcis
+  final Map<String, ProductCategory> categories;
+
+  /// Raccourci de catégorie : onglet Produits, filtré sur cette catégorie
+  final ValueChanged<String>? onCategoryTap;
+
+  /// Carte du panier : le détail (onglet Ma liste)
+  final VoidCallback? onOpenBasket;
+
+  /// Nombre de raccourcis de catégorie affichés, et minimum pour afficher la
+  /// rangée (un ou deux ronds seuls ressemblent à un écran inachevé)
+  static const int _maxCategories = 8;
+  static const int _minCategories = 3;
+
   // Onglets de la fiche produit
   static const int _evolutionTab = 1;
   static const int _storesTab = 2;
@@ -59,6 +75,9 @@ class HomeScreen extends StatelessWidget {
     required this.onSeeProducts,
     required this.onSeeIncreases,
     required this.onProductTap,
+    this.categories = const {},
+    this.onCategoryTap,
+    this.onOpenBasket,
   });
 
   List<_RecentScan> _recentScans(List<ProductStorePrices> allPrices) {
@@ -73,138 +92,291 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final stats = DashboardStats.fromSessions(sessions);
+    final stats = DashboardStats.fromSessions(sessions, categories: categories);
     final recent = _recentScans(stats.productPrices);
     final basket = stats.shoppingBasket;
     final increases = stats.increases.take(3).toList();
     // Les plus gros écarts de prix entre magasins (déjà triés par écart)
     final savings = stats.productPrices.where((p) => p.hasPriceDifference).take(3).toList();
+    // Catégories les plus fournies d'abord
+    final categoryLabels = ([...stats.categoryGroups]..sort((a, b) => b.offers.length.compareTo(a.offers.length)))
+        .map((g) => g.category.label)
+        .take(_maxCategories)
+        .toList();
+
+    final sections = <Widget>[
+      // Raccourcis de catégorie (ronds, défilement horizontal)
+      if (categoryLabels.length >= _minCategories && onCategoryTap != null)
+        _CategoryShortcuts(labels: categoryLabels, onTap: onCategoryTap!),
+
+      // Rien de scanné : inviter au premier scan (ensuite, le bouton Scanner
+      // de la barre du bas suffit)
+      if (recent.isEmpty) _FirstScanCard(onScanBarcode: onScanBarcode, onScanTicket: onScanTicket),
+
+      // Où faire ses courses
+      // (seulement s'il y a assez de produits en commun pour conclure)
+      if (basket != null && basket.comparisonStore != null)
+        _BasketCard(basket: basket, comparison: basket.comparisonStore!, onTap: onOpenBasket),
+
+      // Où économiser : les plus gros écarts entre magasins
+      if (savings.isNotEmpty)
+        _Section(
+          title: 'Où économiser',
+          onSeeAll: onSeeProducts,
+          child: _GlassList(
+            children: [
+              for (final product in savings)
+                _SavingRow(
+                  product: product,
+                  onTap: () => onProductTap(product.productId, product.name, initialTabIndex: _storesTab),
+                ),
+            ],
+          ),
+        ),
+
+      // Derniers scans
+      if (recent.isNotEmpty)
+        _Section(
+          title: 'Tes derniers scans',
+          onSeeAll: onSeeProducts,
+          child: SizedBox(
+            height: 178,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: recent.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (_, i) => _RecentScanCard(
+                scan: recent[i],
+                onTap: () =>
+                    onProductTap(productIdOf(recent[i].item), recent[i].item.name, initialTabIndex: _storesTab),
+              ),
+            ),
+          ),
+        ),
+
+      // Ce qui a augmenté
+      if (increases.isNotEmpty)
+        _Section(
+          title: 'Ce qui a augmenté',
+          onSeeAll: onSeeIncreases,
+          child: _GlassList(
+            children: [
+              for (final change in increases)
+                _IncreaseRow(
+                  change: change,
+                  onTap: () => onProductTap(change.productId, change.name, initialTabIndex: _evolutionTab),
+                ),
+            ],
+          ),
+        ),
+    ];
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       body: SafeArea(
         bottom: false,
-        child: ListView(
-          // Marge du bas : le bouton Scanner dépasse de la barre
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 56),
+        child: Column(
           children: [
-            // En-tête : logo et titre néon
-            Row(
-              children: [
-                const AppLogo(size: 40),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const NeonTitle(text: 'PRIX VIF', fontSize: 24),
-                    Text(
-                      'Le bon prix, au bon endroit',
-                      style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-
-            // Recherche
-            InkWell(
-              key: const ValueKey('home_search'),
-              onTap: onSearch,
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                decoration: AppTheme.glassmorphism().copyWith(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, color: AppTheme.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Chercher un produit ou un magasin',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
-                    ),
-                  ],
-                ),
+            // En-tête fixe : logo et recherche, comme Leboncoin
+            _SearchHeader(onSearch: onSearch),
+            Expanded(
+              child: ListView.separated(
+                // Marge du bas : le bouton Scanner dépasse de la barre
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 56),
+                itemCount: sections.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 22),
+                itemBuilder: (_, i) => sections[i],
               ),
             ),
-            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-            // Rien de scanné : inviter au premier scan (ensuite, le bouton
-            // Scanner de la barre du bas suffit)
-            if (recent.isEmpty) _FirstScanCard(onScanBarcode: onScanBarcode, onScanTicket: onScanTicket),
+/// En-tête fixe de l'accueil (comme Leboncoin) : petit logo et grande barre
+/// de recherche, qui reste en haut quand on fait défiler
+class _SearchHeader extends StatelessWidget {
+  final VoidCallback onSearch;
 
-            // Où faire ses courses
-            if (basket != null) ...[_BasketCard(basket: basket), const SizedBox(height: 24)],
+  const _SearchHeader({required this.onSearch});
 
-            // Où économiser : les plus gros écarts entre magasins
-            if (savings.isNotEmpty) ...[
-              _SectionTitle(title: 'Où économiser', action: 'Tout voir', onAction: onSeeProducts),
-              const SizedBox(height: 10),
-              Container(
-                decoration: AppTheme.glassmorphism(),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < savings.length; i++) ...[
-                      if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
-                      _SavingRow(
-                        product: savings[i],
-                        onTap: () => onProductTap(savings[i].productId, savings[i].name, initialTabIndex: _storesTab),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundDark,
+        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        children: [
+          const AppLogo(size: 34),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey('home_search'),
+                onTap: onSearch,
+                borderRadius: BorderRadius.circular(26),
+                child: Ink(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.45)),
+                    boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.15), blurRadius: 14)],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.search, color: AppTheme.primary),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Rechercher sur Prix Vif',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 15),
+                        ),
                       ),
                     ],
-                  ],
-                ),
-              ),
-            ],
-
-            // Derniers scans
-            if (recent.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _SectionTitle(title: 'Tes derniers scans', action: 'Tout voir', onAction: onSeeProducts),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 178,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: recent.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
-                  itemBuilder: (_, i) => _RecentScanCard(
-                    scan: recent[i],
-                    onTap: () =>
-                        onProductTap(productIdOf(recent[i].item), recent[i].item.name, initialTabIndex: _storesTab),
                   ),
                 ),
               ),
-            ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-            // Ce qui a augmenté
-            if (increases.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _SectionTitle(title: 'Ce qui a augmenté', action: 'Tout voir', onAction: onSeeIncreases),
-              const SizedBox(height: 10),
-              Container(
-                decoration: AppTheme.glassmorphism(),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < increases.length; i++) ...[
-                      if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
-                      _IncreaseRow(
-                        change: increases[i],
-                        onTap: () =>
-                            onProductTap(increases[i].productId, increases[i].name, initialTabIndex: _evolutionTab),
+/// Raccourcis de catégorie : un rond teinté avec une icône, le nom dessous
+class _CategoryShortcuts extends StatelessWidget {
+  final List<String> labels;
+  final ValueChanged<String> onTap;
+
+  const _CategoryShortcuts({required this.labels, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 92,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final label = labels[i];
+          return InkWell(
+            key: ValueKey('home_category_$label'),
+            onTap: () => onTap(label),
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: 74,
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primary.withValues(alpha: 0.3), AppTheme.secondary.withValues(alpha: 0.18)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ],
-                ),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
+                    ),
+                    child: Icon(categoryIcon(label), color: AppTheme.accent, size: 26),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    label,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.15),
+                  ),
+                ],
               ),
-            ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Icône d'une catégorie d'après son nom (« Laits demi-écrémés » → bouteille)
+IconData categoryIcon(String label) {
+  final words = normalizeForSearch(label);
+  const icons = <(List<String>, IconData)>[
+    (['lait', 'jus', 'soda', 'boisson', 'sirop'], Icons.local_drink_outlined),
+    (['eau'], Icons.water_drop_outlined),
+    (['cafe'], Icons.local_cafe_outlined),
+    (['the ', 'infusion'], Icons.emoji_food_beverage_outlined),
+    (['vin', 'biere', 'alcool', 'spiritueux'], Icons.wine_bar_outlined),
+    (['pain', 'brioche', 'biscotte', 'viennois'], Icons.bakery_dining_outlined),
+    (['yaourt', 'dessert', 'glace', 'creme'], Icons.icecream_outlined),
+    (['fromage', 'beurre'], Icons.breakfast_dining_outlined),
+    (['chocolat', 'biscuit', 'gateau', 'confiserie', 'bonbon', 'tartiner'], Icons.cookie_outlined),
+    (['pate', 'riz', 'cereale', 'farine', 'semoule'], Icons.rice_bowl_outlined),
+    (['fruit', 'legume', 'salade', 'compote'], Icons.eco_outlined),
+    (['viande', 'jambon', 'poulet', 'charcuterie', 'saucisse', 'boeuf'], Icons.kebab_dining_outlined),
+    (['poisson', 'thon', 'saumon', 'sardine'], Icons.set_meal_outlined),
+    (['oeuf'], Icons.egg_outlined),
+    (['lessive', 'vaisselle', 'entretien', 'nettoyant'], Icons.cleaning_services_outlined),
+    (['shampo', 'savon', 'dentifrice', 'gel douche', 'hygiene', 'beaute'], Icons.spa_outlined),
+  ];
+  for (final (keywords, icon) in icons) {
+    if (keywords.any((k) => ' $words '.contains(' $k') || words.startsWith(k.trim()))) return icon;
+  }
+  return Icons.category_outlined;
+}
+
+/// Une section : titre, « Tout voir », contenu
+class _Section extends StatelessWidget {
+  final String title;
+  final VoidCallback onSeeAll;
+  final Widget child;
+
+  const _Section({required this.title, required this.onSeeAll, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionTitle(title: title, action: 'Tout voir', onAction: onSeeAll),
+        const SizedBox(height: 10),
+        child,
+      ],
+    );
+  }
+}
+
+/// Liste de lignes dans une carte en verre dépoli, séparées par un trait
+class _GlassList extends StatelessWidget {
+  final List<Widget> children;
+
+  const _GlassList({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppTheme.glassmorphism(),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+            children[i],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -333,60 +505,90 @@ class _SavingRow extends StatelessWidget {
 class _BasketCard extends StatelessWidget {
   final ShoppingBasketAnalysis basket;
 
-  const _BasketCard({required this.basket});
+  /// Magasin comparé au moins cher, sur leurs produits communs
+  final StoreBasketCost comparison;
+
+  /// Ouvre le détail du panier
+  final VoidCallback? onTap;
+
+  const _BasketCard({required this.basket, required this.comparison, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final best = basket.bestStore;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.success.withValues(alpha: 0.28), AppTheme.success.withValues(alpha: 0.06)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.success.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              color: AppTheme.success.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.emoji_events, color: AppTheme.success, size: 26),
+    final radius = BorderRadius.circular(20);
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppTheme.success.withValues(alpha: 0.28), AppTheme.success.withValues(alpha: 0.06)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          borderRadius: radius,
+          border: Border.all(color: AppTheme.success.withValues(alpha: 0.45)),
+        ),
+        child: InkWell(
+          key: const ValueKey('home_basket'),
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Text(
-                  'Ton panier est moins cher chez',
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  best.storeName,
-                  style: theme.textTheme.titleLarge?.copyWith(color: AppTheme.success, fontWeight: FontWeight.w800),
-                ),
-                if (basket.savingVsMostExpensive > 0.01)
-                  Text(
-                    '${_euros(basket.savingVsMostExpensive)} de moins qu\'à ${basket.mostExpensiveStore.storeName}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textPrimary),
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(14),
                   ),
+                  child: const Icon(Icons.emoji_events, color: AppTheme.success, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ton panier est moins cher chez',
+                        style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        best.storeName,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: AppTheme.success,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        '${_euros(comparison.extraVsBest)} de moins qu\'à ${comparison.storeName}',
+                        style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textPrimary),
+                      ),
+                      // Sur quels produits repose la comparaison (aucun prix estimé)
+                      Text(
+                        'Sur ${comparison.commonWithBest} produits relevés dans les deux',
+                        style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '−${comparison.percentVsBest.round()} %',
+                      style: theme.textTheme.titleLarge?.copyWith(color: AppTheme.success, fontWeight: FontWeight.w800),
+                    ),
+                    if (onTap != null) const Icon(Icons.chevron_right, color: AppTheme.success),
+                  ],
+                ),
               ],
             ),
           ),
-          Text(
-            _euros(best.total),
-            style: theme.textTheme.titleLarge?.copyWith(color: AppTheme.success, fontWeight: FontWeight.w800),
-          ),
-        ],
+        ),
       ),
     );
   }

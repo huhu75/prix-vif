@@ -60,6 +60,7 @@ class _MainScreenState extends State<MainScreen> {
   // Onglets de la barre du bas : Accueil (0), Produits (1), Ma liste (2), Profil (3)
   static const int homeTab = 0;
   static const int productsTab = 1;
+  static const int listTab = 2;
 
   static const _navItems = [
     AppNavItem(Icons.home_outlined, Icons.home, 'Accueil'),
@@ -80,6 +81,7 @@ class _MainScreenState extends State<MainScreen> {
   int _productsRequest = 0;
   ProductsView _productsView = ProductsView.whereToBuy;
   bool _productsFocusSearch = false;
+  String _productsQuery = '';
 
   // Repository pour la persistance
   final ScanRepository _repository = ScanRepository();
@@ -168,12 +170,14 @@ class _MainScreenState extends State<MainScreen> {
 
   void _goToTab(int index) => setState(() => _currentIndex = index);
 
-  /// Onglet Produits sur une vue donnée, éventuellement curseur dans la recherche
-  void _openProducts({ProductsView view = ProductsView.whereToBuy, bool focusSearch = false}) {
+  /// Onglet Produits sur une vue donnée, éventuellement curseur dans la
+  /// recherche ou recherche déjà remplie
+  void _openProducts({ProductsView view = ProductsView.whereToBuy, bool focusSearch = false, String query = ''}) {
     setState(() {
       _productsRequest++;
       _productsView = view;
       _productsFocusSearch = focusSearch;
+      _productsQuery = query;
       _currentIndex = productsTab;
     });
   }
@@ -281,6 +285,9 @@ class _MainScreenState extends State<MainScreen> {
         onSeeProducts: _openProducts,
         onSeeIncreases: () => _openProducts(view: ProductsView.evolution),
         onProductTap: _openProductDetail,
+        categories: _categories,
+        onCategoryTap: (label) => _openProducts(query: label),
+        onOpenBasket: () => _goToTab(listTab),
       ),
       ProductsScreen(
         key: const ValueKey('products_screen'),
@@ -289,6 +296,7 @@ class _MainScreenState extends State<MainScreen> {
         requestId: _productsRequest,
         initialView: _productsView,
         focusSearch: _productsFocusSearch,
+        initialQuery: _productsQuery,
         onProductTap: _openProductDetail,
         onAllProducts: _openProductSelection,
       ),

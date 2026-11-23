@@ -53,7 +53,8 @@ class StoresTab extends StatelessWidget {
   }
 }
 
-/// « Où faire mes courses ? » : coût du panier habituel dans chaque magasin
+/// « Où faire mes courses ? » : les magasins comparés à l'identique, sur des
+/// prix réellement relevés (aucun prix estimé)
 class BasketCard extends StatelessWidget {
   final ShoppingBasketAnalysis? analysis;
 
@@ -72,13 +73,13 @@ class BasketCard extends StatelessWidget {
           subtitle: analysis == null
               ? null
               : analysis.usesRegularPurchases
-                  ? 'Tes ${analysis.products.length} produits habituels (achetés au moins 2 fois) coûteraient, un de chaque :'
-                  : 'Tes ${analysis.products.length} produits scannés en magasin coûteraient, un de chaque :',
+                  ? 'Tes produits habituels (achetés au moins 2 fois), comparés sur les prix relevés dans chaque magasin :'
+                  : 'Tes produits, comparés sur les prix relevés dans chaque magasin :',
         ),
         DashboardCard(
           child: analysis == null
               ? const DashboardEmptyMessage(
-                  'Scanne tes produits dans au moins deux magasins pour savoir lequel revient le moins cher.',
+                  'Scanne le même produit dans deux magasins pour savoir lequel revient le moins cher.',
                 )
               : _buildContent(context, analysis),
         ),
@@ -89,8 +90,10 @@ class BasketCard extends StatelessWidget {
   Widget _buildContent(BuildContext context, ShoppingBasketAnalysis analysis) {
     final theme = Theme.of(context);
     final best = analysis.bestStore;
-    final maxTotal = analysis.mostExpensiveStore.total;
-    final anyEstimate = analysis.stores.any((s) => s.estimatedCount > 0);
+    final worst = analysis.stores.last;
+    final comparison = analysis.comparisonStore;
+    final minIndex = best.priceIndex;
+    final maxIndex = worst.priceIndex;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +115,9 @@ class BasketCard extends StatelessWidget {
                 ),
               ),
               Text(
-                formatEuros(store.total),
+                store == best
+                    ? 'le moins cher'
+                    : '${formatSignedEuros(store.extraVsBest)}  (${formatSignedPercent(store.percentVsBest)})',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: store == best ? AppTheme.success : AppTheme.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -121,44 +126,63 @@ class BasketCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
+          // Plus la barre est longue, plus le magasin est cher
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: maxTotal > 0 ? (store.total / maxTotal).clamp(0.0, 1.0) : 0,
+              value: maxIndex > minIndex ? 0.35 + 0.65 * (store.priceIndex - minIndex) / (maxIndex - minIndex) : 0.35,
               minHeight: 6,
               backgroundColor: AppTheme.surfaceLight,
-              valueColor: AlwaysStoppedAnimation(store == best ? AppTheme.success : AppTheme.textMuted),
+              valueColor: AlwaysStoppedAnimation(
+                store == best ? AppTheme.success : (store == worst ? AppTheme.error : AppTheme.textMuted),
+              ),
             ),
           ),
           const SizedBox(height: 2),
           Text(
-            '${store.pricedCount} prix relevé${store.pricedCount > 1 ? 's' : ''} sur ${store.productCount}',
+            store == best
+                ? '${store.comparedCount} produit${store.comparedCount > 1 ? 's' : ''} relevé${store.comparedCount > 1 ? 's' : ''} aussi ailleurs'
+                : 'Sur ${store.commonWithBest} produit${store.commonWithBest > 1 ? 's' : ''} relevé${store.commonWithBest > 1 ? 's' : ''} aussi chez ${best.storeName}',
             style: theme.textTheme.labelSmall?.copyWith(color: AppTheme.textMuted),
           ),
           const SizedBox(height: 10),
         ],
-        if (analysis.savingVsMostExpensive > 0.01)
+        if (comparison != null)
           Text(
-            'Chez ${best.storeName}, tu paies ${formatEuros(analysis.savingVsMostExpensive)} de moins '
-            'que chez ${analysis.mostExpensiveStore.storeName}.',
+            'Chez ${best.storeName}, tu paies ${formatEuros(comparison.extraVsBest)} de moins que chez '
+            '${comparison.storeName} pour les ${comparison.commonWithBest} mêmes produits.',
+            key: const ValueKey('basket_conclusion'),
             style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.success, fontWeight: FontWeight.w600),
+          )
+        else
+          Text(
+            'Pas encore assez de produits en commun pour conclure : relève au moins '
+            '${ShoppingBasketAnalysis.minCommonProducts} mêmes produits chez ${best.storeName} et dans un autre magasin.',
+            key: const ValueKey('basket_not_conclusive'),
+            style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.warning),
           ),
         if (analysis.optimalSavingVsBestStore > 0.01) ...[
           const SizedBox(height: 6),
           Text(
-            'En achetant chaque produit là où il est le moins cher : ${formatEuros(analysis.optimalTotal)} '
-            '(${formatEuros(analysis.optimalSavingVsBestStore)} de moins).',
+            'En achetant chaque produit là où il est le moins cher, tu économiserais encore '
+            '${formatEuros(analysis.optimalSavingVsBestStore)} par rapport à ${best.storeName}.',
             key: const ValueKey('basket_optimal_total'),
             style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w600),
           ),
         ],
-        if (anyEstimate) ...[
-          const SizedBox(height: 8),
+        if (analysis.uncomparedStores.isNotEmpty) ...[
+          const SizedBox(height: 6),
           Text(
-            'Un prix jamais relevé dans un magasin est estimé d\'après les autres magasins.',
+            'Pas encore comparable : ${analysis.uncomparedStores.join(', ')} '
+            '(aucun produit relevé aussi ailleurs).',
             style: theme.textTheme.labelSmall?.copyWith(color: AppTheme.textMuted),
           ),
         ],
+        const SizedBox(height: 8),
+        Text(
+          'Seuls les prix réellement relevés comptent : aucun prix n\'est estimé.',
+          style: theme.textTheme.labelSmall?.copyWith(color: AppTheme.textMuted),
+        ),
       ],
     );
   }

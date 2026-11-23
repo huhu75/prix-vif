@@ -33,6 +33,9 @@ class ProductsScreen extends StatelessWidget {
   /// Curseur dans la recherche à l'ouverture (recherche de l'accueil)
   final bool focusSearch;
 
+  /// Recherche déjà remplie (raccourci de catégorie de l'accueil)
+  final String initialQuery;
+
   // Onglets de la fiche produit
   static const int _evolutionTab = 1;
   static const int _storesTab = 2;
@@ -46,6 +49,7 @@ class ProductsScreen extends StatelessWidget {
     this.requestId = 0,
     this.initialView = ProductsView.whereToBuy,
     this.focusSearch = false,
+    this.initialQuery = '',
   });
 
   PreferredSizeWidget _appBar({PreferredSizeWidget? tabs}) => AppBar(
@@ -98,6 +102,7 @@ class ProductsScreen extends StatelessWidget {
               categoryGroups: stats.categoryGroups,
               categoryOf: stats.categoryOf,
               autofocusSearch: focusSearch,
+              initialQuery: initialQuery,
               onProductTap: (id, name) => onProductTap(id, name, initialTabIndex: _storesTab),
             ),
             PricesTab(

@@ -8,6 +8,23 @@
 
 ## 📋 Historique des versions
 
+### v2.1.1 — 2026-11-23 — Panier : seuls les prix réellement relevés comptent
+
+- **Corrigé** : « Où faire mes courses ? » et la carte « Ton panier est moins cher chez … » estimaient le prix d'un produit jamais relevé dans un magasin (prix moyen des autres magasins). Un magasin pouvait « gagner » sur 6 prix inventés sur 10. Aucun prix n'est plus estimé
+- **Modifié** : les magasins sont classés par **indice de prix** : pour chaque produit relevé dans au moins deux magasins, l'écart avec le prix le plus bas relevé, en moyenne. Un produit vu dans un seul magasin ne départage pas les magasins
+- **Modifié** : l'économie en euros compare **les mêmes produits** : ceux relevés à la fois dans le magasin le moins cher et dans l'autre magasin (« 0,61 € de moins qu'à Carrefour, sur 3 produits relevés dans les deux », « −8 % »)
+- **Modifié** : la conclusion n'apparaît qu'à partir de **3 produits en commun** (`ShoppingBasketAnalysis.minCommonProducts`). En dessous, l'Accueil n'affiche pas la carte du panier, et Ma liste indique combien de produits relever encore. Les magasins sans aucun produit relevé ailleurs sont listés comme « pas encore comparables »
+- **Modifié** : le panier panaché compare, sur les produits relevés dans le magasin le moins cher, ce qu'on économiserait encore en achetant chacun là où il est le moins cher
+- **Modifié** : `StoreBasketCost` (`priceIndex`, `comparedCount`, `commonWithBest`, `total` / `bestTotal` sur les produits communs) ; tests du panier réécrits (`basket_and_price_changes_test.dart`)
+
+### v2.1.0 — 2026-11-23 — Accueil : recherche en haut et panier cliquable
+
+- **Modifié** : l'en-tête de l'Accueil s'inspire de l'app Leboncoin : un petit logo et une grande barre **Rechercher sur Prix Vif**, fixés en haut de l'écran quand on fait défiler. Le grand titre « PRIX VIF » et le slogan disparaissent de l'Accueil
+- **Ajouté** : raccourcis de catégorie sous la barre de recherche (des ronds avec une icône et le nom de la catégorie, défilement horizontal, 8 au plus, affichés dès que 3 catégories sont connues). Un rond ouvre l'onglet Produits avec la recherche remplie par cette catégorie (`categoryIcon`, paramètre `initialQuery` de `ProductsScreen`)
+- **Ajouté** : la carte « Ton panier est moins cher chez … » s'ouvre d'un tap (flèche) sur le détail du panier, l'onglet **Ma liste**. Avant, elle ne réagissait pas
+- **Ajouté** : la carte du panier indique sur combien de prix réellement relevés repose la comparaison (« D'après 4 prix relevés sur 10 »)
+- **Modifié** : tests de l'Accueil (en-tête, carte du panier, raccourcis de catégorie, icônes) et test de démarrage
+
 ### v2.0.0 — 2026-11-23 — Nouvelle navigation : barre du bas et bouton Scanner central
 
 - **Modifié** : la barre du bas passe de 5 onglets (Accueil, Scanner, Résultats, Dashboard, Historique) à 4 onglets autour d'un **bouton Scanner rond et lumineux au centre** (`AppNavBar`, `lib/widgets/app_nav_bar.dart`) : **Accueil · Produits · [Scanner] · Ma liste · Profil**. Le bouton Scanner est visible sur tous les onglets et ouvre le scanner en plein écran ; Retour le referme et ramène sur l'onglet quitté
@@ -326,8 +343,9 @@
 - Le bouton retour d'Android ramène d'un onglet à l'Accueil ; l'app ne se ferme que depuis l'Accueil
 
 ### 🏠 Accueil
-- **Recherche** d'un produit ou d'un magasin (ouvre l'onglet Produits)
-- **Ton panier est moins cher chez …** : le magasin le moins cher pour tes courses habituelles, et l'économie face au plus cher
+- **En-tête fixe**, comme Leboncoin : un petit logo et la barre **Rechercher sur Prix Vif** (ouvre l'onglet Produits)
+- **Raccourcis de catégorie** (dès 3 catégories connues) : un rond par catégorie, qui ouvre Produits filtré sur cette catégorie
+- **Ton panier est moins cher chez …** (dès 3 produits relevés dans les deux magasins) : le magasin le moins cher pour tes courses habituelles et l'économie sur ces mêmes produits ; un tap ouvre le détail (onglet Ma liste)
 - **Où économiser** : les produits pour lesquels changer de magasin rapporte le plus
 - Tant que rien n'a été scanné : une invitation à scanner un premier produit (ou un ticket)
 - **Tes derniers scans** : chaque produit avec son prix, son magasin et une pastille « Meilleur prix » ou « +0,14 € » s'il est moins cher ailleurs
@@ -355,7 +373,7 @@
 - **Prix au kg / L** : chaque article de contenance connue affiche son prix normalisé (ex. `1.49 €/L`)
 
 ### 🛒 Ma liste
-- **Où faire mes courses ?** : le coût de ton panier habituel dans chaque magasin (avec le nombre de prix relevés et le total en achetant chaque produit là où il est le moins cher)
+- **Où faire mes courses ?** : les magasins classés du moins cher au plus cher, comparés uniquement sur des prix réellement relevés (aucun prix estimé) : surcoût de chaque magasin sur les produits relevés aussi dans le moins cher, conclusion dès 3 produits en commun, et ce qu'on économiserait encore en achetant chaque produit là où il est le moins cher
 - **Ce que chaque magasin a de moins cher** : les produits qui sont le moins chers dans chaque magasin
 
 ### 👤 Profil
@@ -690,7 +708,7 @@ Les contributions sont bienvenues ! Ouvrez un Issue ou Pull Request.
 
 *© 2026 - Prix Vif Scanner - Application complète de scan alimentaire*
 
-*Dernière mise à jour : 23 Novembre 2026 (v2.0.0 — voir Historique des versions)*
+*Dernière mise à jour : 23 Novembre 2026 (v2.1.1 — voir Historique des versions)*
 *Documentation technique : Voir AGENT.MD pour les détails d'implémentation*
 *Règles IA : Voir CLAUDE.md (le README est versionné à chaque étape)*
-*Statut : ✅ Nouvelle navigation (Accueil, Produits, Ma liste, Profil et bouton Scanner central), recherche de produit tolérante aux accents et fautes de frappe, comparatif des magasins au scan d'un produit connu (où aller, où éviter), magasin modifiable depuis la fiche produit (ce produit ou partout) et ajout d'un prix sans scanner, tableau de bord centré sur le prix des produits (Produits, Magasins, Évolution), scanner en deux étapes (magasin puis SCANNER), page d'accueil (3 actions) et boutons Retour / Accueil, recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables et export CSV*
+*Statut : ✅ Nouvelle navigation (Accueil avec recherche fixée en haut, Produits, Ma liste, Profil et bouton Scanner central), recherche de produit tolérante aux accents et fautes de frappe, comparatif des magasins au scan d'un produit connu (où aller, où éviter), magasin modifiable depuis la fiche produit (ce produit ou partout) et ajout d'un prix sans scanner, tableau de bord centré sur le prix des produits (Produits, Magasins, Évolution), scanner en deux étapes (magasin puis SCANNER), page d'accueil (3 actions) et boutons Retour / Accueil, recherche par nom fiable (OFF saturé géré), articles de ticket abrégés retrouvés, clé Mistral via `.env` local, fallback OPF/OBF, correction prix/magasin, comparaisons au kg / L, données corrigeables et export CSV*
